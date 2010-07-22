@@ -1,0 +1,377 @@
+%{
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include "query.h"
+
+char *arg_buf;
+int arg_off;
+int arg_len;
+value_t **cur_expr;
+
+/* TBD: use separate function to parse dates differently */
+value_t *
+make_number (char *text)
+{
+	value_t *tmp = malloc(sizeof(*tmp));
+
+	if (tmp) {
+		tmp->type = T_NUMBER;
+		tmp->as_num = strtoll(text,NULL,10);
+	}
+
+	return tmp;
+}
+
+value_t *
+make_string (char *text, type_t t)
+{
+	value_t *tmp = malloc(sizeof(*tmp));
+
+	if (tmp) {
+		tmp->type = t;
+		tmp->as_str = strdup(text);
+	}
+
+	return tmp;
+}
+
+value_t *
+make_tree (type_t t, value_t *left, value_t *right)
+{
+	value_t *tmp = malloc(sizeof(*tmp));
+
+	if (tmp) {
+		tmp->type = t;
+		tmp->as_tree.left = left;
+		tmp->as_tree.right = right;
+	}
+
+	return tmp;
+}
+
+value_t *
+make_comp (comp_t c, value_t *left, value_t *right)
+{
+	value_t *tmp = make_tree(T_COMP,left,right);
+
+	if (tmp) {
+		tmp->as_tree.op = c;
+	}
+
+	return tmp;
+}
+
+#if defined(UNIT_TEST)
+struct { char *name; char *value; } hacked_obj_fields[] = {
+	{ "a", "2" }, { "b", "7" }, { "c", "11" },
+	{ NULL }
+};
+
+char *
+unit_oget (char *text)
+{
+	int i;
+
+	for (i = 0; hacked_obj_fields[i].name; ++i) {
+		if (!strcmp(hacked_obj_fields[i].name,text)) {
+			return hacked_obj_fields[i].value;
+		}
+	}
+
+	return NULL;
+}
+
+char *
+unit_sget (char *text)
+{
+	return "never";
+}
+#endif
+
+char *
+string_value (value_t *v, getter_t *oget, getter_t *sget)
+{
+	switch (v->type) {
+	case T_STRING:
+		return v->as_str;
+	case T_OFIELD:
+		return oget ? (*oget)(v->as_str) : "";
+	case T_SFIELD:
+		return oget ? (*sget)(v->as_str) : "";
+	default:
+		return NULL;
+	}
+}
+
+int
+compare (value_t *left, comp_t op, value_t *right,
+	 getter_t *oget, getter_t *sget)
+{
+	char	*lstr;
+	char	*rstr;
+	int	 lval;
+	int	 rval;
+
+	lstr = string_value(left,oget,sget);
+	rstr = string_value(right,oget,sget);
+
+	if (lstr && rstr) {
+		lval = strcmp(lstr,rstr);
+		rval = 0;
+	}
+	else {
+		if (lstr) {
+			lval = strtoll(lstr,NULL,0);
+		}
+		else if (left->type == T_NUMBER) {
+			lval = left->as_num;
+		}
+		else {
+			lval = eval(left,oget,sget);
+			if (lval < 0) {
+				return lval;
+			}
+		}
+		if (rstr) {
+			rval = strtoll(rstr,NULL,0);
+		}
+		else if (right->type == T_NUMBER) {
+			rval = right->as_num;
+		}
+		else {
+			rval = eval(right,oget,sget);
+			if (rval < 0) {
+				return rval;
+			}
+		}
+	}
+
+	switch (op) {
+	case C_LESSTHAN:	return (lval < rval);
+	case C_LESSOREQ:	return (lval <= rval);
+	case C_EQUAL:		return (lval == rval);
+	case C_DIFFERENT:	return (lval != rval);
+	case C_GREATEROREQ:	return (lval >= rval);
+	case C_GREATERTHAN:	return (lval > rval);
+	default:
+		return -1;
+	}
+}
+
+void
+_print_value (value_t *v, int level)
+{
+	if (!v) {
+		printf("%*sNULL\n",level,"");
+		return;
+	}
+
+	switch (v->type) {
+	case T_NUMBER:
+		printf("%*sNUMBER %lld\n",level,"",v->as_num);
+		break;
+	case T_STRING:
+		printf("%*sSTRING %s\n",level,"",v->as_str);
+		break;
+	case T_OFIELD:
+#if defined(UNIT_TEST)
+		printf("%*sOBJECT FIELD %s (%s)\n",level,"",v->as_str,
+			unit_oget(v->as_str));
+#else
+		printf("%*sOBJECT FIELD %s\n",level,"",v->as_str);
+#endif
+		break;
+	case T_SFIELD:
+#if defined(UNIT_TEST)
+		printf("%*sSERVER FIELD %s (%s)\n",level,"",v->as_str,
+			unit_sget(v->as_str));
+#else
+		printf("%*sSERVER FIELD %s\n",level,"",v->as_str);
+#endif
+		break;
+	case T_COMP:
+		printf("%*sCOMPARISON (%d)\n",level,"",v->as_num);
+		_print_value(v->as_tree.left,level+2);
+		_print_value(v->as_tree.right,level+2);
+		break;
+	case T_NOT:
+		printf("%*sNOT\n",level,"");
+		_print_value(v->as_tree.left,level+2);
+		break;
+	case T_AND:
+		printf("%*sAND\n",level,"");
+		_print_value(v->as_tree.left,level+2);
+		_print_value(v->as_tree.right,level+2);
+		break;
+	case T_OR:
+		printf("%*sOR\n",level,"");
+		_print_value(v->as_tree.left,level+2);
+		_print_value(v->as_tree.right,level+2);
+		break;
+	default:
+		printf("%*sUNKNOWN %d\n",v->type,level,"");
+	}
+}
+
+void
+print_value (value_t *v)
+{
+	_print_value(v,0);
+}
+
+void
+free_value (value_t *v)
+{
+	if (!v) {
+		return;
+	}
+
+	switch (v->type) {
+	case T_STRING:
+	case T_OFIELD:
+	case T_SFIELD:
+		if (v->as_str) {
+			free(v->as_str);
+		}
+		break;
+	case T_COMP:
+	case T_AND:
+	case T_OR:
+		free_value(v->as_tree.right);
+		/* Fall through. */
+	case T_NOT:
+		free_value(v->as_tree.left);
+		/* Fall through. */
+	default:
+		free(v);
+	}
+}
+
+int
+eval (value_t *v, getter_t *oget, getter_t *sget)
+{
+	int	res;
+
+	switch (v->type) {
+	case T_NUMBER:
+		return v->as_num != 0;
+	case T_STRING:
+	case T_OFIELD:
+	case T_SFIELD:
+		return -1;
+	case T_COMP:
+		return compare(v->as_tree.left,(comp_t)v->as_tree.op,
+			v->as_tree.right, oget, sget);
+	case T_NOT:
+		res = eval(v->as_tree.left,oget,sget);
+		return (res >= 0) ? !res : res;
+	case T_AND:
+		res = eval(v->as_tree.left,oget,sget);
+		if (res > 0) {
+			res = eval(v->as_tree.right,oget,sget);
+		}
+		return res;
+	case T_OR:
+		res = eval(v->as_tree.left,oget,sget);
+		if (res > 0) {
+			return res;
+		}
+		return eval(v->as_tree.right,oget,sget);
+	default:
+		return -1;
+	}
+}
+
+#define YY_INPUT(buf,result,max) {					  \
+	result = (arg_off < arg_len) ? (*buf = arg_buf[arg_off++], 1)	  \
+		: (arg_off == arg_len) ? (*buf = '\n', ++arg_off, 1) : 0; \
+}
+
+#define YYSTYPE value_t *
+%}
+
+Stmt = - BoolExpr EOL { *cur_expr = $$; }
+     | ( !EOL . )* EOL
+
+BoolExpr = l:CompExpr ( - ( AND - r:CompExpr ) { $$ = make_tree(T_AND,l,r); }
+                      | - ( OR - r:CompExpr ) { $$ = make_tree(T_OR,l,r); } )* -
+
+CompExpr = l:Unary
+         ( ( LESS - r:Unary { $$ = make_comp(C_LESSTHAN,l,r); } )
+         | ( LESS EQUAL - r:Unary { $$ = make_comp(C_LESSOREQ,l,r); } )
+         | ( EQUAL EQUAL - r:Unary { $$ = make_comp(C_EQUAL,l,r); } )
+         | ( NOT EQUAL - r:Unary { $$ = make_comp(C_DIFFERENT,l,r); } )
+         | ( GREATER EQUAL - r:Unary { $$ = make_comp(C_GREATEROREQ,l,r); } )
+         | ( GREATER - r:Unary { $$ = make_comp(C_GREATERTHAN,l,r); } ) )? -
+
+Unary = Atom
+      | NOT - e:Atom - { $$ = make_tree(T_NOT,e,NULL); }
+      | NOT - e:Unary - { $$ = make_tree(T_NOT,e,NULL); }
+
+Atom = ( Literal | Field | ParenExpr ) -
+
+Literal = NUMBER | STRING | TIME
+
+Field = DOLLAR i:ID { $$ = make_string((char *)$$,T_OFIELD); }
+      | WAFFLE i:ID { $$ = make_string((char *)$$,T_SFIELD); }
+
+ParenExpr = OPEN v:BoolExpr CLOSE - { $$ = v; }
+
+NUMBER	= < [0-9]+ >		{ $$= make_number(yytext); }
+STRING	= '"' < [^"]* > '"'	{ $$ = make_string(yytext,T_STRING); }
+TIME	= '~' < [^~]* > '~'	{ $$ = make_number(yytext); }
+ID	= < [a-z_]+ >		{ $$ = (YYSTYPE)yytext; }
+DOLLAR	= '$'
+WAFFLE	= '#'
+OPEN	= '('
+CLOSE	= ')'
+LESS	= '<'
+GREATER	= '>'
+EQUAL	= '='
+NOT	= '!'
+AND	= '&&'
+OR	= '||'
+
+-	= [ \t]*
+EOL	= '\n' | '\r\n' | '\r' | ';'
+
+%%
+
+value_t *
+parse (char *text)
+{
+	value_t *expr = NULL;
+
+	arg_buf = text;
+	arg_len = strlen(text);
+	arg_off = 0;
+	cur_expr = &expr;
+
+	while (yyparse()) {
+	}
+
+	return expr;
+}
+
+#if defined(UNIT_TEST)
+int
+main (int argc, char **argv)
+{
+	int	i;
+	value_t *expr;
+
+	for (i = 1; i < argc; ++i) {
+		expr = parse(argv[i]);
+		if (expr) {
+			print_value(expr);
+			printf("= %d\n",eval(expr,unit_oget,unit_sget));
+		}
+		else {
+			printf("could not parse '%s'\n",argv[i]);
+		}
+	}
+
+	return 0;
+}
+#endif

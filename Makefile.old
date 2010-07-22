@@ -1,0 +1,41 @@
+HAIL		= /usr/local
+HAIL_INC	= -I$(HAIL)/include
+HAIL_LIB	= -L$(HAIL)/lib -lhttpstor -lhttputil
+MONGO		= /usr/local
+MONGO_INC	= -I$(MONGO)/include
+MONGO_LIB	= -L$(MONGO)/lib64 -lmongoclient
+BOOST_LIB	= -lboost_thread-mt -lboost_filesystem -lboost_system \
+		  -lboost_program_options
+GLIB_INC	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
+
+INCLUDES	= $(GLIB_INC) $(HAIL_INC) -I.
+CFLAGS		= $(INCLUDES) -fPIC -g -Wunused-variable
+CPPFLAGS	= $(CFLAGS) $(MONGO_INC)
+
+COMMON_OBJS	= meta.o
+REST_OBJS	= rest.o proxy.o query.o
+
+COMMON_LIBS	= $(MONGO_LIB) $(BOOST_LIB) -lpthread -lcrypto
+REST_LIBS	= -lcurl -lglib-2.0 -lxml2 -ljansson \
+		  -L. -lmicrohttpd $(HAIL_LIB)
+
+REST		= rest
+REST_ALL_OBJS	= $(COMMON_OBJS) $(REST_OBJS)
+REST_ALL_LIBS	= $(REST_LIBS) $(COMMON_LIBS)
+
+ALL		= $(REST)
+ALL_OBJS	= $(COMMON_OBJS) $(REST_OBJS)
+
+all: $(ALL)
+
+$(REST): $(REST_ALL_OBJS)
+	$(CXX) $(REST_ALL_OBJS) $(REST_ALL_LIBS) -o $@
+
+$(REST_OBJS):: repo.h proxy.h query.h
+$(ALL_OBJS):: Makefile
+
+clean:
+	rm -f $(ALL_OBJS)
+
+clobber mrproper realclean spotless: clean
+	rm -f $(ALL)
