@@ -1,0 +1,125 @@
+Commands:
+
+	GET /
+		list buckets
+
+	POST /
+		create bucket (must not exist)
+
+	GET /bucket
+		list bucket contents
+
+	GET /bucket?query=xxx
+		query bucket contents
+
+	POST /bucket
+		create object (must not exist)
+
+	DELETE /bucket
+		delete bucket (must be empty)
+
+	GET /bucket/object
+		get body/attr* list
+
+	POST /bucket/object
+		set multiple attributes (object must exist)
+
+	DELETE /bucket/object
+		delete object
+
+	GET /bucket/object/body
+		get object body
+
+	PUT /bucket/object/body
+		put object body
+
+	GET /bucket/object/attrs
+		get all attributes
+
+	GET /bucket/object/attr_X
+		get attribute X
+
+	PUT /bucket/object/attr_X
+		set attribute X
+
+	DELETE /bucket/object/attr_X
+		delete attribute X
+
+	GET /bucket/object/repl
+		trigger re-replication
+
+Formats:
+
+	JSON bucket list
+	[
+		{
+			"name": "bucketA",
+			"path": ".../bucketA"
+		},
+		{
+			"name": "bucketB",
+			"path": ".../bucketB"
+		}
+	]
+
+	JSON object list
+	[
+		{
+			"name": "objectC",
+			"path": ".../bucketA/objectC"
+		},
+		{
+			"name": "objectD",
+			"path": ".../bucketA/objectD"
+		}
+	]
+
+	JSON body/attribute list
+	[
+		{
+			"type": "body",
+			"path": ".../bucketA/objectC/body"
+		},
+		{
+			"type": "repl_trigger",
+			"path": ".../bucketA/objectC/repl"
+		},
+		{
+			"type": "multi_attributes",
+			"path": ".../bucketA/objectC/attrs"
+		},
+		{
+			"type": "single_attribute",
+			"name": "abc",
+			"path": ".../bucketA/objectC/attr_abc"
+		}
+		{
+			"type": "single_attribute",
+			"name": "xyz",
+			"path": ".../bucketA/objectC/attr_xyz"
+		}
+	]
+
+
+To Do - priority (1 highest) work (5 largest) desc:
+	1 1 policy inheritance
+	1 2 delete metadata as well as data
+	--- done
+	1 3 re-replicate on policy change (single object)
+	2 2 manual re-replication trigger
+	2 4 writes proxied upstream
+	3 3 content types
+	3 3 get rid of strtok
+	3 4 re-replicate on policy change (default)
+	3 5 replicated DB
+	4 2 check for existence before queuing repl job
+	4 2 use MongoDB C driver now that it's supported
+	4 3 chunked encoding
+	4 5 immediate inline replication
+	4 5 fully modular FS/S3/CF driver structure
+	4 5 generate MongoDB queries from ours
+	5 2 deletes proxied upstream
+	5 3 cache control (TTL?)
+	partial-object reads
+	partial-object writes?
+
