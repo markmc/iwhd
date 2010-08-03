@@ -44,7 +44,8 @@ public:
 
 	DBClientConnection	client;
 
-	char *	DidPut		(char * bucket, char * key, char * loc);
+	char *	DidPut		(char * bucket, char * key, char * loc,
+				 size_t size);
 	void	GotCopy		(char * bucket, char * key, char * loc);
 	char *	HasCopy		(char * bucket, char * key, char * loc);
 	int	SetValue	(char * bucket, char * key, char * mkey,
@@ -53,6 +54,8 @@ public:
 				 char ** mvalue);
 	RepoQuery * NewQuery	(char * expr);
 	auto_ptr<DBClientCursor> GetCursor (Query &q);
+	void	Delete		(char * bucket, char * key);
+	size_t	GetSize		(char * bucket, char * key);
 
 private:
 	void	BucketList	(void);	/* just sample code, don't use */
@@ -119,7 +122,7 @@ RepoMeta::GetCursor (Query &q)
 }
 
 char *
-RepoMeta::DidPut (char * bucket, char * key, char * loc)
+RepoMeta::DidPut (char * bucket, char * key, char * loc, size_t size)
 {
 	BSONObjBuilder			bb;
 	struct timeval			now_tv;
@@ -127,6 +130,9 @@ RepoMeta::DidPut (char * bucket, char * key, char * loc)
 	auto_ptr<DBClientCursor>	curs;
 	Query				q;
 	char				now_str[sizeof(now)*2+1];
+
+	/* TBD: disambiguate master/slave cases a better way */
+	extern char * master_host;
 
 	gettimeofday(&now_tv,NULL);
 	now = (double)now_tv.tv_sec + (double)now_tv.tv_usec / 1000000.0;
@@ -137,14 +143,21 @@ RepoMeta::DidPut (char * bucket, char * key, char * loc)
 	curs = GetCursor(q);
 	if (curs->more()) {
 		/* Nice functionality, but what an ugly syntax! */
-		client.update(MAIN_TBL,q,BSON("$addToSet"<<BSON("loc"<<loc)));
+		if (master_host) {
+			client.update(MAIN_TBL,q,
+				BSON("$addToSet"<<BSON("loc"<<loc)));
+		}
+		else {
+			client.update(MAIN_TBL,q,
+				BSON("$set"<<BSON("loc"<<BSON_ARRAY(loc))));
+		}
 		client.update(MAIN_TBL,q,BSON("$set"<<BSON("date"<<now)));
 		client.update(MAIN_TBL,q,BSON("$set"<<BSON("etag"<<now_str)));
 	}
 	else {
 		bb << "bucket" << bucket << "key" << key
 		   << "loc" << BSON_ARRAY(loc) << "date" << now
-		   << "etag" << now_str;
+		   << "etag" << now_str << "size" << (long long)size;
 		client.insert(MAIN_TBL,bb.obj());
 	}
 
@@ -152,9 +165,9 @@ RepoMeta::DidPut (char * bucket, char * key, char * loc)
 }
 
 extern "C" char *
-meta_did_put (char * bucket, char * key, char * loc)
+meta_did_put (char * bucket, char * key, char * loc, size_t size)
 {
-	return it->DidPut(bucket,key,loc);
+	return it->DidPut(bucket,key,loc,size);
 }
 
 void
@@ -384,3 +397,43 @@ RepoMeta::BucketList (void)
 	}
 }
 
+void
+RepoMeta::Delete (char * bucket, char * key)
+{
+	Query	q	= QUERY("bucket"<<bucket<<"key"<<key);
+
+	client.remove(MAIN_TBL,q);
+}
+
+extern "C"
+void
+meta_delete (char * bucket, char * key)
+{
+	it->Delete(bucket,key);
+}
+
+size_t
+RepoMeta::GetSize (char * bucket, char * key)
+{
+	auto_ptr<DBClientCursor>	curs;
+	Query				q;
+	BSONObj				bo;
+	const char *			data;
+
+	q = QUERY("bucket"<<bucket<<"key"<<key);
+	curs = GetCursor(q);
+
+	if (!curs->more()) {
+		return 0;
+	}
+
+	bo = curs->next();
+	return bo.getField("size").numberLong();
+}
+
+extern "C"
+size_t
+meta_get_size (char * bucket, char * key)
+{
+	return it->GetSize(bucket,key);
+}

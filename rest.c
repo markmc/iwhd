@@ -96,7 +96,6 @@ typedef struct {
 int			 fs_mode	= 0;
 struct hstor_client	*hstor		= NULL;
 unsigned short		 my_port	= MY_PORT;
-char			*me		= "here";
 
 /*
  * These values refer to a front end, but it's a fallback rather than a
@@ -860,7 +859,8 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			slash = index(ms->url+1,'/');
 			if (slash) {
 				*slash = '\0';
-				etag = meta_did_put(ms->url+1,slash+1,me);
+				etag = meta_did_put(ms->url+1,slash+1,me,
+					ms->size);
 				rc = meta_get_value(ms->url+1,slash+1,"_policy",
 					&policy);
 				if (rc != 0) {
@@ -979,6 +979,11 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 			return MHD_YES;
 		}
 		meta_set_value(ms->bucket,ms->key,ms->attr,ms->buf_ptr);
+		if (!strcmp(ms->attr,"_policy")) {
+			DPRINTF("should trigger re-replication for %s (2)\n",
+				ms->key);
+			replicate(ms->url,0,ms->buf_ptr);
+		}
 		free(ms->buf_ptr);
 		free(ms->url);
 		free(ms);
@@ -1150,6 +1155,10 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	CURL			*curl;
 	char			 fixed[1024];
+	char			*copied_url;
+	char			*bucket;
+	char			*key;
+	char			*stctx;
 
 	DPRINTF("PROXY DELETE %s\n",url);
 
@@ -1169,6 +1178,12 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 		curl_easy_cleanup(curl);
 	}
 
+	copied_url = strdup(url);
+	bucket = strtok_r(copied_url,"/",&stctx);
+	key = strtok_r(NULL,"/",&stctx);
+	meta_delete(bucket,key);
+	free(copied_url);
+
 	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 	if (!resp) {
 		return MHD_NO;
@@ -1177,7 +1192,6 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	MHD_queue_response(conn,MHD_HTTP_OK,resp);
 	MHD_destroy_response(resp);
 
-	/* TBD: delete local metadata */
 	replicate_delete((char *)url);
 	return MHD_YES;
 }
@@ -1260,9 +1274,20 @@ void
 post_foreach (gpointer key, gpointer value, gpointer ctx)
 {
 	my_state	*ms	= ctx;
+	char		 fixed[1024];
+	char		*bucket;
+	char		*stctx;
 
+	bucket = strtok_r(ms->url,"/",&stctx);
 	DPRINTF("setting %s = %s for %s/%s\n",key,value,ms->bucket,ms->key);
+
 	meta_set_value(ms->bucket,ms->key,key,value);
+
+	if (!strcmp(key,"_policy")) {
+		DPRINTF("should trigger re-replication for %s (1)\n",ms->key);
+		sprintf(fixed,"/%s/%s",ms->bucket,ms->key);
+		replicate(fixed,0,value);
+	}
 }
 
 int
@@ -1278,6 +1303,7 @@ proxy_post (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
+		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
 			g_str_hash,g_str_equal,free,free);
 		ms->post = MHD_create_post_processor(conn,4096,
@@ -1507,14 +1533,18 @@ main (int argc, char **argv)
 		break;
 	}
 args_done:
-	if (optind < argc) {
-		me = argv[optind];
-	}
 
-	if (cfg_file && !parse_config()) {
+	me = parse_config();
+	if (!me) {
 		fprintf(stderr,"could not parse %s\n",cfg_file);
 		return !0;
 	}
+
+	if (optind < argc) {
+		DPRINTF("overriding name %s with %s\n",me,argv[optind]);
+		me = argv[optind];
+	}
+
 	if (verbose) {
 		if (proxy_host) {
 			printf("primary storage in %s:%u as %s:%s (%s)\n",

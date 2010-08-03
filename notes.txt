@@ -104,8 +104,8 @@ Formats:
 To Do - priority (1 highest) work (5 largest) desc:
 	1 1 policy inheritance
 	1 2 delete metadata as well as data
-	--- done
 	1 3 re-replicate on policy change (single object)
+	--- done
 	2 2 manual re-replication trigger
 	2 4 writes proxied upstream
 	3 3 content types

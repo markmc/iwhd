@@ -123,7 +123,7 @@ validate_server (unsigned int i)
 }
 
 /* We've already validated, so minimal checking here. */
-void
+char *
 set_config (void)
 {
 	json_t		*server;
@@ -142,9 +142,11 @@ set_config (void)
 	else {
 		s3mode = 0;
 	}
+
+	return (char *)json_string_value(json_object_get(server,"name"));
 }
 
-int
+char *
 parse_config (void)
 {
 	json_error_t	 err;
@@ -154,7 +156,7 @@ parse_config (void)
 	config = json_load_file(cfg_file,&err);
 	if (!config) {
 		fprintf(stderr,"JSON error on line %d: %s\n",err.line,err.text);
-		return 0;
+		return NULL;
 	}
 
 	if (json_typeof(config) != JSON_ARRAY) {
@@ -175,8 +177,7 @@ parse_config (void)
 
 	/* Everything looks OK. */
 	printf("%u replication servers defined\n",nservers);
-	set_config();
-	return 1;
+	return set_config();
 
 err:
 	json_decref(config);
@@ -548,20 +549,25 @@ replicate (char *url, size_t size, char *policy)
 	char		*url2;
 	char		*stctx;
 
+	url2 = strdup(url);
+	if (!url2) {
+		fprintf(stderr,"could not parse url %s\n",url);
+		return;
+	}
+	cur_bucket = strtok_r(url2,"/",&stctx);
+	cur_key = strtok_r(NULL,"/",&stctx);
+
+	if (!size) {
+		size = meta_get_size(cur_bucket,cur_key);
+		DPRINTF("fetched size %llu for %s\n",size,url);
+	}
+
 	if (policy) {
 		DPRINTF("--- policy = %s\n",policy);
 		expr = parse(policy);
-		url2 = strdup(url);
-		if (!url2) {
-			fprintf(stderr,"could not parse url %s\n",url);
-			return;
-		}
-		cur_bucket = strtok_r(url2,"/",&stctx);
-		cur_key = strtok_r(NULL,"/",&stctx);
 	}
 	else {
 		expr = NULL;
-		url2 = NULL;
 	}
 
 	for (i = 1; i < json_array_size(config); ++i) {
