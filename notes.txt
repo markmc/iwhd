@@ -1,10 +1,13 @@
 Commands:
 
 	GET /
-		list buckets
+		list top-level objects
 
 	POST /
-		create bucket (must not exist)
+		global control operations (none defined)
+
+	POST /_factory bucket=x,...
+		create bucket with attributes
 
 	GET /bucket
 		list bucket contents
@@ -13,7 +16,10 @@ Commands:
 		query bucket contents
 
 	POST /bucket
-		create object (must not exist)
+		bucket-level control operations
+
+	POST /bucket/_factory key=x,...
+		create object with attributes
 
 	DELETE /bucket
 		delete bucket (must be empty)
@@ -21,8 +27,8 @@ Commands:
 	GET /bucket/object
 		get body/attr* list
 
-	POST /bucket/object
-		set multiple attributes (object must exist)
+	POST /bucket/object op=repl
+		trigger re-replication
 
 	DELETE /bucket/object
 		delete object
@@ -36,6 +42,9 @@ Commands:
 	GET /bucket/object/attrs
 		get all attributes
 
+	POST /bucket/object/attrs
+		set multiple attributes
+
 	GET /bucket/object/attr_X
 		get attribute X
 
@@ -45,7 +54,7 @@ Commands:
 	DELETE /bucket/object/attr_X
 		delete attribute X
 
-	GET /bucket/object/repl
+	POST /bucket/object/_control op=repl
 		trigger re-replication
 
 Formats:
@@ -53,10 +62,16 @@ Formats:
 	JSON bucket list
 	[
 		{
+			"type": "bucket_factory",
+			"path": ".../_factory"
+		},
+		{
+			"type": "bucket",
 			"name": "bucketA",
 			"path": ".../bucketA"
 		},
 		{
+			"type": "bucket",
 			"name": "bucketB",
 			"path": ".../bucketB"
 		}
@@ -65,10 +80,16 @@ Formats:
 	JSON object list
 	[
 		{
+			"type": "object_factory",
+			"path": ".../bucketA/_factory"
+		},
+		{
+			"type": "object",
 			"name": "objectC",
 			"path": ".../bucketA/objectC"
 		},
 		{
+			"type": "object",
 			"name": "objectD",
 			"path": ".../bucketA/objectD"
 		}
@@ -79,10 +100,6 @@ Formats:
 		{
 			"type": "body",
 			"path": ".../bucketA/objectC/body"
-		},
-		{
-			"type": "repl_trigger",
-			"path": ".../bucketA/objectC/repl"
 		},
 		{
 			"type": "multi_attributes",
@@ -105,11 +122,13 @@ To Do - priority (1 highest) work (5 largest) desc:
 	1 1 policy inheritance
 	1 2 delete metadata as well as data
 	1 3 re-replicate on policy change (single object)
-	--- done
 	2 2 manual re-replication trigger
+	--- done
+	1 5 auth
 	2 4 writes proxied upstream
+	2 5 reconcile dispatch with object with commands/format above
 	3 3 content types
-	3 3 get rid of strtok
+	3 3 fix string handling (eliminate strtok)
 	3 4 re-replicate on policy change (default)
 	3 5 replicated DB
 	4 2 check for existence before queuing repl job

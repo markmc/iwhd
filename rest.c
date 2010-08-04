@@ -141,13 +141,13 @@ validate_put (struct MHD_Connection *conn)
 }
 
 int
-is_reserved (char *cand, char **resv_list)
+is_reserved (char *cand, char **resv_list, char *allow)
 {
 	int	i;
 
 	for (i = 0; resv_list[i]; ++i) {
 		if (!strcmp(cand,resv_list[i])) {
-			return 1;
+			return !allow || strcmp(cand,allow);
 		}
 	}
 
@@ -164,7 +164,7 @@ validate_url (const char *url)
 		return 0;
 	}
 
-	return !is_reserved(slash+1,reserved_name);
+	return !is_reserved(slash+1,reserved_name,NULL);
 }
 
 /**********
@@ -965,7 +965,7 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 			return MHD_NO;
 		}
 		ms->buf_ptr[ms->buf_len-1] = '\0';
-		if (is_reserved(ms->attr,reserved_attr)) {
+		if (is_reserved(ms->attr,reserved_attr,NULL)) {
 			resp = MHD_create_response_from_data(
 				0,NULL,MHD_NO,MHD_NO);
 			if (!resp) {
@@ -1254,20 +1254,21 @@ post_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 	return MHD_YES;
 }
 
+/* Returns TRUE if we found an *invalid* key. */
 gboolean
 post_find (gpointer key, gpointer value, gpointer ctx)
 {
 	my_state	*ms	= ctx;
+	char		 fixed[1024];
+	char		*bucket;
+	char		*stctx;
 
-	if (is_reserved(key,reserved_attr)) {
-		if (strcmp(key,"key")) {
-			DPRINTF("bad attr %s\n",key);
-			return TRUE;
-		}
-		strncpy(ms->key,value,MAX_FIELD_LEN-1);
+	if (!is_reserved(key,reserved_attr,"key")) {
+		return FALSE;
 	}
 
-	return FALSE;
+	DPRINTF("bad attr %s\n",key);
+	return TRUE;
 }
 
 void
@@ -1291,13 +1292,14 @@ post_foreach (gpointer key, gpointer value, gpointer ctx)
 }
 
 int
-proxy_post (void *cctx, struct MHD_Connection *conn, const char *url,
-	    const char *method, const char *version, const char *data,
-	    size_t *data_size, void **rctx)
+proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
+		   const char *method, const char *version, const char *data,
+		   size_t *data_size, void **rctx)
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
 	int			 rc;
+	char			*key;
 
 	DPRINTF("PROXY POST (%s, %llu)\n",url,*data_size);
 
@@ -1316,7 +1318,9 @@ proxy_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	else {
 		rc = MHD_HTTP_BAD_REQUEST;
 		if (!g_hash_table_find(ms->dict,post_find,ms)) {
-			if (ms->key[0]) {
+			key = g_hash_table_lookup(ms->dict,"key");
+			if (key) {
+				strncpy(ms->key,key,MAX_FIELD_LEN-1);
 				g_hash_table_remove(ms->dict,"key");
 				g_hash_table_foreach(ms->dict,post_foreach,ms);
 				rc = MHD_HTTP_OK;
@@ -1336,30 +1340,109 @@ proxy_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 
 	return MHD_YES;
+}
+
+void
+do_replicate (my_state * ms)
+{
+	int			 rc;
+	char			*policy	= NULL;
+
+	DPRINTF("fetching policy for %s/%s\n",ms->bucket,ms->key);
+	rc = meta_get_value(ms->bucket,ms->key,
+		"_policy", &policy);
+	if (rc != 0) {
+		DPRINTF("  inheriting policy from %s\n",ms->bucket);
+		rc = meta_get_value(ms->bucket,
+			"_default", "_policy", &policy);
+	}
+
+	if (policy) {
+		DPRINTF("  implementing policy %s\n",policy);
+		replicate(ms->url,0,policy);
+		free(policy);
+	}
+}
+
+int
+proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
+		   const char *method, const char *version, const char *data,
+		   size_t *data_size, void **rctx)
+{
+	struct MHD_Response	*resp;
+	my_state		*ms	= *rctx;
+	int			 rc;
+	char			*op;
+
+	DPRINTF("PROXY POST (%s, %llu)\n",url,*data_size);
+
+	if (ms->state == MS_NEW) {
+		ms->state = MS_NORMAL;
+		ms->url = (char *)url;
+		ms->dict = g_hash_table_new_full(
+			g_str_hash,g_str_equal,free,free);
+		ms->post = MHD_create_post_processor(conn,4096,
+			post_iterator,ms->dict);
+	}
+	else if (*data_size) {
+		MHD_post_process(ms->post,data,*data_size);
+		*data_size = 0;
+	}
+	else {
+		rc = MHD_HTTP_BAD_REQUEST;
+		if (!g_hash_table_find(ms->dict,post_find,ms)) {
+			op = g_hash_table_lookup(ms->dict,"op");
+			if (op) {
+				if (!strcmp(op,"repl")) {
+					do_replicate(ms);
+				}
+				else {
+					DPRINTF("unknown op %s for %s/%s\n",
+						op, ms->bucket, ms->key);
+				}
+				rc = MHD_HTTP_OK;
+			}
+			else  {
+				DPRINTF("op is MISSING (fail)\n");
+			}
+		}
+		g_hash_table_destroy(ms->dict);
+		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
+		if (!resp) {
+			fprintf(stderr,"MHD_crfd failed\n");
+			return MHD_NO;
+		}
+		MHD_queue_response(conn,rc,resp);
+		MHD_destroy_response(resp);
+	}
+
+	return MHD_YES;
 
 }
 
 rule proxy_rules[] = {
 	{ /* get bucket list */
-	  "GET",	URL_ROOT,	proxy_api_root  },
+	  "GET",	URL_ROOT,	proxy_api_root  	},
 	{ /* get object list */
-	  "GET",	URL_BUCKET,	proxy_list_objs	},
+	  "GET",	URL_BUCKET,	proxy_list_objs		},
 	{ /* get object data */
-	  "GET",	URL_OBJECT,	proxy_get_data	},
+	  "GET",	URL_OBJECT,	proxy_get_data		},
 	{ /* get attribute data */
-	  "GET",	URL_ATTR,	proxy_get_attr	},
+	  "GET",	URL_ATTR,	proxy_get_attr		},
 	{ /* put object data */
-	  "PUT",	URL_OBJECT,	proxy_put_data	},
+	  "PUT",	URL_OBJECT,	proxy_put_data		},
 	{ /* put attribute data */
-	  "PUT",	URL_ATTR,	proxy_put_attr	},
+	  "PUT",	URL_ATTR,	proxy_put_attr		},
 	{ /* create object and/or modify attributes */
-	  "POST",	URL_BUCKET,	proxy_post	},
+	  "POST",	URL_BUCKET,	proxy_bucket_post	},
+	{ /* perform control operations on an object */
+	  "POST",	URL_OBJECT,	proxy_object_post	},
 	{ /* query */
-	  "POST",	URL_QUERY,	proxy_query	},
+	  "POST",	URL_QUERY,	proxy_query		},
 	{ /* delete object */
-	  "DELETE",	URL_OBJECT,	proxy_delete	},
+	  "DELETE",	URL_OBJECT,	proxy_delete		},
 	{ /* delete attribute (TBD) */
-	  "DELETE",	URL_ATTR,	NULL		},
+	  "DELETE",	URL_ATTR,	NULL			},
 	{}
 };
 
