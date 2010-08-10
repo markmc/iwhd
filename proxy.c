@@ -355,7 +355,7 @@ proxy_repl_cons (void *ctx)
 	s_type = json_string_value(json_object_get(server,"type"));
 
 	if (!strcasecmp(s_type,"s3")) {
-		DPRINTF("replicating %llu to %s%s (s3)\n",item->size,addr,
+		DPRINTF("replicating %llu to %s%s (S3)\n",item->size,s_host,
 			item->url);
 		snprintf(svc_acc,sizeof(svc_acc),"%s:%lu",s_host,s_port);
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);

@@ -141,17 +141,17 @@ validate_put (struct MHD_Connection *conn)
 }
 
 int
-is_reserved (char *cand, char **resv_list, char *allow)
+is_reserved (char *cand, char **resv_list)
 {
 	int	i;
 
 	for (i = 0; resv_list[i]; ++i) {
 		if (!strcmp(cand,resv_list[i])) {
-			return !allow || strcmp(cand,allow);
+			return TRUE;
 		}
 	}
 
-	return 0;
+	return FALSE;
 }
 
 int
@@ -164,7 +164,7 @@ validate_url (const char *url)
 		return 0;
 	}
 
-	return !is_reserved(slash+1,reserved_name,NULL);
+	return !is_reserved(slash+1,reserved_name);
 }
 
 /**********
@@ -777,6 +777,48 @@ proxy_put_child (void * ctx)
 	return NULL;
 }
 
+void
+recheck_replication (my_state * ms, char *policy)
+{
+	int	rc;
+	int	free_it	= FALSE;
+	char	fixed[MAX_FIELD_LEN];
+
+	if (!policy && ms->dict) {
+		DPRINTF("using new policy for %s/%s\n",ms->bucket,ms->key);
+		policy = g_hash_table_lookup(ms->dict,"_policy");
+	}
+
+	if (!policy) {
+		/* If we get a policy here or below, we have to free it. */
+		free_it = TRUE;
+		DPRINTF("fetching policy for %s/%s\n",ms->bucket,ms->key);
+		rc = meta_get_value(ms->bucket,ms->key, "_policy", &policy);
+	}
+
+	if (!policy) {
+		DPRINTF("  inheriting policy from %s\n",ms->bucket);
+		rc = meta_get_value(ms->bucket,
+			"_default", "_policy", &policy);
+	}
+
+	if (policy) {
+		DPRINTF("  implementing policy %s\n",policy);
+		/*
+		 * Can't use ms->url here because it might be a bucket POST
+		 * and in that case ms->url points to the bucket.
+		 */
+		snprintf(fixed,sizeof(fixed),"%s/%s",ms->bucket,ms->key);
+		replicate(fixed,0,policy);
+		if (free_it) {
+			free(policy);
+		}
+	}
+	else {
+		DPRINTF("  could not find a policy anywhere!\n");
+	}
+}
+
 int
 proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		const char *method, const char *version, const char *data,
@@ -784,9 +826,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	char			*slash;
 	cons_state		*cs;
-	char			*policy;
 	int			 rc;
 	char			*etag	= NULL;
 	void			*child_res;
@@ -855,31 +895,18 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 		}
 		else {
-			policy = NULL;
-			slash = index(ms->url+1,'/');
-			if (slash) {
-				*slash = '\0';
-				etag = meta_did_put(ms->url+1,slash+1,me,
-					ms->size);
-				rc = meta_get_value(ms->url+1,slash+1,"_policy",
-					&policy);
-				if (rc != 0) {
-					rc = meta_get_value(ms->url+1,
-						"_default", "_policy", &policy);
-				}
-				*slash = '/';
-			}
-			if (policy) {
-				replicate(ms->url,ms->size,policy);
-				free(policy);
-			}
+			etag = meta_did_put(ms->bucket,ms->key,me,ms->size);
+			DPRINTF("rereplicate (obj PUT)\n");
+			recheck_replication(ms,NULL);
 			rc = MHD_HTTP_OK;
 		}
 		free(ms->url);
 		free(ms);
 		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 		if (!resp) {
-			free(etag);
+			if (etag) {
+				free(etag);
+			}
 			return MHD_NO;
 		}
 		if (etag) {
@@ -965,7 +992,7 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 			return MHD_NO;
 		}
 		ms->buf_ptr[ms->buf_len-1] = '\0';
-		if (is_reserved(ms->attr,reserved_attr,NULL)) {
+		if (is_reserved(ms->attr,reserved_attr)) {
 			resp = MHD_create_response_from_data(
 				0,NULL,MHD_NO,MHD_NO);
 			if (!resp) {
@@ -979,11 +1006,12 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 			return MHD_YES;
 		}
 		meta_set_value(ms->bucket,ms->key,ms->attr,ms->buf_ptr);
-		if (!strcmp(ms->attr,"_policy")) {
-			DPRINTF("should trigger re-replication for %s (2)\n",
-				ms->key);
-			replicate(ms->url,0,ms->buf_ptr);
-		}
+		/*
+		 * We should always re-replicate, because the replication
+		 * policy might refer to this attr.
+		 */
+		DPRINTF("rereplicate (attr PUT)\n");
+		recheck_replication(ms,ms->buf_ptr);
 		free(ms->buf_ptr);
 		free(ms->url);
 		free(ms);
@@ -1258,12 +1286,7 @@ post_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 gboolean
 post_find (gpointer key, gpointer value, gpointer ctx)
 {
-	my_state	*ms	= ctx;
-	char		 fixed[1024];
-	char		*bucket;
-	char		*stctx;
-
-	if (!is_reserved(key,reserved_attr,"key")) {
+	if (!is_reserved(key,reserved_attr)) {
 		return FALSE;
 	}
 
@@ -1275,20 +1298,9 @@ void
 post_foreach (gpointer key, gpointer value, gpointer ctx)
 {
 	my_state	*ms	= ctx;
-	char		 fixed[1024];
-	char		*bucket;
-	char		*stctx;
 
-	bucket = strtok_r(ms->url,"/",&stctx);
 	DPRINTF("setting %s = %s for %s/%s\n",key,value,ms->bucket,ms->key);
-
 	meta_set_value(ms->bucket,ms->key,key,value);
-
-	if (!strcmp(key,"_policy")) {
-		DPRINTF("should trigger re-replication for %s (1)\n",ms->key);
-		sprintf(fixed,"/%s/%s",ms->bucket,ms->key);
-		replicate(fixed,0,value);
-	}
 }
 
 int
@@ -1317,17 +1329,19 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 	else {
 		rc = MHD_HTTP_BAD_REQUEST;
-		if (!g_hash_table_find(ms->dict,post_find,ms)) {
-			key = g_hash_table_lookup(ms->dict,"key");
-			if (key) {
-				strncpy(ms->key,key,MAX_FIELD_LEN-1);
-				g_hash_table_remove(ms->dict,"key");
+		key = g_hash_table_lookup(ms->dict,"key");
+		if (key) {
+			strncpy(ms->key,key,MAX_FIELD_LEN-1);
+			g_hash_table_remove(ms->dict,"key");
+			if (!g_hash_table_find(ms->dict,post_find,ms)) {
 				g_hash_table_foreach(ms->dict,post_foreach,ms);
+				DPRINTF("rereplicate (bucket POST)\n");
+				recheck_replication(ms,NULL);
 				rc = MHD_HTTP_OK;
 			}
-			else  {
-				DPRINTF("key is MISSING (fail)\n");
-			}
+		}
+		else  {
+			DPRINTF("key is MISSING (fail)\n");
 		}
 		g_hash_table_destroy(ms->dict);
 		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
@@ -1340,28 +1354,6 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 
 	return MHD_YES;
-}
-
-void
-do_replicate (my_state * ms)
-{
-	int			 rc;
-	char			*policy	= NULL;
-
-	DPRINTF("fetching policy for %s/%s\n",ms->bucket,ms->key);
-	rc = meta_get_value(ms->bucket,ms->key,
-		"_policy", &policy);
-	if (rc != 0) {
-		DPRINTF("  inheriting policy from %s\n",ms->bucket);
-		rc = meta_get_value(ms->bucket,
-			"_default", "_policy", &policy);
-	}
-
-	if (policy) {
-		DPRINTF("  implementing policy %s\n",policy);
-		replicate(ms->url,0,policy);
-		free(policy);
-	}
 }
 
 int
@@ -1394,7 +1386,8 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 			op = g_hash_table_lookup(ms->dict,"op");
 			if (op) {
 				if (!strcmp(op,"repl")) {
-					do_replicate(ms);
+					DPRINTF("rereplicate (obj POST)\n");
+					recheck_replication(ms,NULL);
 				}
 				else {
 					DPRINTF("unknown op %s for %s/%s\n",
