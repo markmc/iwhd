@@ -69,7 +69,7 @@ struct { char *name; char *value; } hacked_obj_fields[] = {
 };
 
 char *
-unit_oget (char *text)
+unit_oget_func (void * notused, char *text)
 {
 	int i;
 
@@ -81,12 +81,14 @@ unit_oget (char *text)
 
 	return NULL;
 }
+getter_t unit_oget = { unit_oget_func };
 
 char *
-unit_sget (char *text)
+unit_sget_func (void * notused, char *text)
 {
 	return "never";
 }
+getter_t unit_sget = { unit_sget_func };
 #endif
 
 char *
@@ -96,12 +98,30 @@ string_value (value_t *v, getter_t *oget, getter_t *sget)
 	case T_STRING:
 		return v->as_str;
 	case T_OFIELD:
-		return oget ? (*oget)(v->as_str) : "";
+		return oget ? CALL_GETTER(oget,v->as_str) : "";
 	case T_SFIELD:
-		return oget ? (*sget)(v->as_str) : "";
+		return sget ? CALL_GETTER(sget,v->as_str) : "";
 	default:
 		return NULL;
 	}
+}
+
+int
+is_ok_number (char *a_str)
+{
+	char	*p;
+
+	if (!a_str) {
+		return 0;
+	}
+
+	for (p = a_str; *p; ++p) {
+		if (!isdigit(*p)) {
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
 int
@@ -112,39 +132,53 @@ compare (value_t *left, comp_t op, value_t *right,
 	char	*rstr;
 	int	 lval;
 	int	 rval;
+	int	 num_ok = 1;
 
 	lstr = string_value(left,oget,sget);
 	rstr = string_value(right,oget,sget);
 
-	if (lstr && rstr) {
-		lval = strcmp(lstr,rstr);
-		rval = 0;
+	if (left->type == T_NUMBER) {
+		lval = left->as_num;
 	}
-	else {
-		if (lstr) {
+	else if (lstr) {
+		if (is_ok_number(lstr)) {
 			lval = strtoll(lstr,NULL,0);
 		}
-		else if (left->type == T_NUMBER) {
-			lval = left->as_num;
-		}
 		else {
-			lval = eval(left,oget,sget);
-			if (lval < 0) {
-				return lval;
-			}
+			num_ok = 0;
 		}
-		if (rstr) {
+	}
+	else {
+		lval = eval(left,oget,sget);
+		if (lval < 0) {
+			return lval;
+		}
+	}
+
+	if (right->type == T_NUMBER) {
+		rval = right->as_num;
+	}
+	else if (rstr) {
+		if (is_ok_number(rstr)) {
 			rval = strtoll(rstr,NULL,0);
 		}
-		else if (right->type == T_NUMBER) {
-			rval = right->as_num;
-		}
 		else {
-			rval = eval(right,oget,sget);
-			if (rval < 0) {
-				return rval;
-			}
+			num_ok = 0;
 		}
+	}
+	else {
+		rval = eval(right,oget,sget);
+		if (rval < 0) {
+			return rval;
+		}
+	}
+
+	if (!num_ok) {
+		if (!lstr || !rstr) {
+			return -1;
+		}
+		lval = strcmp(lstr,rstr);
+		rval = 0;
 	}
 
 	switch (op) {
@@ -177,7 +211,7 @@ _print_value (value_t *v, int level)
 	case T_OFIELD:
 #if defined(UNIT_TEST)
 		printf("%*sOBJECT FIELD %s (%s)\n",level,"",v->as_str,
-			unit_oget(v->as_str));
+			unit_oget_func(NULL,v->as_str));
 #else
 		printf("%*sOBJECT FIELD %s\n",level,"",v->as_str);
 #endif
@@ -185,7 +219,7 @@ _print_value (value_t *v, int level)
 	case T_SFIELD:
 #if defined(UNIT_TEST)
 		printf("%*sSERVER FIELD %s (%s)\n",level,"",v->as_str,
-			unit_sget(v->as_str));
+			unit_sget_func(NULL,v->as_str));
 #else
 		printf("%*sSERVER FIELD %s\n",level,"",v->as_str);
 #endif
@@ -365,7 +399,7 @@ main (int argc, char **argv)
 		expr = parse(argv[i]);
 		if (expr) {
 			print_value(expr);
-			printf("= %d\n",eval(expr,unit_oget,unit_sget));
+			printf("= %d\n",eval(expr,&unit_oget,&unit_sget));
 		}
 		else {
 			printf("could not parse '%s'\n",argv[i]);

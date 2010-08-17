@@ -26,7 +26,12 @@ typedef struct _value {
 	};
 } value_t;
 
-typedef char	*getter_t	(char *);
+typedef struct {
+	char	*(*func)	(void *, char *);
+	void	*ctx;
+} getter_t;
+#define CALL_GETTER(g,x)	g->func(g->ctx,x)
+
 
 value_t	*parse		(char *text);
 int	 eval		(value_t *expr, getter_t *oget, getter_t *sget);

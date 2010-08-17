@@ -3,10 +3,7 @@ Commands:
 	GET /
 		list top-level objects
 
-	POST /
-		global control operations (none defined)
-
-	POST /_factory/bucket
+	POST / op=create name=xxx
 		create bucket with attributes
 
 	GET /bucket
@@ -15,29 +12,29 @@ Commands:
 	GET /bucket?query=xxx
 		query bucket contents
 
-	POST /bucket
-		bucket-level control operations
-
-	POST /bucket/_factory/key
-		create object with attributes
-
 	DELETE /bucket
 		delete bucket (must be empty)
 
+	POST /bucket op=create name=xxx
+		create object with attributes
+
 	GET /bucket/object
 		get body/attr* list
-
-	POST /bucket/object op=repl
-		trigger re-replication
-
-	DELETE /bucket/object
-		delete object
 
 	GET /bucket/object/body
 		get object body
 
 	PUT /bucket/object/body
 		put object body
+
+	POST /bucket/object op=push
+		trigger re-replication
+
+	POST /bucket/object op=pull src=xxx
+		trigger reverse replication
+
+	DELETE /bucket/object
+		delete object
 
 	GET /bucket/object/attrs
 		get all attributes
@@ -59,10 +56,6 @@ Formats:
 	JSON bucket list
 	[
 		{
-			"type": "bucket_factory",
-			"path": ".../_factory"
-		},
-		{
 			"type": "bucket",
 			"name": "bucketA",
 			"path": ".../bucketA"
@@ -76,10 +69,6 @@ Formats:
 
 	JSON object list
 	[
-		{
-			"type": "object_factory",
-			"path": ".../bucketA/_factory"
-		},
 		{
 			"type": "object",
 			"name": "objectC",
@@ -122,32 +111,34 @@ To Do - priority (1 highest) work (5 largest) desc:
 	2 2 manual re-replication trigger
 	2 1 re-replicate on *any* tag change
 	--- done
-	1 5 auth
 	2 1 start own MongoDB
 	2 2 reverse-replication API
 	2 3 replication-complete API
-	2 3 statistics/usage API
-	2 4 writes proxied upstream
-	2 5 dynamic config
+	2 3 content types
+	2 5 dynamic config (includes cred mgmt)
 	2 5 reconcile dispatch with commands/format above
-	3 3 VMWare back end
-	3 3 content types
+	3 5 fully modular FS/S3/CF driver structure
+	3 5 VMWare back end
+	3 5 EBS back end
+	3 5 RHEV back end (dependency on Ayal)
+	    * Mark McLoughlin / Eoghan Glynn / rhevm-api
+	3 5 start own Hail
 	3 3 fix string handling (eliminate strtok)
-	3 4 EBS back end
-	3 4 RHEV back end
 	3 4 re-replicate on policy change (default)
-	3 4 start own Hail
-	3 5 replicated DB
+	3 4 writes proxied upstream
 	4 1 direct-copy API (PUT with special header?)
-	4 2 check for existence before queuing repl job
 	4 2 use MongoDB C driver now that it's supported
 	4 3 chunked encoding
+	4 3 statistics/usage API
+	4 3 enhanced query syntax (limits)
 	4 4 optimize re-replication (check current locs)
+	4 5 dcloud-obj back end
 	4 5 immediate inline replication
-	4 5 fully modular FS/S3/CF driver structure
 	4 5 generate MongoDB queries from ours
+	4 5 auth
 	5 2 deletes proxied upstream
 	5 3 cache control (TTL?)
+	5 5 replicated DB
 	partial-object reads
 	partial-object writes?
 

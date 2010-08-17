@@ -19,9 +19,6 @@ using namespace mongo;
 /* TBD: parameterize */
 #define MAIN_TBL "repo.main"
 
-/* TBD: ick!  Need to make the parser/query stuff reentrant. */
-static BSONObj cur_bo;
-
 void
 dbl_to_str (double *foo, char *optr)
 {
@@ -71,6 +68,7 @@ public:
 	bool	Next		(void);
 	char	*bucket;
 	char	*key;
+	getter_t getter;
 };
 
 
@@ -321,9 +319,11 @@ meta_query_stop (void * qobj)
 }
 
 extern "C" char *
-query_getter (char *id)
+query_getter (void *ctx, char *id)
 {
-	return (char *)cur_bo.getStringField(id);
+	BSONObj *cur_bo = (BSONObj *)ctx;
+
+	return (char *)cur_bo->getStringField(id);
 }
 
 bool
@@ -334,8 +334,9 @@ RepoQuery::Next (void)
 	while (curs->more()) {
 		bo = curs->next();
 		if (expr) {
-			cur_bo = bo;
-			if (eval(expr,&query_getter,NULL) <= 0) {
+			getter.func = query_getter;
+			getter.ctx = (void *)&bo;
+			if (eval(expr,&getter,NULL) <= 0) {
 				continue;
 			}
 		}

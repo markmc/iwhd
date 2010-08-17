@@ -48,16 +48,17 @@ typedef struct _repl_item {
 	int			 pipes[2];
 } repl_item;
 
+typedef struct {
+	char		*cur_bucket;
+	char		*cur_key;
+	json_t		*cur_server;
+} query_ctx_t;
+
 repl_item	*queue_head	= NULL;
 repl_item	*queue_tail	= NULL;
 pthread_mutex_t	 queue_lock;
 sem_t		 queue_sema;
 json_t		*config		= NULL;
-
-/* TBD: ick again.  More reasons to update the parser interface. */
-char		*cur_bucket;
-char		*cur_key;
-json_t		*cur_server;
 
 int
 validate_server (unsigned int i)
@@ -522,19 +523,21 @@ repl_init (void)
 }
 
 char *
-repl_oget (char *id)
+repl_oget (void *ctx, char *id)
 {
-	char *cur_value;
+	query_ctx_t	*qctx = ctx;
+	char		*cur_value;
 
-	(void)meta_get_value(cur_bucket,cur_key,id,&cur_value);
+	(void)meta_get_value(qctx->cur_bucket,qctx->cur_key,id,&cur_value);
 
 	return cur_value;
 }
 
 char *
-repl_sget (char *id)
+repl_sget (void *ctx, char *id)
 {
-	json_t *elem = json_object_get(cur_server,id);
+	query_ctx_t	*qctx = ctx;
+	json_t		*elem = json_object_get(qctx->cur_server,id);
 
 	return elem ? (char *)json_string_value(elem) : NULL;
 }
@@ -548,17 +551,20 @@ replicate (char *url, size_t size, char *policy)
 	int		 res;
 	char		*url2;
 	char		*stctx;
+	query_ctx_t	 qctx;
+	getter_t	 oget;
+	getter_t	 sget;
 
 	url2 = strdup(url);
 	if (!url2) {
 		fprintf(stderr,"could not parse url %s\n",url);
 		return;
 	}
-	cur_bucket = strtok_r(url2,"/",&stctx);
-	cur_key = strtok_r(NULL,"/",&stctx);
+	qctx.cur_bucket = strtok_r(url2,"/",&stctx);
+	qctx.cur_key = strtok_r(NULL,"/",&stctx);
 
 	if (!size) {
-		size = meta_get_size(cur_bucket,cur_key);
+		size = meta_get_size(qctx.cur_bucket,qctx.cur_key);
 		DPRINTF("fetched size %llu for %s\n",size,url);
 	}
 
@@ -570,10 +576,15 @@ replicate (char *url, size_t size, char *policy)
 		expr = NULL;
 	}
 
+	oget.func = repl_oget;
+	oget.ctx = &qctx;
+	sget.func = repl_sget;
+	sget.ctx = &qctx;
+
 	for (i = 1; i < json_array_size(config); ++i) {
 		if (expr) {
-			cur_server = json_array_get(config,i);
-			res = eval(expr,repl_oget,repl_sget);
+			qctx.cur_server = json_array_get(config,i);
+			res = eval(expr,&oget,&sget);
 		}
 		else {
 			res = 0;
