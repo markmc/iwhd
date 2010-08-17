@@ -177,7 +177,7 @@ parse_config (void)
 	}
 
 	/* Everything looks OK. */
-	printf("%u replication servers defined\n",nservers);
+	printf("%u replication servers defined\n",nservers-1);
 	return set_config();
 
 err:
@@ -212,7 +212,7 @@ proxy_repl_prod (void *ctx)
 	char			*stctx;
 	char			*myurl;
 
-	sprintf(addr,"http://%s:%u%s",proxy_host,proxy_port,item->url);
+	sprintf(addr,"http://%s:%u/%s",proxy_host,proxy_port,item->url);
 	DPRINTF("replicating from %s\n",addr);
 
 	if (s3mode) {
@@ -355,15 +355,16 @@ proxy_repl_cons (void *ctx)
 	s_secret = json_string_value(json_object_get(server,"secret"));
 	s_type = json_string_value(json_object_get(server,"type"));
 
+	myurl = strdup(item->url);
+	bucket = strtok_r(myurl,"/",&stctx);
+	key = strtok_r(NULL,"/",&stctx);
+
 	if (!strcasecmp(s_type,"s3")) {
 		DPRINTF("replicating %llu to %s%s (S3)\n",item->size,s_host,
 			item->url);
 		snprintf(svc_acc,sizeof(svc_acc),"%s:%lu",s_host,s_port);
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
 		/* Blech.  Can't conflict with producer, though. */
-		myurl = strdup(item->url);
-		bucket = strtok_r(myurl,"/",&stctx);
-		key = strtok_r(NULL,"/",&stctx);
 		hstor_put(hstor,bucket,key,
 			     junk_reader,item->size,fp,NULL);
 		hstor_free(hstor);
@@ -380,12 +381,12 @@ proxy_repl_cons (void *ctx)
 			/* Re-fetch as this might have changed. */
 			s_host = json_string_value(json_object_get(server,
 				"host"));
-			sprintf(addr,"%s%s",s_host,item->url);
+			sprintf(addr,"%s/%s",s_host,item->url);
 			DPRINTF("replicating %llu to %s (CF)\n",item->size,
 				addr);
 		}
 		else {
-			sprintf(addr,"http://%s:%u%s",s_host,s_port,item->url);
+			sprintf(addr,"http://%s:%u/%s",s_host,s_port,item->url);
 			DPRINTF("replicating %llu to %s (repod)\n",item->size,
 				addr);
 		}

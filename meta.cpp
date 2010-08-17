@@ -53,6 +53,7 @@ public:
 	auto_ptr<DBClientCursor> GetCursor (Query &q);
 	void	Delete		(char * bucket, char * key);
 	size_t	GetSize		(char * bucket, char * key);
+	int	Check		(char * bucket, char * key, char * depot);
 
 private:
 	void	BucketList	(void);	/* just sample code, don't use */
@@ -129,9 +130,6 @@ RepoMeta::DidPut (char * bucket, char * key, char * loc, size_t size)
 	Query				q;
 	char				now_str[sizeof(now)*2+1];
 
-	/* TBD: disambiguate master/slave cases a better way */
-	extern char * master_host;
-
 	gettimeofday(&now_tv,NULL);
 	now = (double)now_tv.tv_sec + (double)now_tv.tv_usec / 1000000.0;
 	dbl_to_str(&now,now_str);
@@ -141,16 +139,21 @@ RepoMeta::DidPut (char * bucket, char * key, char * loc, size_t size)
 	curs = GetCursor(q);
 	if (curs->more()) {
 		/* Nice functionality, but what an ugly syntax! */
-		if (master_host) {
-			client.update(MAIN_TBL,q,
-				BSON("$addToSet"<<BSON("loc"<<loc)));
-		}
-		else {
-			client.update(MAIN_TBL,q,
-				BSON("$set"<<BSON("loc"<<BSON_ARRAY(loc))));
-		}
-		client.update(MAIN_TBL,q,BSON("$set"<<BSON("date"<<now)));
-		client.update(MAIN_TBL,q,BSON("$set"<<BSON("etag"<<now_str)));
+		client.update(MAIN_TBL,q,BSON(
+			"$set"<<BSON("loc"<<BSON_ARRAY(loc))
+		<<	"$set"<<BSON("date"<<now)
+		<<	"$set"<<BSON("etag"<<now_str)
+		<<	"$set"<<BSON("size"<<(long long)size)));
+#if 0
+		client.update(MAIN_TBL,q,
+			BSON("$set"<<BSON("loc"<<BSON_ARRAY(loc))));
+		client.update(MAIN_TBL,q,
+			BSON("$set"<<BSON("date"<<now)));
+		client.update(MAIN_TBL,q,
+			BSON("$set"<<BSON("etag"<<now_str)));
+		client.update(MAIN_TBL,q,
+			BSON("$set"<<BSON("size"<<(long long)size)));
+#endif
 	}
 	else {
 		bb << "bucket" << bucket << "key" << key
@@ -165,6 +168,8 @@ RepoMeta::DidPut (char * bucket, char * key, char * loc, size_t size)
 extern "C" char *
 meta_did_put (char * bucket, char * key, char * loc, size_t size)
 {
+	cout << "meta_did_put(" << bucket << "," << key << "," << loc << ")"
+	     << endl;
 	return it->DidPut(bucket,key,loc,size);
 }
 
@@ -203,13 +208,17 @@ RepoMeta::HasCopy (char * bucket, char * key, char * loc)
 	q = QUERY("bucket"<<bucket<<"key"<<key<<"loc"<<loc);
 	curs = GetCursor(q);
 	if (!curs->more()) {
+		cout << bucket << "/" << key << " not found at " << loc << endl;
 		return NULL;
 	}
 
 	value = curs->next().getStringField("etag");
 	if (!value || !*value) {
+		cout << bucket << "/" << key << " no etag at " << loc << endl;
 		return NULL;
 	}
+
+	cout << bucket << "/" << key << " etag = " << value << endl;
 	return strdup(value);
 }
 
@@ -438,3 +447,4 @@ meta_get_size (char * bucket, char * key)
 {
 	return it->GetSize(bucket,key);
 }
+

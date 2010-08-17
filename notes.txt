@@ -3,7 +3,7 @@ Commands:
 	GET /
 		list top-level objects
 
-	POST / op=create name=xxx
+	POST /_factory/bucket
 		create bucket with attributes
 
 	GET /bucket
@@ -15,7 +15,7 @@ Commands:
 	DELETE /bucket
 		delete bucket (must be empty)
 
-	POST /bucket op=create name=xxx
+	POST /bucket/_factory/object
 		create object with attributes
 
 	GET /bucket/object
@@ -30,8 +30,11 @@ Commands:
 	POST /bucket/object op=push
 		trigger re-replication
 
-	POST /bucket/object op=pull src=xxx
+	POST /bucket/object op=pull depot=xxx
 		trigger reverse replication
+
+	POST /bucket/object op-check depot=xxx
+		check availability
 
 	DELETE /bucket/object
 		delete object
@@ -56,6 +59,10 @@ Formats:
 	JSON bucket list
 	[
 		{
+			"type": "bucket_factory",
+			"path": ".../_factory"
+		},
+		{
 			"type": "bucket",
 			"name": "bucketA",
 			"path": ".../bucketA"
@@ -69,6 +76,10 @@ Formats:
 
 	JSON object list
 	[
+		{
+			"type": "object_factory",
+			"path": ".../bucket/_factory"
+		},
 		{
 			"type": "object",
 			"name": "objectC",
@@ -110,10 +121,10 @@ To Do - priority (1 highest) work (5 largest) desc:
 	1 3 re-replicate on policy change (single object)
 	2 2 manual re-replication trigger
 	2 1 re-replicate on *any* tag change
+	2 3 replication-complete API
 	--- done
 	2 1 start own MongoDB
 	2 2 reverse-replication API
-	2 3 replication-complete API
 	2 3 content types
 	2 5 dynamic config (includes cred mgmt)
 	2 5 reconcile dispatch with commands/format above

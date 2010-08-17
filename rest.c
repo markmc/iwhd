@@ -895,7 +895,14 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 		}
 		else {
-			etag = meta_did_put(ms->bucket,ms->key,me,ms->size);
+			if (master_host) {
+				meta_got_copy(ms->bucket,ms->key,me);
+				etag = NULL;
+			}
+			else {
+				etag = meta_did_put(ms->bucket,ms->key,me,
+					ms->size);
+			}
 			DPRINTF("rereplicate (obj PUT)\n");
 			recheck_replication(ms,NULL);
 			rc = MHD_HTTP_OK;
@@ -1357,6 +1364,26 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 }
 
 int
+check_location (my_state *ms)
+{
+	char	*loc	= g_hash_table_lookup(ms->dict,"depot");
+
+	if (!loc) {
+		DPRINTF("missing loc on check for %s/%s\n",ms->bucket,ms->key);
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	if (!meta_has_copy(ms->bucket,ms->key,loc)) {
+		DPRINTF("did not find %s/%s at %s\n",ms->bucket,ms->key,loc);
+		return MHD_HTTP_NOT_FOUND;
+	}
+
+	/* TBD: meta_has_copy returns an etag which we should check */
+	DPRINTF("found %s/%s at %s\n",ms->bucket,ms->key,loc);
+	return MHD_HTTP_OK;
+}
+
+int
 proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		   const char *method, const char *version, const char *data,
 		   size_t *data_size, void **rctx)
@@ -1385,15 +1412,18 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!g_hash_table_find(ms->dict,post_find,ms)) {
 			op = g_hash_table_lookup(ms->dict,"op");
 			if (op) {
-				if (!strcmp(op,"repl")) {
+				if (!strcmp(op,"push")) {
 					DPRINTF("rereplicate (obj POST)\n");
 					recheck_replication(ms,NULL);
+					rc = MHD_HTTP_OK;
+				}
+				else if (!strcmp(op,"check")) {
+					rc = check_location(ms);
 				}
 				else {
 					DPRINTF("unknown op %s for %s/%s\n",
 						op, ms->bucket, ms->key);
 				}
-				rc = MHD_HTTP_OK;
 			}
 			else  {
 				DPRINTF("op is MISSING (fail)\n");
@@ -1634,6 +1664,7 @@ args_done:
 		printf("db is at %s:%u\n",db_host,db_port);
 		printf("will listen on port %u\n",my_port);
 		printf("my location is \"%s\"\n",me);
+		fflush(stdout);
 	}
 
 	sem_init(&the_sem,0,0);
