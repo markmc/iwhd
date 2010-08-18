@@ -663,3 +663,29 @@ replicate_delete (char *url)
 	}
 }
 
+int
+get_provider (int i, provider_t *out)
+{
+	json_t	*server;
+
+	server = json_array_get(config,i);
+	if (!server) {
+		DPRINTF("no such entry %d\n",i);
+		return 0;
+	}
+
+	out->name = json_string_value(json_object_get(server,"name"));
+	out->type = json_string_value(json_object_get(server,"type"));
+	out->host = json_string_value(json_object_get(server,"host"));
+	out->port = json_integer_value(json_object_get(server,"port"));
+	/* TBD: change key/secret field names to username/password */
+	out->username = json_string_value(json_object_get(server,"key"));
+	out->password = json_string_value(json_object_get(server,"secret"));
+
+	/* Use empty strings instead of NULL. */
+	if (!out->username) out->username = "";
+	if (!out->password) out->password = "";
+
+	return 1;
+}
+

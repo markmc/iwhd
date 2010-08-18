@@ -75,7 +75,13 @@ typedef struct {
 	int				 block_gen;
 	pthread_t			 backend_th;
 	pthread_t			 cache_th;
+	/* for provider-list generator */
+	int				 pl_flags;
+	int				 pl_index;
 } my_state;
+
+#define PL_FLAG_HEADER_SENT	0x01
+#define PL_FLAG_FOOTER_SENT	0x02
 
 typedef struct {
 	my_state	*ms;
@@ -84,7 +90,8 @@ typedef struct {
 } cons_state;
 
 typedef enum {
-	URL_ROOT=0, URL_BUCKET, URL_OBJECT, URL_ATTR, URL_INVAL, URL_QUERY
+	URL_ROOT=0, URL_BUCKET, URL_OBJECT, URL_ATTR, URL_INVAL,
+	URL_QUERY, URL_PROVLIST
 } url_type;
 
 typedef struct {
@@ -398,7 +405,7 @@ proxy_init_pc (my_state *ms)
 }
 
 void
-query_closer (void *ctx)
+simple_closer (void *ctx)
 {
 	my_state	*ms	= ctx;
 
@@ -410,7 +417,7 @@ query_closer (void *ctx)
 }
 
 void
-data_closer (void * ctx)
+child_closer (void * ctx)
 {
 	cons_state	*cs	= ctx;
 
@@ -666,14 +673,14 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	/* TBD: check return value */
 
 	resp = MHD_create_response_from_callback(
-		MHD_SIZE_UNKNOWN, 65536, proxy_get_cons, cs, data_closer);
+		MHD_SIZE_UNKNOWN, 65536, proxy_get_cons, cs, child_closer);
 	if (!resp) {
 		fprintf(stderr,"MHD_crfc failed\n");
 		if (cs2) {
 			/* TBD: terminate thread */
 			free(cs2);
 		}
-		data_closer(cs);
+		child_closer(cs);
 		return MHD_NO;
 	}
 	MHD_queue_response(conn,ms->rc,resp);
@@ -1141,11 +1148,10 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->query = meta_query_new(ms->buf_ptr);
 		ms->state = MS_Q_BEGIN;
 		resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
-			65536, proxy_query_func, ms, query_closer);
+			65536, proxy_query_func, ms, simple_closer);
 		if (!resp) {
 			fprintf(stderr,"MHD_crfc failed\n");
-			free(ms->buf_ptr);
-			free(ms);
+			simple_closer(ms);
 			return MHD_NO;
 		}
 		MHD_add_response_header(resp,"Content-Type","text/xml");
@@ -1168,11 +1174,10 @@ proxy_list_objs (void *cctx, struct MHD_Connection *conn, const char *url,
 	ms->state = MS_Q_BEGIN;
 
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
-		65536, proxy_query_func, ms, query_closer);
+		65536, proxy_query_func, ms, simple_closer);
 	if (!resp) {
 		fprintf(stderr,"MHD_crfc failed\n");
-		free(ms->buf_ptr);
-		free(ms);
+		simple_closer(ms);
 		return MHD_NO;
 	}
 
@@ -1443,6 +1448,94 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 
 }
 
+/*
+ * TBD: turn into content-type-specific templates.  Better yet, turn them into
+ * template *calls* so e.g. JSON can deal invisibly with adding commas as
+ * entry separators.
+ */
+char *pl_header = "<providers>\n";
+char *pl_footer = "</providers>\n";
+/* TBD: temporary while code is being written. */
+char *pl_fake_entry = "\
+	<provider name=\"%s\">\n\
+		<type>%s</type>\n\
+		<host>%s</host>\n\
+		<port>%d</port>\n\
+		<username>%s</username>\n\
+		<password>%s</password>\n\
+	</provider>\n\
+";
+
+int
+prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
+{
+	my_state	*ms	= ctx;
+	int		 len;
+	provider_t	 prov;
+	char		 result[1024];
+
+	if (~ms->pl_flags & PL_FLAG_HEADER_SENT) {
+		len = strlen(pl_header);
+		if (len > max) {
+			len = max;
+		}
+		ms->pl_flags |= PL_FLAG_HEADER_SENT;
+		memcpy(buf,pl_header,len);
+		return len;
+	}
+
+	if (get_provider(ms->pl_index,&prov)) {
+		len = snprintf(result,sizeof(result),pl_fake_entry,
+			prov.name, prov.type,
+			prov.host, prov.port,
+			prov.username, prov.password);
+		if (len < sizeof(result)) {
+			++(ms->pl_index);
+			memcpy(buf,result,len);
+			return len;
+		}
+		/* TBD: handle overflow more gracefully */
+	}
+
+	if (~ms->pl_flags & PL_FLAG_FOOTER_SENT) {
+		len = strlen(pl_footer);
+		if (len > max) {
+			len = max;
+		}
+		ms->pl_flags |= PL_FLAG_FOOTER_SENT;
+		memcpy(buf,pl_footer,len);
+		return len;
+	}
+
+	return -1;
+}
+
+int
+proxy_list_provs (void *cctx, struct MHD_Connection *conn, const char *url,
+		  const char *method, const char *version, const char *data,
+		  size_t *data_size, void **rctx)
+{
+	struct MHD_Response	*resp;
+	my_state		*ms	= *rctx;
+	int			 rc;
+	char			*op;
+
+	ms->pl_flags = 0;
+	ms->pl_index = 0;
+
+	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
+		65536, prov_list_generator, ms, simple_closer);
+	if (!resp) {
+		fprintf(stderr,"MHD_crfd failed\n");
+		simple_closer(ms);
+		return MHD_NO;
+	}
+	MHD_queue_response(conn,rc,resp);
+	MHD_destroy_response(resp);
+
+	return MHD_YES;
+}
+
 rule proxy_rules[] = {
 	{ /* get bucket list */
 	  "GET",	URL_ROOT,	proxy_api_root  	},
@@ -1466,6 +1559,8 @@ rule proxy_rules[] = {
 	  "DELETE",	URL_OBJECT,	proxy_delete		},
 	{ /* delete attribute (TBD) */
 	  "DELETE",	URL_ATTR,	NULL			},
+	{ /* get provider list */
+	  "GET",	URL_PROVLIST,	proxy_list_provs	},
 	{}
 };
 
@@ -1490,6 +1585,9 @@ parse_url (const char *url, my_state *ms)
 			if (eindex == URL_BUCKET) {
 				if (!strcmp(ms->bucket,"query")) {
 					eindex = URL_QUERY;
+				}
+				else if (!strcmp(ms->bucket,"_providers")) {
+					eindex = URL_PROVLIST;
 				}
 			}
 			break;

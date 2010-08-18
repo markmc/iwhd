@@ -3,8 +3,20 @@ Commands:
 	GET /
 		list top-level objects
 
-	POST /_factory/bucket
+	POST /_new/bucket
 		create bucket with attributes
+
+	GET /_providers
+		list providers
+
+	POST /_providers/_new/provider
+		create new provider with info
+
+	GET /_providers/provider
+		show provider information (requires token)
+
+	POST /_providers/provider
+		set provider information (requires/token)
 
 	GET /bucket
 		list bucket contents
@@ -15,7 +27,7 @@ Commands:
 	DELETE /bucket
 		delete bucket (must be empty)
 
-	POST /bucket/_factory/object
+	POST /bucket/_new/object
 		create object with attributes
 
 	GET /bucket/object
@@ -56,11 +68,15 @@ Commands:
 
 Formats:
 
-	JSON bucket list
+	JSON top-level list
 	[
 		{
 			"type": "bucket_factory",
-			"path": ".../_factory"
+			"path": ".../_new"
+		},
+		{
+			"type": "provider_list",
+			"path": ".../_providers"
 		},
 		{
 			"type": "bucket",
@@ -74,11 +90,31 @@ Formats:
 		}
 	]
 
-	JSON object list
+	JSON provider list
+	[
+		{
+			"name": "my primary",
+			"type": "cf",
+			"host": "swift.usersys.redhat.com",
+			"port": 8080,
+			"username": "my_cf_username",
+			"password": "my_cf_password"
+		},
+		{
+			"name": "my secondary",
+			"type": "s3",
+			"host": "s3.amazonaws.com",
+			"port": 80,
+			"username": "my_aws_key",
+			"password": "my_aws_secret"
+		}
+	}
+
+	JSON bucket-level list
 	[
 		{
 			"type": "object_factory",
-			"path": ".../bucket/_factory"
+			"path": ".../bucket/_new"
 		},
 		{
 			"type": "object",
@@ -92,7 +128,7 @@ Formats:
 		}
 	]
 
-	JSON body/attribute list
+	JSON object-level list
 	[
 		{
 			"type": "body",
