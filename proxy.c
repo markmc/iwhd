@@ -689,3 +689,29 @@ get_provider (int i, provider_t *out)
 	return 1;
 }
 
+void
+update_provider (char *provider, char *username, char *password)
+{
+	int		 i;
+	json_t		*server;
+	const char	*s_name;
+
+	DPRINTF("updating %s username=%s password=%s\n",
+		provider, username, password);
+
+	for (i = 0; ; ++i) {
+		server = json_array_get(config,i);
+		if (!server) {
+			DPRINTF("  could not find provider %s\n",provider);
+			break;
+		}
+		s_name = json_string_value(json_object_get(server,"name"));
+		DPRINTF("  checking %s\n",s_name);
+		if (s_name && !strcmp(s_name,provider)) {
+			json_object_set(server,"key",json_string(username));
+			json_object_set(server,"secret",json_string(password));
+			break;
+		}
+	}
+}
+

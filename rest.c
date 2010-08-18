@@ -1536,6 +1536,68 @@ proxy_list_provs (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
+int
+prov_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
+	       const char *filename, const char *content_type,
+	       const char *transfer_encoding, const char *data,
+	       uint64_t off, size_t size)
+{
+	g_hash_table_insert(ctx,strdup(key),strndup(data,size));
+	/* TBD: check return value for strdups (none avail for insert) */
+	return MHD_YES;
+}
+
+
+int
+proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
+		   const char *method, const char *version, const char *data,
+		   size_t *data_size, void **rctx)
+{
+	struct MHD_Response	*resp;
+	my_state		*ms	= *rctx;
+	int			 rc;
+	char			*provider;
+	char			*username;
+	char			*password;
+
+	if (ms->state == MS_NEW) {
+		ms->state = MS_NORMAL;
+		ms->url = (char *)url;
+		ms->dict = g_hash_table_new_full(
+			g_str_hash,g_str_equal,free,free);
+		ms->post = MHD_create_post_processor(conn,4096,
+			prov_iterator,ms->dict);
+	}
+	else if (*data_size) {
+		MHD_post_process(ms->post,data,*data_size);
+		*data_size = 0;
+	}
+	else {
+		rc = MHD_HTTP_BAD_REQUEST;
+		provider = g_hash_table_lookup(ms->dict,"provider");
+		username = g_hash_table_lookup(ms->dict,"username");
+		password = g_hash_table_lookup(ms->dict,"password");
+		if (provider && username && password) {
+			update_provider(provider,username,password);
+			rc = MHD_HTTP_OK;
+		}
+		else {
+			DPRINTF("provider/username/password MISSING\n");
+		}
+		g_hash_table_destroy(ms->dict);
+		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
+		if (!resp) {
+			fprintf(stderr,"MHD_crfd failed\n");
+			return MHD_NO;
+		}
+		MHD_queue_response(conn,rc,resp);
+		MHD_destroy_response(resp);
+	}
+
+	return MHD_YES;
+}
+
+
 rule proxy_rules[] = {
 	{ /* get bucket list */
 	  "GET",	URL_ROOT,	proxy_api_root  	},
@@ -1561,6 +1623,8 @@ rule proxy_rules[] = {
 	  "DELETE",	URL_ATTR,	NULL			},
 	{ /* get provider list */
 	  "GET",	URL_PROVLIST,	proxy_list_provs	},
+	{ /* update a provider */
+	  "POST",	URL_PROVLIST,	proxy_update_prov	},
 	{}
 };
 
