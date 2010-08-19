@@ -8,6 +8,7 @@ AM_INIT_AUTOMAKE
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
+AM_PROG_CC_C_O
 
 AC_CHECK_LIB([curl], [curl_easy_init],
 	CURL_LIB=-lcurl,

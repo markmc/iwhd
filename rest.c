@@ -20,6 +20,7 @@
 #include "repo.h"
 #include "meta.h"
 #include "proxy.h"
+#include "template.h"
 
 #if defined(DEBUG)
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION | MHD_USE_DEBUG
@@ -30,6 +31,9 @@
 
 #define MAX_FIELD_LEN	64
 #define THREAD_FAILED	((void *)(-1))
+
+/* TBD: fix code that uses this to figure out the correct URL instead */
+#define FAKE_BASE "http://fserver-1:9090"
 
 typedef enum {
 	MS_NEW,
@@ -75,13 +79,9 @@ typedef struct {
 	int				 block_gen;
 	pthread_t			 backend_th;
 	pthread_t			 cache_th;
-	/* for provider-list generator */
-	int				 pl_flags;
-	int				 pl_index;
+	/* for bucket/object/provider list generators */
+	tmpl_ctx_t			*gen_ctx;
 } my_state;
-
-#define PL_FLAG_HEADER_SENT	0x01
-#define PL_FLAG_FOOTER_SENT	0x02
 
 typedef struct {
 	my_state	*ms;
@@ -111,16 +111,6 @@ unsigned short		 my_port	= MY_PORT;
  */
 const char 		*master_host	= NULL;
 unsigned short		 master_port	= MY_PORT;
-
-char api_root_blob[] = "\
-<api service='dc_imglib' version='1.0'>\n\
-	<link href='http://%s/descriptions' rel='descriptions'/>\n\
-	<link href='http://%s/images' rel='images'/>\n\
-	<link href='http://%s/instances' rel='instances'/>\n\
-	<link href='http://%s/snapshots' rel='snapshots'/>\n\
-	<link href='http://%s/query' rel='query'/>\n\
-</api>\n\
-";
 
 char entry_blob[] = "\
 	<dc_obj>\n\
@@ -1236,46 +1226,94 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
+/* TBD: get actual bucket list */
+typedef struct {
+	char *rel;
+	char *link;
+} fake_bucket_t;
+
+fake_bucket_t fake_bucket_list[] = {
+	{ "bucket_factory",	"_new" },
+	{ "bucket",		"bucket_a" },
+	{ "bucket",		"bucket_b" },
+	{ NULL }
+};
+
+int
+root_blob_generator (void *ctx, uint64_t pos, char *buf, int max)
+{
+	my_state	*ms	= ctx;
+	fake_bucket_t *	 fb;
+	int		 len;
+
+	if (!ms->gen_ctx) {
+		ms->gen_ctx = tmpl_get_ctx("fubar");
+		if (!ms->gen_ctx) {
+			return -1;
+		}
+		ms->gen_ctx->base = FAKE_BASE;
+		len = tmpl_root_header(ms->gen_ctx,"image_warehouse","1.0");
+		if (!len) {
+			free(ms->gen_ctx);
+			return -1;
+		}
+		if (len > max) {
+			len = max;
+		}
+		memcpy(buf,ms->gen_ctx->buf,len);
+		return len;
+	}
+
+	if (ms->gen_ctx == TMPL_CTX_DONE) {
+		return -1;
+	}
+
+	fb = fake_bucket_list + ms->gen_ctx->index;
+	if (fb->rel) {
+		len = tmpl_root_entry(ms->gen_ctx,fb->rel,fb->link);
+		if (!len) {
+			free(ms->gen_ctx);
+			return -1;
+		}
+		if (len > max) {
+			len = max;
+		}
+		memcpy(buf,ms->gen_ctx->buf,len);
+		return len;
+	}
+
+	len = tmpl_root_footer(ms->gen_ctx);
+	if (!len) {
+		free(ms->gen_ctx);
+		return -1;
+	}
+	if (len > max) {
+		len = max;
+	}
+	memcpy(buf,ms->gen_ctx->buf,len);
+	free(ms->gen_ctx);
+	ms->gen_ctx = TMPL_CTX_DONE;
+	return len;
+}
+
 int
 proxy_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 		const char *method, const char *version, const char *data,
 		size_t *data_size, void **rctx)
 {
 	struct MHD_Response	*resp	= NULL;
-	char			*junk	= NULL;
 	const char		*host;
 	unsigned int		 rc	= MHD_HTTP_OK;
+	my_state		*ms	= *rctx;
 
 	DPRINTF("PROXY API ROOT (%s, %llu)\n",url,*data_size);
 
-	host = MHD_lookup_connection_value(conn,MHD_HEADER_KIND,"Host");
-	if (!host) {
-		rc = MHD_HTTP_BAD_REQUEST;
-		goto done;
-	}
-
-	junk = malloc(sizeof(api_root_blob)+strlen(host)*5);
-	if (!junk) {
-		rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
-		goto done;
-	}
-	sprintf(junk,api_root_blob,host,host,host,host,host);
-
-	resp = MHD_create_response_from_data(strlen(junk),junk,MHD_YES,MHD_NO);
-	if (resp) {
-		MHD_add_response_header(resp,"Content-Type","text/xml");
-	}
-	else {
-		free(junk);
-	}
-
-done:
+	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
+		65536, root_blob_generator, ms, simple_closer);
 	if (!resp) {
-		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
-		if (!resp) {
-			return MHD_NO;
-		}
+		return MHD_NO;
 	}
+	MHD_add_response_header(resp,"Content-Type","text/xml");
 
 	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
@@ -1448,23 +1486,6 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 
 }
 
-/*
- * TBD: turn into content-type-specific templates.  Better yet, turn them into
- * template *calls* so e.g. JSON can deal invisibly with adding commas as
- * entry separators.
- */
-char *pl_header = "<providers>\n";
-char *pl_footer = "</providers>\n";
-/* TBD: temporary while code is being written. */
-char *pl_fake_entry = "\
-	<provider name=\"%s\">\n\
-		<type>%s</type>\n\
-		<host>%s</host>\n\
-		<port>%d</port>\n\
-		<username>%s</username>\n\
-		<password>%s</password>\n\
-	</provider>\n\
-";
 
 int
 prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
@@ -1472,42 +1493,55 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
 	my_state	*ms	= ctx;
 	int		 len;
 	provider_t	 prov;
-	char		 result[1024];
 
-	if (~ms->pl_flags & PL_FLAG_HEADER_SENT) {
-		len = strlen(pl_header);
+	if (!ms->gen_ctx) {
+		ms->gen_ctx = tmpl_get_ctx("fubar");
+		if (!ms->gen_ctx) {
+			return -1;
+		}
+		ms->gen_ctx->base = FAKE_BASE;
+		len = tmpl_prov_header(ms->gen_ctx);
+		if (!len) {
+			free(ms->gen_ctx);
+			return -1;
+		}
 		if (len > max) {
 			len = max;
 		}
-		ms->pl_flags |= PL_FLAG_HEADER_SENT;
-		memcpy(buf,pl_header,len);
+		memcpy(buf,ms->gen_ctx->buf,len);
 		return len;
 	}
 
-	if (get_provider(ms->pl_index,&prov)) {
-		len = snprintf(result,sizeof(result),pl_fake_entry,
-			prov.name, prov.type,
-			prov.host, prov.port,
-			prov.username, prov.password);
-		if (len < sizeof(result)) {
-			++(ms->pl_index);
-			memcpy(buf,result,len);
-			return len;
-		}
-		/* TBD: handle overflow more gracefully */
+	if (ms->gen_ctx == TMPL_CTX_DONE) {
+		return -1;
 	}
 
-	if (~ms->pl_flags & PL_FLAG_FOOTER_SENT) {
-		len = strlen(pl_footer);
+	if (get_provider(ms->gen_ctx->index,&prov)) {
+		len = tmpl_prov_entry(ms->gen_ctx,prov.name,prov.type,
+			prov.host, prov.port, prov.username, prov.password);
+		if (!len) {
+			free(ms->gen_ctx);
+			return -1;
+		}
 		if (len > max) {
 			len = max;
 		}
-		ms->pl_flags |= PL_FLAG_FOOTER_SENT;
-		memcpy(buf,pl_footer,len);
+		memcpy(buf,ms->gen_ctx->buf,len);
 		return len;
 	}
 
-	return -1;
+	len = tmpl_prov_footer(ms->gen_ctx);
+	if (!len) {
+		free(ms->gen_ctx);
+		return -1;
+	}
+	if (len > max) {
+		len = max;
+	}
+	memcpy(buf,ms->gen_ctx->buf,len);
+	free(ms->gen_ctx);
+	ms->gen_ctx = TMPL_CTX_DONE;
+	return len;
 }
 
 int
@@ -1519,9 +1553,6 @@ proxy_list_provs (void *cctx, struct MHD_Connection *conn, const char *url,
 	my_state		*ms	= *rctx;
 	int			 rc;
 	char			*op;
-
-	ms->pl_flags = 0;
-	ms->pl_index = 0;
 
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 		65536, prov_list_generator, ms, simple_closer);
