@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "template.h"
 
 char xml_root_header[] = "\
@@ -32,6 +33,7 @@ char xml_prov_entry[] = "\
 ";
 
 char xml_prov_footer[] = "\
+\n\
 </providers>\n\
 ";
 
@@ -45,6 +47,58 @@ tmpl_format_t xml_format = {
 	.z_offset	= 0
 };
 
+char json_root_header[] = "\
+{\n\
+	\"service\": \"%s\",\n\
+	\"version\": \"%s\",\n\
+	[\
+";
+
+char json_root_entry[] = "\
+,\n\
+		{\n\
+			\"rel\": \"%s\",\n\
+			\"link\": \"%s/%s\"\n\
+		}\
+";
+
+char json_root_footer[] = "\
+\n\
+	]\n\
+}\n\
+";
+
+char json_prov_header[] = "\
+[\
+";
+
+char json_prov_entry[] = "\
+,\n\
+	{\n\
+		\"name\": \"%s\",\n\
+		\"type\": \"%s\",\n\
+		\"host\": \"%s\",\n\
+		\"port\": %d,\n\
+		\"username\": \"%s\",\n\
+		\"password\": \"%s\"\n\
+	}\
+";
+
+char json_prov_footer[] = "\
+\n\
+]\
+";
+
+tmpl_format_t json_format = {
+	.root_header	= json_root_header,
+	.root_entry	= json_root_entry,
+	.root_footer	= json_root_footer,
+	.prov_header	= json_prov_header,
+	.prov_entry	= json_prov_entry,
+	.prov_footer	= json_prov_footer,
+	.z_offset	= 1
+};
+
 tmpl_ctx_t *
 tmpl_get_ctx (char *type)
 {
@@ -52,7 +106,7 @@ tmpl_get_ctx (char *type)
 
 	tmp = (tmpl_ctx_t *)malloc(sizeof(*tmp));
 	if (tmp) {
-		tmp->format = &xml_format;
+		tmp->format = &json_format;
 		tmp->index = 0;
 	}
 }
@@ -98,31 +152,15 @@ tmpl_root_entry (tmpl_ctx_t *ctx, char *rel, char *link)
 int
 tmpl_root_footer (tmpl_ctx_t *ctx)
 {
-	int		 size;
-	tmpl_format_t	*fmt	= ctx->format;
-
-	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->root_footer);
-	if (size >= TMPL_BUF_SIZE) {
-		return 0;
-	}
-	ctx->buf = ctx->raw_buf;
-
-	return size;
+	ctx->buf = ctx->format->root_footer;
+	return strlen(ctx->buf);
 }
 
 int
 tmpl_prov_header (tmpl_ctx_t *ctx)
 {
-	int		 size;
-	tmpl_format_t	*fmt	= ctx->format;
-
-	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->prov_header);
-	if (size >= TMPL_BUF_SIZE) {
-		return 0;
-	}
-	ctx->buf = ctx->raw_buf;
-
-	return size;
+	ctx->buf = ctx->format->prov_header;
+	return strlen(ctx->buf);
 }
 
 int
@@ -153,14 +191,6 @@ tmpl_prov_entry (tmpl_ctx_t *ctx,
 int
 tmpl_prov_footer (tmpl_ctx_t *ctx)
 {
-	int		 size;
-	tmpl_format_t	*fmt	= ctx->format;
-
-	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->prov_footer);
-	if (size >= TMPL_BUF_SIZE) {
-		return 0;
-	}
-	ctx->buf = ctx->raw_buf;
-
-	return size;
+	ctx->buf = ctx->format->prov_footer;
+	return strlen(ctx->buf);
 }
