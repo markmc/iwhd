@@ -1061,6 +1061,68 @@ int
 proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
 {
 	my_state	*ms	= ctx;
+	int		 len;
+	provider_t	 prov;
+	const char	*accept;
+	char		*bucket;
+	char		*key;
+
+	accept = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Accept");
+
+	if (!ms->gen_ctx) {
+		ms->gen_ctx = tmpl_get_ctx(accept);
+		if (!ms->gen_ctx) {
+			return -1;
+		}
+		len = tmpl_obj_header(ms->gen_ctx);
+		if (!len) {
+			free(ms->gen_ctx);
+			return -1;
+		}
+		if (len > max) {
+			len = max;
+		}
+		memcpy(buf,ms->gen_ctx->buf,len);
+		return len;
+	}
+
+	if (ms->gen_ctx == TMPL_CTX_DONE) {
+		return -1;
+	}
+
+	for(;;) {
+		if (!meta_query_next(ms->query,&bucket,&key)) {
+			break;
+		}
+		if (is_reserved(key,reserved_name)) {
+			continue;
+		}
+		len = tmpl_obj_entry(ms->gen_ctx,bucket,key);
+		if (!len) {
+			free(ms->gen_ctx);
+			return -1;
+		}
+		if (len > max) {
+			len = max;
+		}
+		memcpy(buf,ms->gen_ctx->buf,len);
+		return len;
+	}
+
+	len = tmpl_obj_footer(ms->gen_ctx);
+	if (!len) {
+		free(ms->gen_ctx);
+		return -1;
+	}
+	if (len > max) {
+		len = max;
+	}
+	memcpy(buf,ms->gen_ctx->buf,len);
+	free(ms->gen_ctx);
+	ms->gen_ctx = TMPL_CTX_DONE;
+	return len;
+#if 0
+	my_state	*ms	= ctx;
 	char		*bucket;
 	char		*key;
 	int		 i;
@@ -1091,6 +1153,7 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
 	case MS_Q_END:
 		return -1;
 	}
+#endif
 }
 
 int

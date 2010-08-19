@@ -7,6 +7,9 @@ typedef struct {
 	char	*prov_header;
 	char	*prov_entry;
 	char	*prov_footer;
+	char	*obj_header;
+	char	*obj_entry;
+	char	*obj_footer;
 	int	 z_offset;	/* offset to use when index is zero */
 } tmpl_format_t;
 
@@ -32,4 +35,8 @@ int		 tmpl_prov_entry	(tmpl_ctx_t *ctx,
 					 const char *host, int port,
 					 const char *user, const char *pass);
 int		 tmpl_root_footer	(tmpl_ctx_t *ctx);
+int		 tmpl_obj_header	(tmpl_ctx_t *ctx);
+int		 tmpl_obj_entry		(tmpl_ctx_t *ctx,
+					 const char *bucket, const char *key);
+int		 tmpl_obj_footer	(tmpl_ctx_t *ctx);
 	
