@@ -778,6 +778,11 @@ recheck_replication (my_state * ms, char *policy)
 	int	free_it	= FALSE;
 	char	fixed[MAX_FIELD_LEN];
 
+	if (is_reserved(ms->key,reserved_name)) {
+		DPRINTF("declining to replicate reserved object %s\n",ms->key);
+		return;
+	}
+
 	if (!policy && ms->dict) {
 		DPRINTF("using new policy for %s/%s\n",ms->bucket,ms->key);
 		policy = g_hash_table_lookup(ms->dict,"_policy");
@@ -1121,39 +1126,6 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
 	free(ms->gen_ctx);
 	ms->gen_ctx = TMPL_CTX_DONE;
 	return len;
-#if 0
-	my_state	*ms	= ctx;
-	char		*bucket;
-	char		*key;
-	int		 i;
-
-	/* TBD: check max */
-
-	switch (ms->state) {
-	case MS_Q_BEGIN:
-		ms->state = MS_Q_MIDDLE;
-		return sprintf(buf,"<dc_obj_list>\n");
-	case MS_Q_MIDDLE:
-		do {
-			if (!meta_query_next(ms->query,&bucket,&key)) {
-				ms->state = MS_Q_END;
-				return sprintf(buf,"</dc_obj_list>\n");
-			}
-			for (i = 0; reserved_name[i]; ++i) {
-				if (!strcmp(reserved_name[i],key)) {
-					DPRINTF("skipping %s\n",key);
-					break;
-				}
-			}
-		} while (reserved_name[i]);
-		return sprintf(buf,entry_blob,bucket,key);
-	default:
-		DPRINTF("bad state %d in %s\n",ms->state,__func__);
-		/* Fall through. */
-	case MS_Q_END:
-		return -1;
-	}
-#endif
 }
 
 int
@@ -1694,12 +1666,54 @@ proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
+int
+proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
+		     const char *method, const char *version, const char *data,
+		     size_t *data_size, void **rctx)
+{
+	struct MHD_Response	*resp;
+	my_state		*ms	= *rctx;
+	char			*policy;
+	int			 rc 	= MHD_HTTP_OK;
+
+	if ((rc == MHD_HTTP_OK) && !s3mode) {
+		DPRINTF("cannot create bucket in non-S3 mode\n");
+		rc = MHD_HTTP_NOT_IMPLEMENTED;
+	}
+
+	if (rc == MHD_HTTP_OK) {
+		DPRINTF("creating bucket %s\n",ms->bucket);
+		if (!hstor_add_bucket(hstor,ms->bucket)) {
+			DPRINTF("  bucket create failed\n");
+			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+		}
+	}
+
+	if (rc == MHD_HTTP_OK) {
+		if (meta_set_value(ms->bucket,"_default","_policy","1") != 0) {
+			DPRINTF("default-policy create failed\n");
+			/* Non-fatal. */
+		}
+	}
+
+	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
+	if (!resp) {
+		fprintf(stderr,"MHD_crfd failed\n");
+		return MHD_NO;
+	}
+	MHD_queue_response(conn,rc,resp);
+	MHD_destroy_response(resp);
+
+	return MHD_YES;
+}
 
 rule proxy_rules[] = {
 	{ /* get bucket list */
 	  "GET",	URL_ROOT,	proxy_api_root  	},
 	{ /* get object list */
 	  "GET",	URL_BUCKET,	proxy_list_objs		},
+	{ /* create bucket */
+	  "PUT",	URL_BUCKET,	proxy_create_bucket	},
 	{ /* get object data */
 	  "GET",	URL_OBJECT,	proxy_get_data		},
 	{ /* get attribute data */

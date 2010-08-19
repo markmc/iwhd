@@ -159,10 +159,11 @@ To Do - priority (1 highest) work (5 largest) desc:
 	2 1 re-replicate on *any* tag change
 	2 3 replication-complete API
 	2 5 basic cred-management API
+	2 3 content types
 	--- done
 	2 1 start own MongoDB
 	2 2 reverse-replication API
-	2 3 content types
+	2 4 link-following syntax
 	2 5 reconcile dispatch with commands/format above
 	3 5 fully modular FS/S3/CF driver structure
 	3 5 VMWare back end
