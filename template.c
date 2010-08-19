@@ -9,7 +9,7 @@ char xml_root_header[] = "\
 
 char xml_root_entry[] = "\
 \n\
-	<link rel=\"%s\" href=\"%s/\%s\"/>\
+	<link rel=\"%s\" href=\"http://%s/\%s\"/>\
 ";
 
 char xml_root_footer[] = "\
@@ -57,7 +57,7 @@ char json_root_header[] = "\
 char json_root_entry[] = "\
 ,\n\
 		{\n\
-			\"rel\": \"%s\",\n\
+			\"rel\": \"http://%s\",\n\
 			\"link\": \"%s/%s\"\n\
 		}\
 ";
@@ -86,7 +86,7 @@ char json_prov_entry[] = "\
 
 char json_prov_footer[] = "\
 \n\
-]\
+]\n\
 ";
 
 tmpl_format_t json_format = {
@@ -100,13 +100,18 @@ tmpl_format_t json_format = {
 };
 
 tmpl_ctx_t *
-tmpl_get_ctx (char *type)
+tmpl_get_ctx (const char *type)
 {
 	tmpl_ctx_t	*tmp;
 
 	tmp = (tmpl_ctx_t *)malloc(sizeof(*tmp));
 	if (tmp) {
-		tmp->format = &json_format;
+		if (type && strstr(type,"/json")) {
+			tmp->format = &json_format;
+		}
+		else {
+			tmp->format = &xml_format;
+		}
 		tmp->index = 0;
 	}
 }

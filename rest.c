@@ -32,9 +32,6 @@
 #define MAX_FIELD_LEN	64
 #define THREAD_FAILED	((void *)(-1))
 
-/* TBD: fix code that uses this to figure out the correct URL instead */
-#define FAKE_BASE "http://fserver-1:9090"
-
 typedef enum {
 	MS_NEW,
 	MS_NORMAL,
@@ -847,7 +844,6 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!ms->url) {
 			return MHD_NO;
 		}
-		ms->conn = conn;
 		ms->size = 0;
 		cs = proxy_init_pc(ms);
 		if (!cs) {
@@ -1245,13 +1241,18 @@ root_blob_generator (void *ctx, uint64_t pos, char *buf, int max)
 	my_state	*ms	= ctx;
 	fake_bucket_t *	 fb;
 	int		 len;
+	const char	*accept;
+	const char	*host;
+
+	accept = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Accept");
+	host = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Host");
 
 	if (!ms->gen_ctx) {
-		ms->gen_ctx = tmpl_get_ctx("fubar");
+		ms->gen_ctx = tmpl_get_ctx(accept);
 		if (!ms->gen_ctx) {
 			return -1;
 		}
-		ms->gen_ctx->base = FAKE_BASE;
+		ms->gen_ctx->base = host;
 		len = tmpl_root_header(ms->gen_ctx,"image_warehouse","1.0");
 		if (!len) {
 			free(ms->gen_ctx);
@@ -1493,13 +1494,15 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
 	my_state	*ms	= ctx;
 	int		 len;
 	provider_t	 prov;
+	const char	*accept;
+
+	accept = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Accept");
 
 	if (!ms->gen_ctx) {
-		ms->gen_ctx = tmpl_get_ctx("fubar");
+		ms->gen_ctx = tmpl_get_ctx(accept);
 		if (!ms->gen_ctx) {
 			return -1;
 		}
-		ms->gen_ctx->base = FAKE_BASE;
 		len = tmpl_prov_header(ms->gen_ctx);
 		if (!len) {
 			free(ms->gen_ctx);
@@ -1744,6 +1747,7 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->fd		= (-1);
 		ms->url		= NULL;
 		ms->post	= NULL;
+		ms->conn	= conn;
 		*rctx = ms;
 		return ms->handler(cctx,conn,url,method,version,
 			data,data_size,rctx);

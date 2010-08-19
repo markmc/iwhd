@@ -12,7 +12,7 @@ typedef struct {
 
 typedef struct {
 	tmpl_format_t	*format;
-	char		*base;
+	const char	*base;
 	int		 index;
 	char		 raw_buf[TMPL_BUF_SIZE];
 	char		*buf;
@@ -20,7 +20,7 @@ typedef struct {
 
 #define TMPL_CTX_DONE	((tmpl_ctx_t *)(-1))
 
-tmpl_ctx_t	*tmpl_get_ctx		(char *type);
+tmpl_ctx_t	*tmpl_get_ctx		(const char *type);
 int		 tmpl_root_header	(tmpl_ctx_t *ctx,
 					 char *name, char *version);
 int		 tmpl_root_entry	(tmpl_ctx_t *ctx,
