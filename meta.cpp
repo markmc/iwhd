@@ -49,14 +49,11 @@ public:
 				 char * mvalue);
 	int	GetValue	(char * bucket, char * key, char * mkey,
 				 char ** mvalue);
-	RepoQuery * NewQuery	(char * expr);
+	RepoQuery * NewQuery	(char * bucket, char * key, char * expr);
 	auto_ptr<DBClientCursor> GetCursor (Query &q);
 	void	Delete		(char * bucket, char * key);
 	size_t	GetSize		(char * bucket, char * key);
 	int	Check		(char * bucket, char * key, char * depot);
-
-private:
-	void	BucketList	(void);	/* just sample code, don't use */
 };
 
 class RepoQuery {
@@ -64,14 +61,13 @@ class RepoQuery {
 	DBClientCursor *	curs;
 	value_t *		expr;
 public:
-		RepoQuery	(char *, RepoMeta &);
+		RepoQuery	(char *, char *, char *, RepoMeta &);
 		~RepoQuery	();
 	bool	Next		(void);
 	char	*bucket;
 	char	*key;
 	getter_t getter;
 };
-
 
 RepoMeta *it;
 
@@ -275,29 +271,38 @@ meta_get_value (char * bucket, char * key, char * mkey, char ** mvalue)
 	return it->GetValue(bucket,key,mkey,mvalue);
 }
 
-RepoQuery::RepoQuery (char *qstr, RepoMeta &p) : parent(p)
+RepoQuery::RepoQuery (char * bucket, char * key, char *qstr, RepoMeta &p)
+	: parent(p)
 {
 	Query				q;
 	auto_ptr<DBClientCursor>	tmp;
 
-	if (*qstr == '/') {
-		expr = NULL;
-		q = QUERY("bucket"<<qstr+1);
+	if (bucket) {
+		cout << "bucket is " << bucket << " and we don't care" << endl;
+		q = QUERY("bucket"<<bucket);
 	}
 	else {
+		cout << "key is " << key << " and we don't care" << endl;
+		q = QUERY("key"<<key);
+	}
+
+	/*
+	 * TBD: we should really convert our query into one of Mongo's,
+	 * and let them do all the work.  Handling the general case
+	 * would be pretty messy, but we could handle specific cases
+	 * pretty easily.  For example, a very high percentage of
+	 * queries are likely to be a single field/value comparison.
+	 * For now just punt, but revisit later.
+	 */
+
+	if (qstr) {
 		expr = parse(qstr);
 		if (expr) {
 			print_value(expr);
 		}
-		/*
-		 * TBD: we should really convert our query into one of Mongo's,
-		 * and let them do all the work.  Handling the general case
-		 * would be pretty messy, but we could handle specific cases
-		 * pretty easily.  For example, a very high percentage of
-		 * queries are likely to be a single field/value comparison.
-		 * For now just punt, but revisit later.
-		 */
-		q = Query();
+	}
+	else {
+		expr = NULL;
 	}
 
 	curs = parent.GetCursor(q).release();
@@ -311,14 +316,8 @@ RepoQuery::~RepoQuery ()
 	if (expr) {
 		free_value(expr);
 	}
-	delete curs;
 
-	if (bucket) {
-		free(bucket);
-	}
-	if (key) {
-		free(key);
-	}
+	delete curs;
 }
 
 extern "C" void
@@ -349,27 +348,27 @@ RepoQuery::Next (void)
 				continue;
 			}
 		}
-		if (bucket) { free(bucket); }
-		bucket = strdup(bo.getStringField("bucket"));
-		if (key) { free(key); }
-		key = strdup(bo.getStringField("key"));
+		bucket = (char *)bo.getStringField("bucket");
+		key = (char *)bo.getStringField("key");
 		return true;
 	}
 
-	curs = NULL;
 	return false;
 }
 
 RepoQuery *
-RepoMeta::NewQuery (char *expr)
+RepoMeta::NewQuery (char * bucket, char * key, char *expr)
 {
-	return new RepoQuery(expr,*this);
+	return new RepoQuery(bucket,key,expr,*this);
 }
 
 extern "C" void *
-meta_query_new (char *expr)
+meta_query_new (char * bucket, char * key, char *expr)
 {
-	return it->NewQuery(expr);
+	if ((bucket && key) || (!bucket && !key)) {
+		return NULL;
+	}
+	return it->NewQuery(bucket,key,expr);
 }
 
 extern "C" int
@@ -378,7 +377,6 @@ meta_query_next (void * qobj, char ** bucket, char ** key)
 	RepoQuery *	rq	= (RepoQuery *)qobj;
 
 	if (!rq->Next()) {
-		delete rq;
 		return 0;
 	}
 
@@ -387,7 +385,8 @@ meta_query_next (void * qobj, char ** bucket, char ** key)
 	return 1;
 }
 
-void
+#if 0
+char *
 RepoMeta::BucketList (void)
 {
 	/*
@@ -406,6 +405,7 @@ RepoMeta::BucketList (void)
 		}
 	}
 }
+#endif
 
 void
 RepoMeta::Delete (char * bucket, char * key)
