@@ -1294,10 +1294,7 @@ typedef struct {
 } fake_bucket_t;
 
 fake_bucket_t fake_bucket_list[] = {
-	{ "bucket_factory",	"_new" },
-	{ "bucket",		"bucket_a" },
-	{ "bucket",		"bucket_b" },
-	{ NULL }
+	{ "bucket_factory",	"_new" }
 };
 
 int
@@ -1336,8 +1333,21 @@ root_blob_generator (void *ctx, uint64_t pos, char *buf, int max)
 		return -1;
 	}
 
+	if (ms->gen_ctx->index < ARRAY_SIZE(fake_bucket_list)) {
+		fb = fake_bucket_list + ms->gen_ctx->index;
+		len = tmpl_root_entry(ms->gen_ctx,fb->rel,fb->link);
+		if (!len) {
+			return -1;
+		}
+		if (len > max) {
+			len = max;
+		}
+		memcpy(buf,ms->gen_ctx->buf,len);
+		return len;
+	}
+
 	if (meta_query_next(ms->query,&bucket,&key)) {
-		len = tmpl_root_entry(ms->gen_ctx,bucket,bucket);
+		len = tmpl_root_entry(ms->gen_ctx,"bucket",bucket);
 		if (!len) {
 			return -1;
 		}

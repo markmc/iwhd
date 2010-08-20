@@ -78,8 +78,8 @@ char json_root_header[] = "\
 char json_root_entry[] = "\
 ,\n\
 		{\n\
-			\"rel\": \"http://%s\",\n\
-			\"link\": \"%s/%s\"\n\
+			\"rel\": \"%s\",\n\
+			\"link\": \"http://%s/%s\"\n\
 		}\
 ";
 
