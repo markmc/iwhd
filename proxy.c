@@ -216,7 +216,7 @@ proxy_repl_prod (void *ctx)
 	DPRINTF("replicating from %s\n",addr);
 
 	if (s3mode) {
-		snprintf(svc_acc,sizeof(svc_acc),"%s:%lu",
+		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",
 			proxy_host,proxy_port);
 		hstor = hstor_new(svc_acc,proxy_host,
 				     proxy_key,proxy_secret);
@@ -255,7 +255,8 @@ junk_reader (void *ptr, size_t size, size_t nmemb, void *stream)
 }
 
 size_t
-cf_writer (void *ptr, size_t size, size_t nmemb, void *stream)
+cf_writer (void *ptr ATTRIBUTE_UNUSED, size_t size, size_t nmemb,
+	   void *stream ATTRIBUTE_UNUSED)
 {
 	return size * nmemb;
 }
@@ -362,7 +363,7 @@ proxy_repl_cons (void *ctx)
 	if (!strcasecmp(s_type,"s3")) {
 		DPRINTF("replicating %zu to %s%s (S3)\n",item->size,s_host,
 			item->url);
-		snprintf(svc_acc,sizeof(svc_acc),"%s:%lu",s_host,s_port);
+		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",s_host,s_port);
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
 		/* Blech.  Can't conflict with producer, though. */
 		hstor_put(hstor,bucket,key,
@@ -449,7 +450,7 @@ repl_worker_del (repl_item *item)
 	if (!strcasecmp(s_type,"s3")) {
 		DPRINTF("%s replicating delete of %s on %s:%u (S3)\n",__func__,
 			item->url, s_host, s_port);
-		snprintf(svc_acc,sizeof(svc_acc),"%s:%lu",s_host,s_port);
+		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",s_host,s_port);
 		/* TBD: check return */
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
 		bucket = strtok_r(item->url,"/",&stctx);
@@ -473,7 +474,7 @@ repl_worker_del (repl_item *item)
 }
 
 void *
-repl_worker (void *notused)
+repl_worker (void *notused ATTRIBUTE_UNUSED)
 {
 	repl_item	*item;
 	pthread_t	 cons;
