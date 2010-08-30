@@ -346,7 +346,6 @@ proxy_repl_cons (void *ctx)
 	const char		*s_key;
 	const char		*s_secret;
 	const char		*s_type;
-	const char		*token_str;
 	struct curl_slist	*slist;
 	char			*myurl;
 
@@ -373,6 +372,7 @@ proxy_repl_cons (void *ctx)
 		free(myurl);
 	}
 	else {
+		const char *token_str = NULL;
 		if (!strcasecmp(s_type,"cf")) {
 			token_str = get_cloudfiles_token(server,s_host,s_port,
 				s_key, s_secret);
