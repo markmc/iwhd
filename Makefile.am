@@ -1,4 +1,4 @@
-AM_CFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
+AM_CFLAGS	= -W -Wall -Wshadow -Wextra
 AM_CPPFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
 
 bin_PROGRAMS	= repod
