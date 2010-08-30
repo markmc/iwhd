@@ -1421,7 +1421,7 @@ post_find (gpointer key, gpointer value, gpointer ctx)
 		return FALSE;
 	}
 
-	DPRINTF("bad attr %s\n",key);
+	DPRINTF("bad attr %s\n", (char *)key);
 	return TRUE;
 }
 
@@ -1430,7 +1430,8 @@ post_foreach (gpointer key, gpointer value, gpointer ctx)
 {
 	my_state	*ms	= ctx;
 
-	DPRINTF("setting %s = %s for %s/%s\n",key,value,ms->bucket,ms->key);
+	DPRINTF("setting %s = %s for %s/%s\n",(char *)key, (char *)value,
+		ms->bucket,ms->key);
 	meta_set_value(ms->bucket,ms->key,key,value);
 }
 
@@ -1994,7 +1995,7 @@ args_done:
 	if (proxy_host) {
 		if (s3mode) {
 			char svc_acc[128];
-			snprintf(svc_acc,sizeof(svc_acc),"%s:%lu",
+			snprintf(svc_acc,sizeof(svc_acc),"%s:%u",
 				proxy_host,proxy_port);
 			hstor = hstor_new(svc_acc,proxy_host,
 					     proxy_key,proxy_secret);
