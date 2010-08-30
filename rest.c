@@ -513,7 +513,7 @@ proxy_get_prod (void *ptr, size_t size, size_t nmemb, void *stream)
 	size_t		 total	= size * nmemb;
 	my_state	*ms	= stream;
 
-	DPRINTF("producer posting %llu bytes as %d\n",total,ms->block_gen+1);
+	DPRINTF("producer posting %zu bytes as %d\n",total,ms->block_gen+1);
 	pthread_mutex_lock(&ms->lock);
 	ms->buf_ptr = ptr;
 	ms->buf_len = total;
@@ -716,7 +716,7 @@ proxy_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 	my_state	*ms	= cs->ms;
 	size_t		 done;
 
-	DPRINTF("consumer asked to read %llu\n",total);
+	DPRINTF("consumer asked to read %zu\n",total);
 
 	pthread_mutex_lock(&ms->lock);
 	DPRINTF("consumer about to wait for %d\n",cs->block_gen);
@@ -890,7 +890,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		/* TBD: check return value */
 	}
 	else if (*data_size) {
-		DPRINTF("producer posting %llu bytes as %d\n",
+		DPRINTF("producer posting %zu bytes as %d\n",
 			*data_size,ms->block_gen+1);
 		pthread_mutex_lock(&ms->lock);
 		ms->buf_ptr = (char *)data;
@@ -1163,7 +1163,7 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
 
-	DPRINTF("PROXY QUERY %s (%llu)\n",url,*data_size);
+	DPRINTF("PROXY QUERY %s (%zu)\n",url,*data_size);
 
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
@@ -1380,7 +1380,7 @@ proxy_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 	unsigned int		 rc	= MHD_HTTP_OK;
 	my_state		*ms	= *rctx;
 
-	DPRINTF("PROXY API ROOT (%s, %llu)\n",url,*data_size);
+	DPRINTF("PROXY API ROOT (%s, %zu)\n",url,*data_size);
 
 	ms->query = meta_query_new(NULL,"_default",NULL);
 	if (!ms->query) {
@@ -1444,7 +1444,7 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	int			 rc;
 	char			*key;
 
-	DPRINTF("PROXY POST (%s, %llu)\n",url,*data_size);
+	DPRINTF("PROXY POST (%s, %zu)\n",url,*data_size);
 
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
@@ -1518,7 +1518,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	int			 rc;
 	char			*op;
 
-	DPRINTF("PROXY POST (%s, %llu)\n",url,*data_size);
+	DPRINTF("PROXY POST (%s, %zu)\n",url,*data_size);
 
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
