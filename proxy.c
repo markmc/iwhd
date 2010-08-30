@@ -193,7 +193,7 @@ junk_writer (void *ptr, size_t size, size_t nmemb, void *stream)
 
 	n = fwrite(ptr,size,nmemb,stream);
 	fflush(stream);
-	printf("in %s(%llu,%llu) => %llu\n",__func__,size,nmemb,n);
+	printf("in %s(%zu,%zu) => %zu\n",__func__,size,nmemb,n);
 
 	return n;
 }
@@ -250,7 +250,7 @@ junk_reader (void *ptr, size_t size, size_t nmemb, void *stream)
 	size_t	n;
 
 	n = fread(ptr,size,nmemb,stream);
-	printf("in %s(%llu,%llu) => %llu\n",__func__,size,nmemb,n);
+	printf("in %s(%zu,%zu) => %zu\n",__func__,size,nmemb,n);
 	return n;
 }
 
@@ -360,7 +360,7 @@ proxy_repl_cons (void *ctx)
 	key = strtok_r(NULL,"/",&stctx);
 
 	if (!strcasecmp(s_type,"s3")) {
-		DPRINTF("replicating %llu to %s%s (S3)\n",item->size,s_host,
+		DPRINTF("replicating %zu to %s%s (S3)\n",item->size,s_host,
 			item->url);
 		snprintf(svc_acc,sizeof(svc_acc),"%s:%lu",s_host,s_port);
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
@@ -382,12 +382,12 @@ proxy_repl_cons (void *ctx)
 			s_host = json_string_value(json_object_get(server,
 				"host"));
 			sprintf(addr,"%s/%s",s_host,item->url);
-			DPRINTF("replicating %llu to %s (CF)\n",item->size,
+			DPRINTF("replicating %zu to %s (CF)\n",item->size,
 				addr);
 		}
 		else {
 			sprintf(addr,"http://%s:%u/%s",s_host,s_port,item->url);
-			DPRINTF("replicating %llu to %s (repod)\n",item->size,
+			DPRINTF("replicating %zu to %s (repod)\n",item->size,
 				addr);
 		}
 		curl = curl_easy_init();
@@ -566,7 +566,7 @@ replicate (char *url, size_t size, char *policy)
 
 	if (!size) {
 		size = meta_get_size(qctx.cur_bucket,qctx.cur_key);
-		DPRINTF("fetched size %llu for %s\n",size,url);
+		DPRINTF("fetched size %zu for %s\n",size,url);
 	}
 
 	if (policy) {
