@@ -145,7 +145,7 @@ tmpl_get_ctx (const char *type)
 {
 	tmpl_ctx_t	*tmp;
 
-	tmp = (tmpl_ctx_t *)malloc(sizeof(*tmp));
+	tmp = malloc(sizeof(*tmp));
 	if (tmp) {
 		if (type && strstr(type,"/json")) {
 			tmp->format = &json_format;
@@ -155,6 +155,7 @@ tmpl_get_ctx (const char *type)
 		}
 		tmp->index = 0;
 	}
+	return tmp;
 }
 
 int
