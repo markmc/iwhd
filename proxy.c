@@ -18,6 +18,7 @@
 #include "repo.h"
 #include "proxy.h"
 #include "query.h"
+#include "meta.h"
 
 /*
  * A config consists of a JSON array of objects, where each object includes:
