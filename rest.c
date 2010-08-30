@@ -1096,7 +1096,6 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
 {
 	my_state	*ms	= ctx;
 	int		 len;
-	provider_t	 prov;
 	const char	*accept;
 	char		*bucket;
 	char		*key;
@@ -1378,7 +1377,6 @@ proxy_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 		size_t *data_size, void **rctx)
 {
 	struct MHD_Response	*resp	= NULL;
-	const char		*host;
 	unsigned int		 rc	= MHD_HTTP_OK;
 	my_state		*ms	= *rctx;
 
@@ -1638,7 +1636,6 @@ proxy_list_provs (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
 	int			 rc;
-	char			*op;
 
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 		65536, prov_list_generator, ms, simple_closer);
@@ -1722,7 +1719,6 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	char			*policy;
 	int			 rc 	= MHD_HTTP_OK;
 
 	if ((rc == MHD_HTTP_OK) && !s3mode) {
