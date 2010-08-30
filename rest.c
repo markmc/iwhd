@@ -144,7 +144,7 @@ free_ms (my_state *ms)
 	if (ms->cleanup & CLEANUP_TMPL) {
 		free(ms->gen_ctx);
 	}
-	
+
 	if (ms->cleanup & CLEANUP_URL) {
 		free(ms->url);
 	}
@@ -862,7 +862,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	void			*child_res;
 
 	DPRINTF("PROXY PUT DATA %s (%lld)\n",url,*data_size);
-	
+
 	if (ms->state == MS_NEW) {
 		if (!validate_put(conn) || !validate_url(url)) {
 			DPRINTF("rejecting %s\n",url);
@@ -1399,7 +1399,7 @@ proxy_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 	MHD_destroy_response(resp);
 
 	return MHD_YES;
-	
+
 }
 
 int

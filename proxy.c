@@ -618,7 +618,7 @@ replicate (char *url, size_t size, char *policy)
 		pthread_mutex_unlock(&queue_lock);
 		sem_post(&queue_sema);
 	}
-	
+
 	if (expr) {
 		free_value(expr);
 	}
@@ -714,4 +714,3 @@ update_provider (char *provider, char *username, char *password)
 		}
 	}
 }
-
