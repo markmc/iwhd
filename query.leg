@@ -130,7 +130,7 @@ compare (value_t *left, comp_t op, value_t *right,
 {
 	char	*lstr;
 	char	*rstr;
-	int	 lval;
+	int	 lval = 0; // solely to placate gcc
 	int	 rval;
 	int	 num_ok = 1;
 
@@ -244,7 +244,7 @@ _print_value (value_t *v, int level)
 		_print_value(v->as_tree.right,level+2);
 		break;
 	default:
-		printf("%*sUNKNOWN %d\n",v->type,level,"");
+		printf("%*sUNKNOWN %d\n",level,"",v->type);
 	}
 }
 

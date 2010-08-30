@@ -1636,7 +1636,6 @@ proxy_list_provs (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	int			 rc;
 
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 		65536, prov_list_generator, ms, simple_closer);
@@ -1645,7 +1644,7 @@ proxy_list_provs (void *cctx, struct MHD_Connection *conn, const char *url,
 		simple_closer(ms);
 		return MHD_NO;
 	}
-	MHD_queue_response(conn,rc,resp);
+	MHD_queue_response(conn,MHD_HTTP_OK,resp);
 	MHD_destroy_response(resp);
 
 	return MHD_YES;
