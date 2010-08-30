@@ -9,6 +9,7 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include <microhttpd.h>
 #include <curl/curl.h>
@@ -223,6 +224,7 @@ proxy_repl_prod (void *ctx)
 				     proxy_key,proxy_secret);
 		/* Blech.  Can't conflict with consumer, though. */
 		myurl = strdup(item->url);
+		assert (myurl);
 		bucket = strtok_r(myurl,"/",&stctx);
 		key = strtok_r(NULL,"/",&stctx);
 		hstor_get(hstor,bucket,key,
@@ -357,6 +359,7 @@ proxy_repl_cons (void *ctx)
 	s_type = json_string_value(json_object_get(server,"type"));
 
 	myurl = strdup(item->url);
+	assert (myurl);
 	bucket = strtok_r(myurl,"/",&stctx);
 	key = strtok_r(NULL,"/",&stctx);
 
@@ -454,6 +457,7 @@ repl_worker_del (repl_item *item)
 		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",s_host,s_port);
 		/* TBD: check return */
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
+		assert (item->url);
 		bucket = strtok_r(item->url,"/",&stctx);
 		key = strtok_r(NULL,"/",&stctx);
 		DPRINTF("%s calling hstor_del\n",__func__);
