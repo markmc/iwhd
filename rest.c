@@ -212,6 +212,8 @@ local_reader (void *ctx, uint64_t pos, char *buf, int max)
 {
 	int nb;
 
+	(void)pos;
+
 	nb = read(P2I(ctx),buf,max);
 	DPRINTF("got %d from %d\n",nb,P2I(ctx));
 
@@ -233,6 +235,13 @@ local_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	int			 fd;
 	struct stat		 sb;
+
+	(void)cctx;
+	(void)method;
+	(void)version;
+	(void)data;
+	(void)data_size;
+	(void)rctx;
 
 	DPRINTF("LOCAL GET DATA %s\n",url);
 
@@ -278,7 +287,11 @@ local_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	int				 nb;
 	int				 rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
-	DPRINTF("LOCAL PUT DATA %s (%lld)\n",url,*data_size);
+	(void)cctx;
+	(void)method;
+	(void)version;
+
+	DPRINTF("LOCAL PUT DATA %s (%zu)\n",url,*data_size);
 
 	ms = *rctx;
 	if (ms->state == MS_NEW) {
@@ -329,6 +342,13 @@ local_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 
+	(void)cctx;
+	(void)method;
+	(void)version;
+	(void)data;
+	(void)data_size;
+	(void)rctx;
+
 	DPRINTF("LOCAL DELETE %s\n",url);
 	if (unlink(url+1) < 0) {
 		perror("unlink");
@@ -367,7 +387,7 @@ rule local_rules[] = {
 	  "DELETE",	URL_OBJECT,	local_delete	},
 	{ /* delete attribute */
 	  "DELETE",	URL_ATTR,	NULL		},
-	{}
+	{ NULL, 0, NULL }
 };
 
 /**********
@@ -452,6 +472,8 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
 	my_state	*ms	= cs->ms;
 	int		 done;
 	void		*child_res;
+
+	(void)pos;
 
 	DPRINTF("consumer asked to read %d\n",max);
 
@@ -637,6 +659,12 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	char			*my_etag;
 	const char		*user_etag;
 
+	(void)cctx;
+	(void)method;
+	(void)version;
+	(void)data;
+	(void)data_size;
+
 	DPRINTF("PROXY GET DATA %s\n",url);
 
 	my_etag = meta_has_copy(ms->bucket,ms->key,me);
@@ -740,7 +768,7 @@ proxy_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 		}
 		memcpy(ptr,ms->buf_ptr+cs->offset,done);
 		cs->offset += done;
-		DPRINTF("consumer copied %d, new offset %d\n",
+		DPRINTF("consumer copied %zu, new offset %d\n",
 			done, cs->offset);
 		if (cs->offset == ms->buf_len) {
 			DPRINTF("consumer finished chunk\n");
@@ -861,7 +889,11 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	char			*etag	= NULL;
 	void			*child_res;
 
-	DPRINTF("PROXY PUT DATA %s (%lld)\n",url,*data_size);
+	(void)cctx;
+	(void)method;
+	(void)version;
+
+	DPRINTF("PROXY PUT DATA %s (%zu)\n",url,*data_size);
 
 	if (ms->state == MS_NEW) {
 		if (!validate_put(conn) || !validate_url(url)) {
@@ -964,6 +996,12 @@ proxy_get_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 	char			*fixed;
 	my_state		*ms	= *rctx;
 
+	(void)cctx;
+	(void)method;
+	(void)version;
+	(void)data;
+	(void)data_size;
+
 	DPRINTF("PROXY GET ATTR %s\n",url);
 
 	meta_get_value(ms->bucket,ms->key,ms->attr,&fixed);
@@ -989,7 +1027,11 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 	const char		*attrval;
 	int			 send_resp = 0;
 
-	DPRINTF("PROXY PUT ATTR %s (%lld)\n",url,*data_size);
+	(void)cctx;
+	(void)method;
+	(void)version;
+
+	DPRINTF("PROXY PUT ATTR %s (%zu)\n",url,*data_size);
 
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
@@ -1086,6 +1128,16 @@ query_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 		const char *transfer_encoding, const char *data,
 		uint64_t off, size_t size)
 {
+	(void)ctx;
+	(void)kind;
+	(void)key;
+	(void)filename;
+	(void)content_type;
+	(void)transfer_encoding;
+	(void)data;
+	(void)off;
+	(void)size;
+
 	/* We actually accumulate the data in proxy_query. */
 	return MHD_YES;
 }
@@ -1096,14 +1148,17 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
 {
 	my_state	*ms	= ctx;
 	int		 len;
-	const char	*accept;
+	const char	*accept_hdr;
 	char		*bucket;
 	char		*key;
 
-	accept = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Accept");
+	(void)pos;
+
+	accept_hdr = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,
+		"Accept");
 
 	if (!ms->gen_ctx) {
-		ms->gen_ctx = tmpl_get_ctx(accept);
+		ms->gen_ctx = tmpl_get_ctx(accept_hdr);
 		if (!ms->gen_ctx) {
 			return -1;
 		}
@@ -1163,6 +1218,10 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
 
+	(void)cctx;
+	(void)method;
+	(void)version;
+
 	DPRINTF("PROXY QUERY %s (%zu)\n",url,*data_size);
 
 	if (ms->state == MS_NEW) {
@@ -1220,6 +1279,13 @@ proxy_list_objs (void *cctx, struct MHD_Connection *conn, const char *url,
 	my_state	*ms	= *rctx;
 	struct MHD_Response	*resp;
 
+	(void)cctx;
+	(void)url;
+	(void)method;
+	(void)version;
+	(void)data;
+	(void)data_size;
+
 	ms->query = meta_query_new((char *)ms->bucket,NULL,NULL);
 	ms->cleanup |= CLEANUP_QUERY;
 
@@ -1249,6 +1315,12 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	char			*bucket;
 	char			*key;
 	char			*stctx;
+
+	(void)cctx;
+	(void)method;
+	(void)version;
+	(void)data;
+	(void)data_size;
 
 	DPRINTF("PROXY DELETE %s\n",url);
 
@@ -1302,16 +1374,19 @@ root_blob_generator (void *ctx, uint64_t pos, char *buf, int max)
 	my_state	*ms	= ctx;
 	fake_bucket_t *	 fb;
 	int		 len;
-	const char	*accept;
+	const char	*accept_hdr;
 	const char	*host;
 	char		*bucket;
 	char		*key;
 
-	accept = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Accept");
+	(void)pos;
+
+	accept_hdr = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,
+		"Accept");
 	host = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Host");
 
 	if (!ms->gen_ctx) {
-		ms->gen_ctx = tmpl_get_ctx(accept);
+		ms->gen_ctx = tmpl_get_ctx(accept_hdr);
 		if (!ms->gen_ctx) {
 			return -1;
 		}
@@ -1380,6 +1455,11 @@ proxy_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 	unsigned int		 rc	= MHD_HTTP_OK;
 	my_state		*ms	= *rctx;
 
+	(void)cctx;
+	(void)method;
+	(void)version;
+	(void)data;
+
 	DPRINTF("PROXY API ROOT (%s, %zu)\n",url,*data_size);
 
 	ms->query = meta_query_new(NULL,"_default",NULL);
@@ -1408,6 +1488,12 @@ post_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 	       const char *transfer_encoding, const char *data,
 	       uint64_t off, size_t size)
 {
+	(void)kind;
+	(void)filename;
+	(void)content_type;
+	(void)transfer_encoding;
+	(void)off;
+
 	g_hash_table_insert(ctx,strdup(key),strndup(data,size));
 	/* TBD: check return value for strdups (none avail for insert) */
 	return MHD_YES;
@@ -1417,6 +1503,9 @@ post_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 gboolean
 post_find (gpointer key, gpointer value, gpointer ctx)
 {
+	(void)value;
+	(void)ctx;
+
 	if (!is_reserved(key,reserved_attr)) {
 		return FALSE;
 	}
@@ -1444,6 +1533,10 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	my_state		*ms	= *rctx;
 	int			 rc;
 	char			*key;
+
+	(void)cctx;
+	(void)method;
+	(void)version;
 
 	DPRINTF("PROXY POST (%s, %zu)\n",url,*data_size);
 
@@ -1519,6 +1612,10 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	int			 rc;
 	char			*op;
 
+	(void)cctx;
+	(void)method;
+	(void)version;
+
 	DPRINTF("PROXY POST (%s, %zu)\n",url,*data_size);
 
 	if (ms->state == MS_NEW) {
@@ -1577,12 +1674,15 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
 	my_state	*ms	= ctx;
 	int		 len;
 	provider_t	 prov;
-	const char	*accept;
+	const char	*accept_hdr;
 
-	accept = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Accept");
+	(void)pos;
+
+	accept_hdr = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,
+		"Accept");
 
 	if (!ms->gen_ctx) {
-		ms->gen_ctx = tmpl_get_ctx(accept);
+		ms->gen_ctx = tmpl_get_ctx(accept_hdr);
 		if (!ms->gen_ctx) {
 			return -1;
 		}
@@ -1637,6 +1737,13 @@ proxy_list_provs (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
 
+	(void)cctx;
+	(void)url;
+	(void)method;
+	(void)version;
+	(void)data;
+	(void)data_size;
+
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 		65536, prov_list_generator, ms, simple_closer);
 	if (!resp) {
@@ -1656,6 +1763,12 @@ prov_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 	       const char *transfer_encoding, const char *data,
 	       uint64_t off, size_t size)
 {
+	(void)kind;
+	(void)filename;
+	(void)content_type;
+	(void)transfer_encoding;
+	(void)off;
+
 	g_hash_table_insert(ctx,strdup(key),strndup(data,size));
 	/* TBD: check return value for strdups (none avail for insert) */
 	return MHD_YES;
@@ -1673,6 +1786,10 @@ proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	char			*provider;
 	char			*username;
 	char			*password;
+
+	(void)cctx;
+	(void)method;
+	(void)version;
 
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
@@ -1720,6 +1837,13 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
 	int			 rc 	= MHD_HTTP_OK;
+
+	(void)cctx;
+	(void)url;
+	(void)method;
+	(void)version;
+	(void)data;
+	(void)data_size;
 
 	if ((rc == MHD_HTTP_OK) && !s3mode) {
 		DPRINTF("cannot create bucket in non-S3 mode\n");
@@ -1781,7 +1905,7 @@ rule proxy_rules[] = {
 	  "GET",	URL_PROVLIST,	proxy_list_provs	},
 	{ /* update a provider */
 	  "POST",	URL_PROVLIST,	proxy_update_prov	},
-	{}
+	{ NULL, 0, NULL }
 };
 
 url_type
@@ -1901,7 +2025,7 @@ struct option my_options[] = {
 	{ "master",  required_argument, NULL, 'm' },
 	{ "port",    required_argument, NULL, 'p' },
 	{ "verbose", no_argument,       NULL, 'v' },
-	{}
+	{ NULL, 0, NULL, '\0' }
 };
 
 void

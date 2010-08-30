@@ -5,6 +5,7 @@
 #include <string.h>
 #define YYRULECOUNT 24
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -231,7 +232,7 @@ _print_value (value_t *v, int level)
 #endif
 		break;
 	case T_COMP:
-		printf("%*sCOMPARISON (%d)\n",level,"",v->as_num);
+		printf("%*sCOMPARISON\n",level,"");
 		_print_value(v->as_tree.left,level+2);
 		_print_value(v->as_tree.right,level+2);
 		break;

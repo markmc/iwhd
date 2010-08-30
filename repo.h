@@ -35,7 +35,12 @@ GLOBAL(char *,          me,             "here")
 
 #define I2P(x)	((void *)(long)(x))
 #define P2I(x)	((int)(long)(x))
-#define DPRINTF	verbose && printf
+
+#define DPRINTF(fmt,args...) { \
+	if (verbose)			{	\
+		printf(fmt,##args);		\
+	}					\
+}
 
 #ifndef __attribute__
 # if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 8)
