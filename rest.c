@@ -1845,17 +1845,16 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)data;
 	(void)data_size;
 
-	if ((rc == MHD_HTTP_OK) && !s3mode) {
-		DPRINTF("cannot create bucket in non-S3 mode\n");
-		rc = MHD_HTTP_NOT_IMPLEMENTED;
-	}
-
-	if (rc == MHD_HTTP_OK) {
+	if (s3mode) {
 		DPRINTF("creating bucket %s\n",ms->bucket);
 		if (!hstor_add_bucket(hstor,ms->bucket)) {
 			DPRINTF("  bucket create failed\n");
 			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 		}
+	}
+	else {
+		DPRINTF("cannot create bucket in non-S3 mode\n");
+		//rc = MHD_HTTP_NOT_IMPLEMENTED;
 	}
 
 	if (rc == MHD_HTTP_OK) {
@@ -2138,7 +2137,7 @@ args_done:
 	 */
 	the_daemon = MHD_start_daemon(MY_MHD_FLAGS,
 		my_port, NULL, NULL, &access_handler, &the_sem,
-		MHD_OPTION_CONNECTION_MEMORY_LIMIT, 1048576,
+		MHD_OPTION_CONNECTION_MEMORY_LIMIT, (size_t)1048576,
 		MHD_OPTION_END);
 	if (!the_daemon) {
 		fprintf(stderr,"Could not create daemon.\n");
