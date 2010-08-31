@@ -1052,7 +1052,11 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 	else if (*data_size) {
 		if (ms->buf_len) {
 			ms->buf_len += *data_size;
-			ms->buf_ptr = realloc(ms->buf_ptr,ms->buf_len);
+			char *p = realloc(ms->buf_ptr,ms->buf_len);
+			if (!p) {
+				return MHD_NO;
+			}
+			p = ms->buf_ptr;
 		}
 		else {
 			ms->buf_len = *data_size + 1;
@@ -1235,7 +1239,11 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		MHD_post_process(ms->post,data,*data_size);
 		if (ms->buf_len) {
 			ms->buf_len += *data_size;
-			ms->buf_ptr = realloc(ms->buf_ptr,ms->buf_len);
+			char *p = realloc(ms->buf_ptr,ms->buf_len);
+			if (!p) {
+				return MHD_NO;
+			}
+			p = ms->buf_ptr;
 		}
 		else {
 			ms->buf_len = *data_size + 1;
