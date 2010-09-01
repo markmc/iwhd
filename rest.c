@@ -648,6 +648,9 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		pthread_create(&ms->cache_th,NULL,cache_get_child,pp2);
 		/* TBD: check return value */
 	}
+	else {
+		pp2 = NULL;
+	}
 
 	resp = MHD_create_response_from_callback(
 		MHD_SIZE_UNKNOWN, 65536, proxy_get_cons, pp, child_closer);
@@ -947,7 +950,11 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 	else if (*data_size) {
 		if (ms->pipe.data_len) {
 			ms->pipe.data_len += *data_size;
-			ms->pipe.data_ptr = realloc(ms->pipe.data_ptr,ms->pipe.data_len);
+			char *p = realloc(ms->pipe.data_ptr,ms->pipe.data_len);
+			if (!p) {
+				return MHD_NO;
+			}
+			ms->pipe.data_ptr = p;
 		}
 		else {
 			ms->pipe.data_len = *data_size + 1;
@@ -1128,7 +1135,11 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		MHD_post_process(ms->post,data,*data_size);
 		if (ms->pipe.data_len) {
 			ms->pipe.data_len += *data_size;
-			ms->pipe.data_ptr = realloc(ms->pipe.data_ptr,ms->pipe.data_len);
+			char *p = realloc(ms->pipe.data_ptr,ms->pipe.data_len);
+			if (!p) {
+				return MHD_NO;
+			}
+			ms->pipe.data_ptr = p;
 		}
 		else {
 			ms->pipe.data_len = *data_size + 1;
@@ -1206,7 +1217,7 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	char			*copied_url;
 	char			*bucket;
 	char			*key;
-	char			*stctx;
+	char			*stctx = NULL;
 
 	(void)cctx;
 	(void)method;
@@ -1938,7 +1949,7 @@ main (int argc, char **argv)
 {
 	struct MHD_Daemon	*the_daemon;
 	sem_t			 the_sem;
-	char			*stctx;
+	char			*stctx = NULL;
 	char			*port_tmp;
 
 	for (;;) switch (getopt_long(argc,argv,"c:d:fm:p:v",my_options,NULL)) {
