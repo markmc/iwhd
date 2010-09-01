@@ -21,6 +21,7 @@
 #include "meta.h"
 #include "proxy.h"
 #include "template.h"
+#include "mpipe.h"
 
 #if defined(DEBUG)
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION | MHD_USE_DEBUG
@@ -55,8 +56,6 @@ typedef struct {
 	/* for proxy puts */
 	size_t				 size;
 	/* for proxy puts and queries */
-	char				*buf_ptr;
-	int				 buf_len;
 	struct MHD_Connection		*conn;
 	/* for proxy queries */
 	struct MHD_PostProcessor	*post;
@@ -64,14 +63,8 @@ typedef struct {
 	/* for bucket-level puts */
 	GHashTable			*dict;
 	/* for new producer/consumer model */
-	pthread_mutex_t			 lock;
-	pthread_cond_t			 prod_cond;
-	pthread_cond_t			 cons_cond;
-	int				 prod_done;
-	unsigned int			 cons_count;
+	pipe_shared			 pipe;
 	int				 from_master;
-	int				 children;
-	int				 block_gen;
 	pthread_t			 backend_th;
 	pthread_t			 cache_th;
 	/* for bucket/object/provider list generators */
@@ -85,12 +78,6 @@ typedef struct {
 #define CLEANUP_QUERY	0x10
 #define CLEANUP_TMPL	0x20
 #define CLEANUP_URL	0x40
-
-typedef struct {
-	my_state	*ms;
-	int		 block_gen;
-	int		 offset;
-} cons_state;
 
 typedef enum {
 	URL_ROOT=0, URL_BUCKET, URL_OBJECT, URL_ATTR, URL_INVAL,
@@ -126,7 +113,7 @@ free_ms (my_state *ms)
 	}
 
 	if (ms->cleanup & CLEANUP_BUF_PTR) {
-		free(ms->buf_ptr);
+		free(ms->pipe.data_ptr);
 	}
 
 	if (ms->cleanup & CLEANUP_POST) {
@@ -412,7 +399,7 @@ rule local_rules[] = {
  * all consumers to check back in saying they've finished it.  This might
  * involve multiple passes through each consumer for one pass through the
  * single producer.  When the producer is done, it does a similar handshake
- * with the consumers.  Each consumer has its own cons_state structure,
+ * with the consumers.  Each consumer has its own pipe_private structure,
  * containing a pointer to the shared my_state plus a per-consumer offset
  * into the current chunk.
  *
@@ -420,29 +407,6 @@ rule local_rules[] = {
  * buffering.  Queries also don't use CURL, but the MHD POST interface
  * introduces some of its own complexity so see below for that.
  **********/
-
-cons_state *
-proxy_init_pc (my_state *ms)
-{
-	cons_state	*cs;
-
-	if (!ms->children++) {
-		pthread_mutex_init(&ms->lock,NULL);
-		pthread_cond_init(&ms->prod_cond,NULL);
-		pthread_cond_init(&ms->cons_cond,NULL);
-		ms->block_gen = 0;
-		ms->cons_count = 0;
-		ms->prod_done = 0;
-	}
-
-	cs = malloc(sizeof(*cs));
-	if (cs) {
-		cs->ms = ms;
-		cs->block_gen = 1;
-		cs->offset = 0;
-	}
-	return cs;
-}
 
 void
 simple_closer (void *ctx)
@@ -456,20 +420,20 @@ simple_closer (void *ctx)
 void
 child_closer (void * ctx)
 {
-	cons_state	*cs	= ctx;
+	pipe_private	*pp	= ctx;
 
 	DPRINTF("in %s\n",__func__);
 
-	free_ms(cs->ms);
-	free(cs);
+	free(pp);
 }
 
 /* Invoked from MHD. */
 int
 proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
 {
-	cons_state	*cs	= ctx;
-	my_state	*ms	= cs->ms;
+	pipe_private	*pp	= ctx;
+	pipe_shared	*ps	= pp->shared;
+	my_state	*ms	= ps->owner;
 	int		 done;
 	void		*child_res;
 
@@ -477,41 +441,25 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
 
 	DPRINTF("consumer asked to read %d\n",max);
 
-	pthread_mutex_lock(&ms->lock);
-	DPRINTF("consumer about to wait for %d\n",cs->block_gen);
-	while (ms->block_gen != cs->block_gen) {
-		pthread_cond_wait(&ms->cons_cond,&ms->lock);
-	}
-	DPRINTF("consumer done waiting\n");
-
-	if (ms->prod_done) {
-		DPRINTF("consumer saw producer is done\n");
-		if (!--ms->cons_count) {
-			pthread_cond_signal(&ms->prod_cond);
-		}
-		done = -1;
-	}
-	else {
-		DPRINTF("consumer offset %d into %d\n",
-			cs->offset, ms->buf_len);
-		done = ms->buf_len - cs->offset;
+	if (pipe_cons_wait(pp)) {
+		DPRINTF("consumer offset %zu into %zu\n",
+			pp->offset, ps->data_len);
+		done = ps->data_len - pp->offset;
 		if (done > max) {
 			done = max;
 		}
-		memcpy(buf,ms->buf_ptr+cs->offset,done);
-		cs->offset += done;
-		DPRINTF("consumer copied %d, new offset %d\n",
-			done, cs->offset);
-		if (cs->offset == ms->buf_len) {
+		memcpy(buf,ps->data_ptr+pp->offset,done);
+		pp->offset += done;
+		DPRINTF("consumer copied %d, new offset %zu\n",
+			done, pp->offset);
+		if (pp->offset == ps->data_len) {
 			DPRINTF("consumer finished chunk\n");
-			++cs->block_gen;
-			cs->offset = 0;
-			if (!--ms->cons_count) {
-				pthread_cond_signal(&ms->prod_cond);
-			}
+			pipe_cons_signal(pp);
 		}
 	}
-	pthread_mutex_unlock(&ms->lock);
+	else {
+		done = -1;
+	}
 
 	if (done == (-1)) {
 		child_res = NULL;
@@ -533,20 +481,10 @@ size_t
 proxy_get_prod (void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	size_t		 total	= size * nmemb;
-	my_state	*ms	= stream;
+	pipe_shared	*ps	= stream;
 
-	DPRINTF("producer posting %zu bytes as %d\n",total,ms->block_gen+1);
-	pthread_mutex_lock(&ms->lock);
-	ms->buf_ptr = ptr;
-	ms->buf_len = total;
-	ms->cons_count = ms->children;
-	++ms->block_gen;
-	do {
-		pthread_cond_broadcast(&ms->cons_cond);
-		pthread_cond_wait(&ms->prod_cond,&ms->lock);
-		DPRINTF("%u children yet to read\n",ms->cons_count);
-	} while (ms->cons_count);
-	pthread_mutex_unlock(&ms->lock);
+	DPRINTF("producer posting %zu bytes as %ld\n",total,ps->sequence+1);
+	pipe_prod_signal(ps,ptr,total);
 
 	DPRINTF("producer chunk finished\n");
 	return total;
@@ -557,11 +495,10 @@ void *
 proxy_get_child (void * ctx)
 {
 	char		 fixed[1024];
-	cons_state	*cs	= ctx;
-	my_state	*ms	= cs->ms;
+	my_state	*ms	= ctx;
 
 	if (!ms->from_master && s3mode) {
-		hstor_get(hstor,ms->bucket,ms->key, proxy_get_prod,ms,0);
+		hstor_get(hstor,ms->bucket,ms->key,proxy_get_prod,&ms->pipe,0);
 		/* TBD: check return value */
 	}
 	else {
@@ -586,19 +523,10 @@ proxy_get_child (void * ctx)
 		curl_easy_getinfo(ms->curl,CURLINFO_RESPONSE_CODE,&ms->rc);
 	}
 
-	pthread_mutex_lock(&ms->lock);
-	ms->prod_done = 1;
-	ms->cons_count = ms->children;
-	++ms->block_gen;
-	DPRINTF("waiting for %u children\n",ms->cons_count);
-	do {
-		pthread_cond_broadcast(&ms->cons_cond);
-		pthread_cond_wait(&ms->prod_cond,&ms->lock);
-		DPRINTF("%u children left\n",ms->cons_count);
-	} while (ms->cons_count);
-	pthread_mutex_unlock(&ms->lock);
+	pipe_prod_finish(&ms->pipe);
 
 	DPRINTF("producer exiting\n");
+	free_ms(ms);
 	return NULL;
 }
 
@@ -610,8 +538,9 @@ proxy_put_cons (void *ptr, size_t size, size_t nmemb, void *stream);
 void *
 cache_get_child (void * ctx)
 {
-	cons_state	*cs	= ctx;
-	my_state	*ms	= cs->ms;
+	pipe_private	*pp	= ctx;
+	pipe_shared	*ps	= pp->shared;
+	my_state	*ms	= ps->owner;
 	char		 fixed[1024];
 	CURL		*curl;
 	char		*slash;
@@ -633,7 +562,7 @@ cache_get_child (void * ctx)
 	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,
 		(curl_off_t)MHD_SIZE_UNKNOWN);
 	curl_easy_setopt(curl,CURLOPT_READFUNCTION,proxy_put_cons);
-	curl_easy_setopt(curl,CURLOPT_READDATA,cs);
+	curl_easy_setopt(curl,CURLOPT_READDATA,pp);
 	curl_easy_perform(curl);
 	curl_easy_cleanup(curl);
 
@@ -654,8 +583,8 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	cons_state		*cs;
-	cons_state		*cs2;
+	pipe_private		*pp;
+	pipe_private		*pp2;
 	char			*my_etag;
 	const char		*user_etag;
 
@@ -666,6 +595,12 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)data_size;
 
 	DPRINTF("PROXY GET DATA %s\n",url);
+
+	ms->url = strdup(url);
+	if (!ms->url) {
+		return MHD_NO;
+	}
+	ms->cleanup |= CLEANUP_URL;
 
 	my_etag = meta_has_copy(ms->bucket,ms->key,me);
 	if (my_etag) {
@@ -681,13 +616,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			return MHD_YES;
 		}
 		free(my_etag);
-		ms->url = strdup(url);
-		if (!ms->url) {
-			return MHD_NO;
-		}
-		ms->cleanup |= CLEANUP_URL;
 		ms->from_master = 0;
-		cs2 = NULL;
 	}
 	else {
 		DPRINTF("%s/%s not found locally\n",ms->bucket,ms->key);
@@ -700,33 +629,35 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			return MHD_YES;
 		}
 		DPRINTF("  will fetch from %s:%u\n", master_host,master_port);
-		ms->url = strdup(url);
-		if (!ms->url) {
-			return MHD_NO;
-		}
-		ms->cleanup |= CLEANUP_URL;
 		ms->from_master = 1;
-		cs2 = proxy_init_pc(ms);
-		if (!cs2) {
-			return MHD_NO;
-		}
-		pthread_create(&ms->cache_th,NULL,cache_get_child,cs2);
-		/* TBD: check return value */
 	}
-	cs = proxy_init_pc(ms);
-	/* TBD: check return value, terminate cs2 if it exists */
-	pthread_create(&ms->backend_th,NULL,proxy_get_child,cs);
+
+	pipe_init_shared(&ms->pipe,ms,ms->from_master+1);
+	pp = pipe_init_private(&ms->pipe);
+	if (!pp) {
+		return MHD_NO;
+	}
+	pthread_create(&ms->backend_th,NULL,proxy_get_child,ms);
 	/* TBD: check return value */
 
+	if (ms->from_master) {
+		pp2 = pipe_init_private(&ms->pipe);
+		if (!pp2) {
+			return MHD_NO;
+		}
+		pthread_create(&ms->cache_th,NULL,cache_get_child,pp2);
+		/* TBD: check return value */
+	}
+
 	resp = MHD_create_response_from_callback(
-		MHD_SIZE_UNKNOWN, 65536, proxy_get_cons, cs, child_closer);
+		MHD_SIZE_UNKNOWN, 65536, proxy_get_cons, pp, child_closer);
 	if (!resp) {
 		fprintf(stderr,"MHD_crfc failed\n");
-		if (cs2) {
+		if (pp2) {
 			/* TBD: terminate thread */
-			free(cs2);
+			free(pp2);
 		}
-		child_closer(cs);
+		child_closer(pp);
 		return MHD_NO;
 	}
 	MHD_queue_response(conn,ms->rc,resp);
@@ -740,45 +671,30 @@ size_t
 proxy_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	size_t		 total	= size * nmemb;
-	cons_state	*cs	= stream;
-	my_state	*ms	= cs->ms;
+	pipe_private	*pp	= stream;
+	pipe_shared	*ps	= pp->shared;
 	size_t		 done;
 
 	DPRINTF("consumer asked to read %zu\n",total);
 
-	pthread_mutex_lock(&ms->lock);
-	DPRINTF("consumer about to wait for %d\n",cs->block_gen);
-	while (ms->block_gen != cs->block_gen) {
-		pthread_cond_wait(&ms->cons_cond,&ms->lock);
+	if (!pipe_cons_wait(pp)) {
+		return 0;
 	}
 
-	if (ms->prod_done) {
-		DPRINTF("consumer saw producer is done\n");
-		if (!--ms->cons_count) {
-			pthread_cond_signal(&ms->prod_cond);
-		}
-		done = 0;
+	DPRINTF("consumer offset %zu into %zu\n",
+		pp->offset, ps->data_len);
+	done = ps->data_len - pp->offset;
+	if (done > total) {
+		done = total;
 	}
-	else {
-		DPRINTF("consumer offset %d into %d\n",
-			cs->offset, ms->buf_len);
-		done = ms->buf_len - cs->offset;
-		if (done > total) {
-			done = total;
-		}
-		memcpy(ptr,ms->buf_ptr+cs->offset,done);
-		cs->offset += done;
-		DPRINTF("consumer copied %zu, new offset %d\n",
-			done, cs->offset);
-		if (cs->offset == ms->buf_len) {
-			DPRINTF("consumer finished chunk\n");
-			cs->offset = 0;
-			++cs->block_gen;
-			--ms->cons_count;
-			pthread_cond_signal(&ms->prod_cond);
-		}
+	memcpy(ptr,ps->data_ptr+pp->offset,done);
+	pp->offset += done;
+	DPRINTF("consumer copied %zu, new offset %zu\n",
+		done, pp->offset);
+	if (pp->offset == ps->data_len) {
+		DPRINTF("consumer finished chunk\n");
+		pipe_cons_signal(pp);
 	}
-	pthread_mutex_unlock(&ms->lock);
 
 	return done;
 }
@@ -787,8 +703,9 @@ proxy_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 void *
 proxy_put_child (void * ctx)
 {
-	cons_state	*cs	= ctx;
-	my_state	*ms	= cs->ms;
+	pipe_private	*pp	= ctx;
+	pipe_shared	*ps	= pp->shared;
+	my_state	*ms	= ps->owner;
 	curl_off_t	 llen;
 	char		 fixed[1024];
 	CURL		*curl;
@@ -806,7 +723,7 @@ proxy_put_child (void * ctx)
 
 	if (s3mode) {
 		hstor_put(hstor,ms->bucket,ms->key,
-			     proxy_put_cons,llen,cs,NULL);
+			     proxy_put_cons,llen,pp,NULL);
 		/* TBD: check return value */
 	}
 	else {
@@ -820,13 +737,13 @@ proxy_put_child (void * ctx)
 		curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
 		curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,llen);
 		curl_easy_setopt(curl,CURLOPT_READFUNCTION,proxy_put_cons);
-		curl_easy_setopt(curl,CURLOPT_READDATA,cs);
+		curl_easy_setopt(curl,CURLOPT_READDATA,pp);
 		curl_easy_perform(curl);
 		curl_easy_cleanup(curl);
 	}
 
 	DPRINTF("%s returning\n",__func__);
-	free(cs);
+	free(pp);
 	return NULL;
 }
 
@@ -884,7 +801,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	cons_state		*cs;
+	pipe_private		*pp;
 	int			 rc;
 	char			*etag	= NULL;
 	void			*child_res;
@@ -914,43 +831,22 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		ms->cleanup |= CLEANUP_URL;
 		ms->size = 0;
-		cs = proxy_init_pc(ms);
-		if (!cs) {
+		pipe_init_shared(&ms->pipe,ms,1);
+		pp = pipe_init_private(&ms->pipe);
+		if (!pp) {
 			return MHD_NO;
 		}
-		pthread_create(&ms->backend_th,NULL,proxy_put_child,cs);
+		pthread_create(&ms->backend_th,NULL,proxy_put_child,pp);
 		/* TBD: check return value */
 	}
 	else if (*data_size) {
-		DPRINTF("producer posting %zu bytes as %d\n",
-			*data_size,ms->block_gen+1);
-		pthread_mutex_lock(&ms->lock);
-		ms->buf_ptr = (char *)data;
-		ms->buf_len = *data_size;
-		ms->cons_count = ms->children;
-		++ms->block_gen;
-		do {
-			pthread_cond_broadcast(&ms->cons_cond);
-			pthread_cond_wait(&ms->prod_cond,&ms->lock);
-			DPRINTF("%u children yet to read\n",ms->cons_count);
-		} while (ms->cons_count);
+		pipe_prod_signal(&ms->pipe,(void *)data,*data_size);
 		ms->size += *data_size;
-		pthread_mutex_unlock(&ms->lock);
 		DPRINTF("producer chunk finished\n");
 		*data_size = 0;
 	}
 	else {
-		pthread_mutex_lock(&ms->lock);
-		ms->prod_done = 1;
-		ms->cons_count = ms->children;
-		++ms->block_gen;
-		DPRINTF("waiting for %u children\n",ms->cons_count);
-		do {
-			pthread_cond_broadcast(&ms->cons_cond);
-			pthread_cond_wait(&ms->prod_cond,&ms->lock);
-			DPRINTF("%u children left\n",ms->cons_count);
-		} while (ms->cons_count);
-		pthread_mutex_unlock(&ms->lock);
+		pipe_prod_finish(&ms->pipe);
 		pthread_join(ms->backend_th,&child_res);
 		if (child_res == THREAD_FAILED) {
 			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
@@ -1049,28 +945,26 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 	}
 	else if (*data_size) {
-		if (ms->buf_len) {
-			ms->buf_len += *data_size;
-			ms->buf_ptr = realloc(ms->buf_ptr,ms->buf_len);
+		if (ms->pipe.data_len) {
+			ms->pipe.data_len += *data_size;
+			ms->pipe.data_ptr = realloc(ms->pipe.data_ptr,ms->pipe.data_len);
 		}
 		else {
-			ms->buf_len = *data_size + 1;
-			ms->buf_ptr = malloc(ms->buf_len);
-			if (!ms->buf_ptr) {
+			ms->pipe.data_len = *data_size + 1;
+			ms->pipe.data_ptr = malloc(ms->pipe.data_len);
+			if (!ms->pipe.data_ptr) {
 				return MHD_NO;
 			}
 			ms->cleanup |= CLEANUP_BUF_PTR;
-			ms->buf_ptr[0] = '\0';
 		}
-		(void)strncat(ms->buf_ptr,data,*data_size);
+		(void)strncat(ms->pipe.data_ptr,data,*data_size);
 		/* TBD: check return value */
 		*data_size = 0;
 	}
 	else {
-		if (!ms->buf_ptr) {
+		if (!ms->pipe.data_ptr) {
 			return MHD_NO;
 		}
-		ms->buf_ptr[ms->buf_len-1] = '\0';
 		if (is_reserved(ms->attr,reserved_attr)) {
 			resp = MHD_create_response_from_data(
 				0,NULL,MHD_NO,MHD_NO);
@@ -1083,7 +977,7 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 			free_ms(ms);
 			return MHD_YES;
 		}
-		meta_set_value(ms->bucket,ms->key,ms->attr,ms->buf_ptr);
+		meta_set_value(ms->bucket,ms->key,ms->attr,ms->pipe.data_ptr);
 		/*
 		 * We should always re-replicate, because the replication
 		 * policy might refer to this attr.
@@ -1232,29 +1126,27 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 	else if (*data_size) {
 		MHD_post_process(ms->post,data,*data_size);
-		if (ms->buf_len) {
-			ms->buf_len += *data_size;
-			ms->buf_ptr = realloc(ms->buf_ptr,ms->buf_len);
+		if (ms->pipe.data_len) {
+			ms->pipe.data_len += *data_size;
+			ms->pipe.data_ptr = realloc(ms->pipe.data_ptr,ms->pipe.data_len);
 		}
 		else {
-			ms->buf_len = *data_size + 1;
-			ms->buf_ptr = malloc(ms->buf_len);
-			if (!ms->buf_ptr) {
+			ms->pipe.data_len = *data_size + 1;
+			ms->pipe.data_ptr = malloc(ms->pipe.data_len);
+			if (!ms->pipe.data_ptr) {
 				return MHD_NO;
 			}
 			ms->cleanup |= CLEANUP_BUF_PTR;
-			ms->buf_ptr[0] = '\0';
 		}
-		(void)strncat(ms->buf_ptr,data,*data_size);
+		(void)strncat(ms->pipe.data_ptr,data,*data_size);
 		/* TBD: check return value */
 		*data_size = 0;
 	}
 	else {
-		if (!ms->buf_ptr) {
+		if (!ms->pipe.data_ptr) {
 			return MHD_NO;
 		}
-		ms->buf_ptr[ms->buf_len-1] = '\0';
-		ms->query = meta_query_new(ms->bucket,NULL,ms->buf_ptr);
+		ms->query = meta_query_new(ms->bucket,NULL,ms->pipe.data_ptr);
 		ms->cleanup |= CLEANUP_QUERY;
 		resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 			65536, proxy_query_func, ms, simple_closer);
