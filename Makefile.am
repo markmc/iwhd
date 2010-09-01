@@ -5,6 +5,8 @@ bin_PROGRAMS	= repod
 repod_SOURCES = \
   meta.cpp	\
   meta.h	\
+  mpipe.c	\
+  mpipe.h	\
   proxy.c	\
   proxy.h	\
   query.c	\
