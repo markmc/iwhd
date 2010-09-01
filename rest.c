@@ -17,12 +17,13 @@
 #include <hstor.h>
 #include <glib.h>
 
-#define GLOBALS_IMPL
 #include "repo.h"
 #include "meta.h"
 #include "proxy.h"
 #include "template.h"
 #include "mpipe.h"
+#include "backend.h"
+#include "state_defs.h"
 
 #if defined(DEBUG)
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION | MHD_USE_DEBUG
@@ -31,54 +32,9 @@
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION
 #endif
 
-#define MAX_FIELD_LEN	64
-#define THREAD_FAILED	((void *)(-1))
-
-typedef enum {
-	MS_NEW,
-	MS_NORMAL,
-} ms_state;
-
-typedef struct {
-	int				 cleanup;
-	/* for everyone */
-	MHD_AccessHandlerCallback	 handler;
-	ms_state			 state;
-	/* for local ops */
-	int				 fd;
-	/* for proxy ops */
-	char				*url;
-	char				 bucket[MAX_FIELD_LEN];
-	char				 key[MAX_FIELD_LEN];
-	char				 attr[MAX_FIELD_LEN];
-	/* for proxy gets */
-	CURL				*curl;
-	long				 rc;
-	/* for proxy puts */
-	size_t				 size;
-	/* for proxy puts and queries */
-	struct MHD_Connection		*conn;
-	/* for proxy queries */
-	struct MHD_PostProcessor	*post;
-	void				*query;
-	/* for bucket-level puts */
-	GHashTable			*dict;
-	/* for new producer/consumer model */
-	pipe_shared			 pipe;
-	int				 from_master;
-	pthread_t			 backend_th;
-	pthread_t			 cache_th;
-	/* for bucket/object/provider list generators */
-	tmpl_ctx_t			*gen_ctx;
-} my_state;
-
-#define CLEANUP_CURL	0x01
-#define CLEANUP_BUF_PTR	0x02
-#define CLEANUP_POST	0x04
-#define CLEANUP_DICT	0x08
-#define CLEANUP_QUERY	0x10
-#define CLEANUP_TMPL	0x20
-#define CLEANUP_URL	0x40
+extern backend_func_tbl	bad_func_tbl;
+extern backend_func_tbl	s3_func_tbl;
+extern backend_func_tbl	curl_func_tbl;
 
 typedef enum {
 	URL_ROOT=0, URL_BUCKET, URL_OBJECT, URL_ATTR, URL_INVAL,
@@ -105,6 +61,8 @@ unsigned short		 master_port	= MY_PORT;
 
 char *(reserved_name[]) = { "_default", "_query", "_new", NULL };
 char *(reserved_attr[]) = { "bucket", "key", "date", "etag", "loc", NULL };
+
+backend_func_tbl *main_func_tbl = &bad_func_tbl;
 
 void
 free_ms (my_state *ms)
@@ -477,106 +435,6 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
 	return done;
 }
 
-/* Invoked from CURL. */
-size_t
-proxy_get_prod (void *ptr, size_t size, size_t nmemb, void *stream)
-{
-	size_t		 total	= size * nmemb;
-	pipe_shared	*ps	= stream;
-
-	DPRINTF("producer posting %zu bytes as %ld\n",total,ps->sequence+1);
-	pipe_prod_signal(ps,ptr,total);
-
-	DPRINTF("producer chunk finished\n");
-	return total;
-}
-
-/* Start a CURL _producer_. */
-void *
-proxy_get_child (void * ctx)
-{
-	char		 fixed[1024];
-	my_state	*ms	= ctx;
-
-	if (!ms->from_master && s3mode) {
-		hstor_get(hstor,ms->bucket,ms->key,proxy_get_prod,&ms->pipe,0);
-		/* TBD: check return value */
-	}
-	else {
-		ms->curl = curl_easy_init();
-		if (!ms->curl) {
-			return NULL;	/* TBD: flag error somehow */
-		}
-		ms->cleanup |= CLEANUP_CURL;
-		if (ms->from_master) {
-			sprintf(fixed,"http://%s:%u%s",
-				master_host, master_port, ms->url);
-		}
-		else {
-			sprintf(fixed,"http://%s:%u%s",
-				proxy_host, proxy_port, ms->url);
-		}
-		curl_easy_setopt(ms->curl,CURLOPT_URL,fixed);
-		curl_easy_setopt(ms->curl,CURLOPT_WRITEFUNCTION,
-				 proxy_get_prod);
-		curl_easy_setopt(ms->curl,CURLOPT_WRITEDATA,ms);
-		curl_easy_perform(ms->curl);
-		curl_easy_getinfo(ms->curl,CURLINFO_RESPONSE_CODE,&ms->rc);
-	}
-
-	pipe_prod_finish(&ms->pipe);
-
-	DPRINTF("producer exiting\n");
-	free_ms(ms);
-	return NULL;
-}
-
-/* Forward declaration since it does the same thing. */
-size_t
-proxy_put_cons (void *ptr, size_t size, size_t nmemb, void *stream);
-
-/* Start a CURL cache consumer. */
-void *
-cache_get_child (void * ctx)
-{
-	pipe_private	*pp	= ctx;
-	pipe_shared	*ps	= pp->shared;
-	my_state	*ms	= ps->owner;
-	char		 fixed[1024];
-	CURL		*curl;
-	char		*slash;
-	char		*my_url = strdup(ms->url);
-
-	if (!my_url) {
-		return THREAD_FAILED;
-	}
-
-	curl = curl_easy_init();
-	if (!curl) {
-		free(my_url);
-		return THREAD_FAILED;
-	}
-	sprintf(fixed,"http://%s:%u%s",proxy_host,proxy_port,
-		ms->url);
-	curl_easy_setopt(curl,CURLOPT_URL,fixed);
-	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
-	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,
-		(curl_off_t)MHD_SIZE_UNKNOWN);
-	curl_easy_setopt(curl,CURLOPT_READFUNCTION,proxy_put_cons);
-	curl_easy_setopt(curl,CURLOPT_READDATA,pp);
-	curl_easy_perform(curl);
-	curl_easy_cleanup(curl);
-
-	slash = index(my_url+1,'/');
-	if (slash) {
-		*slash = '\0';
-		meta_got_copy(my_url+1,slash+1,me);
-	}
-
-	free(my_url);
-	return NULL;
-}
-
 int
 proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		const char *method, const char *version, const char *data,
@@ -638,7 +496,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (!pp) {
 		return MHD_NO;
 	}
-	pthread_create(&ms->backend_th,NULL,proxy_get_child,ms);
+	pthread_create(&ms->backend_th,NULL,main_func_tbl->get_child_func,ms);
 	/* TBD: check return value */
 
 	if (ms->from_master) {
@@ -646,7 +504,8 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!pp2) {
 			return MHD_NO;
 		}
-		pthread_create(&ms->cache_th,NULL,cache_get_child,pp2);
+		pthread_create(&ms->cache_th,NULL,
+			main_func_tbl->cache_child_func,pp2);
 		/* TBD: check return value */
 	}
 	else {
@@ -668,87 +527,6 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	MHD_destroy_response(resp);
 
 	return MHD_YES;
-}
-
-/* Invoked from CURL. */
-size_t
-proxy_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
-{
-	size_t		 total	= size * nmemb;
-	pipe_private	*pp	= stream;
-	pipe_shared	*ps	= pp->shared;
-	size_t		 done;
-
-	DPRINTF("consumer asked to read %zu\n",total);
-
-	if (!pipe_cons_wait(pp)) {
-		return 0;
-	}
-
-	DPRINTF("consumer offset %zu into %zu\n",
-		pp->offset, ps->data_len);
-	done = ps->data_len - pp->offset;
-	if (done > total) {
-		done = total;
-	}
-	memcpy(ptr,ps->data_ptr+pp->offset,done);
-	pp->offset += done;
-	DPRINTF("consumer copied %zu, new offset %zu\n",
-		done, pp->offset);
-	if (pp->offset == ps->data_len) {
-		DPRINTF("consumer finished chunk\n");
-		pipe_cons_signal(pp);
-	}
-
-	return done;
-}
-
-/* Start a CURL _consumer_. */
-void *
-proxy_put_child (void * ctx)
-{
-	pipe_private	*pp	= ctx;
-	pipe_shared	*ps	= pp->shared;
-	my_state	*ms	= ps->owner;
-	curl_off_t	 llen;
-	char		 fixed[1024];
-	CURL		*curl;
-	const char	*clen;
-
-	clen = MHD_lookup_connection_value(
-		ms->conn, MHD_HEADER_KIND, "Content-Length");
-	if (clen) {
-		llen = strtoll(clen,NULL,10);
-	}
-	else {
-		fprintf(stderr,"missing Content-Length\n");
-		llen = (curl_off_t)MHD_SIZE_UNKNOWN;
-	}
-
-	if (s3mode) {
-		hstor_put(hstor,ms->bucket,ms->key,
-			     proxy_put_cons,llen,pp,NULL);
-		/* TBD: check return value */
-	}
-	else {
-		curl = curl_easy_init();
-		if (!curl) {
-			return THREAD_FAILED;
-		}
-		sprintf(fixed,"http://%s:%u%s",proxy_host,proxy_port,
-			ms->url);
-		curl_easy_setopt(curl,CURLOPT_URL,fixed);
-		curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
-		curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,llen);
-		curl_easy_setopt(curl,CURLOPT_READFUNCTION,proxy_put_cons);
-		curl_easy_setopt(curl,CURLOPT_READDATA,pp);
-		curl_easy_perform(curl);
-		curl_easy_cleanup(curl);
-	}
-
-	DPRINTF("%s returning\n",__func__);
-	free(pp);
-	return NULL;
 }
 
 void
@@ -840,7 +618,8 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!pp) {
 			return MHD_NO;
 		}
-		pthread_create(&ms->backend_th,NULL,proxy_put_child,pp);
+		pthread_create(&ms->backend_th,NULL,
+			main_func_tbl->put_child_func,pp);
 		/* TBD: check return value */
 	}
 	else if (*data_size) {
@@ -2032,9 +1811,13 @@ args_done:
 			if (verbose) {
 				hstor->verbose = 1;
 			}
+			main_func_tbl = &s3_func_tbl;
 		}
-		meta_init();
+		else {
+			main_func_tbl = &curl_func_tbl;
+		}
 	}
+	meta_init();
 	repl_init();
 
 	/*
