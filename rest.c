@@ -10,6 +10,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 #include <microhttpd.h>
 #include <curl/curl.h>
@@ -1244,6 +1245,7 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 
 	copied_url = strdup(url);
+	assert (copied_url);
 	bucket = strtok_r(copied_url,"/",&stctx);
 	key = strtok_r(NULL,"/",&stctx);
 	meta_delete(bucket,key);
@@ -1957,6 +1959,7 @@ main (int argc, char **argv)
 		cfg_file = optarg;
 		break;
 	case 'd':
+		assert (optarg);
 		db_host = strtok_r(optarg,":",&stctx);
 		port_tmp = strtok_r(NULL,":",&stctx);
 		if (port_tmp) {
@@ -1967,6 +1970,7 @@ main (int argc, char **argv)
 		cfg_file = NULL;
 		break;
 	case 'm':
+		assert (optarg);
 		master_host = strtok_r(optarg,":",&stctx);
 		port_tmp = strtok_r(NULL,":",&stctx);
 		if (port_tmp) {
