@@ -171,8 +171,6 @@ s3_put_child (void * ctx)
 	pipe_shared	*ps	= pp->shared;
 	my_state	*ms	= ps->owner;
 	curl_off_t	 llen;
-	char		 fixed[1024];
-	CURL		*curl;
 	const char	*clen;
 
 	clen = MHD_lookup_connection_value(
@@ -185,26 +183,9 @@ s3_put_child (void * ctx)
 		llen = (curl_off_t)MHD_SIZE_UNKNOWN;
 	}
 
-	if (s3mode) {
-		hstor_put(hstor,ms->bucket,ms->key,
-			     http_put_cons,llen,pp,NULL);
-		/* TBD: check return value */
-	}
-	else {
-		curl = curl_easy_init();
-		if (!curl) {
-			return THREAD_FAILED;
-		}
-		sprintf(fixed,"http://%s:%u%s",proxy_host,proxy_port,
-			ms->url);
-		curl_easy_setopt(curl,CURLOPT_URL,fixed);
-		curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
-		curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,llen);
-		curl_easy_setopt(curl,CURLOPT_READFUNCTION,http_put_cons);
-		curl_easy_setopt(curl,CURLOPT_READDATA,pp);
-		curl_easy_perform(curl);
-		curl_easy_cleanup(curl);
-	}
+	hstor_put(hstor,ms->bucket,ms->key,
+		     http_put_cons,llen,pp,NULL);
+	/* TBD: check return value */
 
 	DPRINTF("%s returning\n",__func__);
 	free(pp);
@@ -398,6 +379,111 @@ curl_bcreate (char *bucket)
 
 /***** FS-specific functions (TBD) *****/
 
+void
+fs_init (void)
+{
+}
+
+/* Start an FS _producer_. */
+void *
+fs_get_child (void * ctx)
+{
+	my_state	*ms	= ctx;
+	int		 fd;
+	char		 buf[1<<16];
+	ssize_t		 bytes;
+
+	fd = open(ms->url+1,O_RDONLY);
+	if (fd < 0) {
+		return THREAD_FAILED;
+	}
+
+	for (;;) {
+		bytes = read(fd,buf,sizeof(buf));
+		if (bytes <= 0) {
+			if (bytes < 0) {
+				perror("read");
+			}
+			break;
+		}
+		pipe_prod_signal(&ms->pipe,buf,bytes);
+	}
+
+	close(fd);
+	pipe_prod_finish(&ms->pipe);
+
+	DPRINTF("producer exiting\n");
+	return NULL;
+}
+
+/* Start an FS _consumer_. */
+void *
+fs_put_child (void * ctx)
+{
+	pipe_private	*pp	= ctx;
+	pipe_shared	*ps	= pp->shared;
+	my_state	*ms	= ps->owner;
+	int		 fd;
+	ssize_t		 bytes;
+	size_t		 offset;
+
+	fd = open(ms->url+1,O_WRONLY|O_CREAT,0666);
+	if (fd < 0) {
+		return THREAD_FAILED;
+	}
+
+	while (pipe_cons_wait(pp)) {
+		offset = 0;
+		do {
+			bytes = write(fd,
+				ps->data_ptr+offset,ps->data_len-offset);
+			if (bytes <= 0) {
+				if (bytes < 0) {
+					perror("write");
+				}
+				goto done;
+			}
+			offset += bytes;
+		} while (offset < ps->data_len);
+		pipe_cons_signal(pp);
+	}
+
+done:
+	close(fd);
+
+	DPRINTF("%s returning\n",__func__);
+	free(pp);
+	return NULL;
+}
+
+int
+fs_delete (char *bucket, char *key, char *url)
+{
+	(void)bucket;
+	(void)key;
+
+	if (unlink(url+1) < 0) {
+		perror("unlink");
+		return MHD_NO;
+	}
+	
+	return MHD_YES;
+}
+
+int
+fs_bcreate (char *bucket)
+{
+	DPRINTF("creating bucket %s\n",bucket);
+
+	if (mkdir(bucket,0777) < 0) {
+		perror("mkdir");
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	return MHD_HTTP_OK;
+}
+
+
 /***** Function tables. ****/
 
 backend_func_tbl bad_func_tbl = {
@@ -425,5 +511,14 @@ backend_func_tbl curl_func_tbl = {
 	curl_cache_child,
 	curl_delete,
 	curl_bcreate,
+};
+
+backend_func_tbl fs_func_tbl = {
+	fs_init,
+	fs_get_child,
+	fs_put_child,
+	bad_cache_child,
+	fs_delete,
+	fs_bcreate,
 };
 

@@ -35,6 +35,7 @@
 extern backend_func_tbl	bad_func_tbl;
 extern backend_func_tbl	s3_func_tbl;
 extern backend_func_tbl	curl_func_tbl;
+extern backend_func_tbl	fs_func_tbl;
 
 typedef enum {
 	URL_ROOT=0, URL_BUCKET, URL_OBJECT, URL_ATTR, URL_INVAL,
@@ -1638,7 +1639,8 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 	memset(ms,0,sizeof(*ms));
 
-	my_rules = proxy_host ? proxy_rules : local_rules;
+	//my_rules = proxy_host ? proxy_rules : local_rules;
+	my_rules = proxy_rules;
 	utype = parse_url(url,ms);
 
 	for (i = 0; my_rules[i].method; ++i) {
@@ -1682,7 +1684,7 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 struct option my_options[] = {
 	{ "config",  required_argument, NULL, 'c' },
 	{ "db",      required_argument, NULL, 'd' },
-	{ "fsmode",  no_argument,       NULL, 'f' },
+	{ "fsmode",  required_argument,	NULL, 'f' },
 	{ "master",  required_argument, NULL, 'm' },
 	{ "port",    required_argument, NULL, 'p' },
 	{ "verbose", no_argument,       NULL, 'v' },
@@ -1695,7 +1697,7 @@ exit_with_usage (char *prog)
 	fprintf(stderr,"Usage: %s [options] [loc_id]\n",prog);
 	fprintf(stderr,"  -c file  config file (default repo.json)\n");
 	fprintf(stderr,"  -d db    database server as ip[:port]\n");
-	fprintf(stderr,"  -f       local-filesystem mode for testing\n");
+	fprintf(stderr,"  -f name  local-filesystem mode for testing\n");
 	fprintf(stderr,"  -m addr  master (upstream) server as ip[:port]\n");
 	fprintf(stderr,"  -p port  alternate listen port (default 9090)\n");
 	fprintf(stderr,"  -v       verbose/debug output\n");
@@ -1725,6 +1727,7 @@ main (int argc, char **argv)
 		break;
 	case 'f':
 		cfg_file = NULL;
+		me = optarg;
 		break;
 	case 'm':
 		assert (optarg);
@@ -1785,6 +1788,9 @@ args_done:
 		else {
 			main_func_tbl = &curl_func_tbl;
 		}
+	}
+	else {
+		main_func_tbl = &fs_func_tbl;
 	}
 	main_func_tbl->init_func();
 	meta_init();
