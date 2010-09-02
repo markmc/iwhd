@@ -71,6 +71,15 @@ bad_delete (char *bucket, char *key, char *url)
 	return MHD_NO;
 }
 
+int
+bad_bcreate (char *bucket)
+{
+	(void)bucket;
+
+	DPRINTF("*** bad call to %s\n",__func__);
+	return MHD_HTTP_NOT_IMPLEMENTED;
+}
+
 /***** Generic functions shared by the HTTP back ends. */
 
 /* Invoked from S3/CURL/CF. */
@@ -134,7 +143,6 @@ s3_get_child (void * ctx)
 	pipe_prod_finish(&ms->pipe);
 
 	DPRINTF("producer exiting\n");
-	free_ms(ms);
 	return NULL;
 }
 
@@ -197,6 +205,19 @@ s3_delete (char *bucket, char *key, char *url)
 	return MHD_YES;
 }
 
+int
+s3_bcreate (char *bucket)
+{
+	DPRINTF("creating bucket %s\n",bucket);
+
+	if (!hstor_add_bucket(hstor,bucket)) {
+		DPRINTF("  bucket create failed\n");
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	return MHD_HTTP_OK;
+}
+
 /***** CURL-specific functions *****/
 
 /* Start a CURL _producer_. */
@@ -222,14 +243,13 @@ curl_get_child (void * ctx)
 	curl_easy_setopt(ms->curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(ms->curl,CURLOPT_WRITEFUNCTION,
 			 http_get_prod);
-	curl_easy_setopt(ms->curl,CURLOPT_WRITEDATA,ms);
+	curl_easy_setopt(ms->curl,CURLOPT_WRITEDATA,&ms->pipe);
 	curl_easy_perform(ms->curl);
 	curl_easy_getinfo(ms->curl,CURLINFO_RESPONSE_CODE,&ms->rc);
 
 	pipe_prod_finish(&ms->pipe);
 
 	DPRINTF("producer exiting\n");
-	free_ms(ms);
 	return NULL;
 }
 
@@ -339,6 +359,19 @@ curl_delete (char *bucket, char *key, char *url)
 	return MHD_YES;
 }
 
+int
+curl_bcreate (char *bucket)
+{
+	(void)bucket;
+
+	DPRINTF("cannot create bucket in non-S3 mode\n");
+	/* TBD: pretend this works for testing, fix for release
+	rc = MHD_HTTP_NOT_IMPLEMENTED;
+	*/
+	return MHD_HTTP_OK;
+}
+
+
 /***** CF-specific functions (TBD) *****/
 
 /***** FS-specific functions (TBD) *****/
@@ -350,6 +383,7 @@ backend_func_tbl bad_func_tbl = {
 	bad_put_child,
 	bad_cache_child,
 	bad_delete,
+	bad_bcreate,
 };
 
 backend_func_tbl s3_func_tbl = {
@@ -357,6 +391,7 @@ backend_func_tbl s3_func_tbl = {
 	s3_put_child,
 	bad_cache_child,
 	s3_delete,
+	s3_bcreate,
 };
 
 backend_func_tbl curl_func_tbl = {
@@ -364,5 +399,6 @@ backend_func_tbl curl_func_tbl = {
 	curl_put_child,
 	curl_cache_child,
 	curl_delete,
+	curl_bcreate,
 };
 

@@ -426,10 +426,11 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
 		if (child_res == THREAD_FAILED) {
 			ms->rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 		}
-		if (master_host) {
+		if (ms->from_master) {
 			pthread_join(ms->cache_th,NULL);
 			/* TBD: do something about cache failure? */
 		}
+		free_ms(ms);
 	}
 
 	return done;
@@ -496,7 +497,15 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (!pp) {
 		return MHD_NO;
 	}
-	pthread_create(&ms->backend_th,NULL,main_func_tbl->get_child_func,ms);
+	/* Master is always assumed to be CURL (i.e. our own protocol) */
+	if (ms->from_master) {
+		pthread_create(&ms->backend_th,NULL,
+			curl_func_tbl.get_child_func,ms);
+	}
+	else {
+		pthread_create(&ms->backend_th,NULL,
+			main_func_tbl->get_child_func,ms);
+	}
 	/* TBD: check return value */
 
 	if (ms->from_master) {
@@ -1006,7 +1015,7 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	DPRINTF("PROXY DELETE %s\n",url);
 
-	rc = main_func_tbl->delete_func(ms->bucket,ms->key,url);
+	rc = main_func_tbl->delete_func(ms->bucket,ms->key,(char *)url);
 	if (rc != MHD_YES) {
 		return rc;
 	}
@@ -1517,17 +1526,7 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)data;
 	(void)data_size;
 
-	if (s3mode) {
-		DPRINTF("creating bucket %s\n",ms->bucket);
-		if (!hstor_add_bucket(hstor,ms->bucket)) {
-			DPRINTF("  bucket create failed\n");
-			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
-		}
-	}
-	else {
-		DPRINTF("cannot create bucket in non-S3 mode\n");
-		//rc = MHD_HTTP_NOT_IMPLEMENTED;
-	}
+	rc = main_func_tbl->bcreate_func(ms->bucket);
 
 	if (rc == MHD_HTTP_OK) {
 		if (meta_set_value(ms->bucket,"_default","_policy","1") != 0) {
