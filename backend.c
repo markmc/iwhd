@@ -60,7 +60,16 @@ bad_cache_child (void * ctx)
 	return NULL;
 }
 
+int
+bad_delete (char *bucket, char *key, char *url)
+{
+	(void)bucket;
+	(void)key;
+	(void)url;
 
+	DPRINTF("*** bad call to %s\n",__func__);
+	return MHD_NO;
+}
 
 /***** Generic functions shared by the HTTP back ends. */
 
@@ -175,6 +184,17 @@ s3_put_child (void * ctx)
 	DPRINTF("%s returning\n",__func__);
 	free(pp);
 	return NULL;
+}
+
+int
+s3_delete (char *bucket, char *key, char *url)
+{
+	(void)url;
+
+	hstor_del(hstor,bucket,key);
+	/* TBD: check return value */
+	
+	return MHD_YES;
 }
 
 /***** CURL-specific functions *****/
@@ -296,6 +316,28 @@ curl_cache_child (void * ctx)
 	return NULL;
 }
 
+int
+curl_delete (char *bucket, char *key, char *url)
+{
+	CURL			*curl;
+	char			 fixed[1024];
+
+	(void)bucket;
+	(void)key;
+
+	curl = curl_easy_init();
+	if (!curl) {
+		return MHD_NO;
+	}
+
+	sprintf(fixed,"http://%s:%u%s",proxy_host,proxy_port,url);
+	curl_easy_setopt(curl,CURLOPT_URL,fixed);
+	curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"DELETE");
+	curl_easy_perform(curl);
+	curl_easy_cleanup(curl);
+
+	return MHD_YES;
+}
 
 /***** CF-specific functions (TBD) *****/
 
@@ -307,17 +349,20 @@ backend_func_tbl bad_func_tbl = {
 	bad_get_child,
 	bad_put_child,
 	bad_cache_child,
+	bad_delete,
 };
 
 backend_func_tbl s3_func_tbl = {
 	s3_get_child,
 	s3_put_child,
-	curl_cache_child,
+	bad_cache_child,
+	s3_delete,
 };
 
 backend_func_tbl curl_func_tbl = {
 	curl_get_child,
 	curl_put_child,
-	curl_cache_child
+	curl_cache_child,
+	curl_delete,
 };
 

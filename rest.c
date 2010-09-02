@@ -992,12 +992,11 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	my_state		*ms	= *rctx;
 	struct MHD_Response	*resp;
-	CURL			*curl;
-	char			 fixed[1024];
 	char			*copied_url;
 	char			*bucket;
 	char			*key;
 	char			*stctx = NULL;
+	int			 rc;
 
 	(void)cctx;
 	(void)method;
@@ -1007,20 +1006,9 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	DPRINTF("PROXY DELETE %s\n",url);
 
-	if (s3mode) {
-		hstor_del(hstor,ms->bucket,ms->key);
-		/* TBD: check return value */
-	}
-	else {
-		curl = curl_easy_init();
-		if (!curl) {
-			return MHD_NO;
-		}
-		sprintf(fixed,"http://%s:%u%s",proxy_host,proxy_port,url);
-		curl_easy_setopt(curl,CURLOPT_URL,fixed);
-		curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"DELETE");
-		curl_easy_perform(curl);
-		curl_easy_cleanup(curl);
+	rc = main_func_tbl->delete_func(ms->bucket,ms->key,url);
+	if (rc != MHD_YES) {
+		return rc;
 	}
 
 	copied_url = strdup(url);
