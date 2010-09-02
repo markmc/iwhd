@@ -133,202 +133,6 @@ validate_url (const char *url)
 }
 
 /**********
- * The local server is intended mostly for testing.  Therefore, it supports
- * only basic get/put of files in the simplest possible way.  If you want to
- * create/delete buckets, use bash.  If you want to do anything with
- * metadata, use the mongo shell.  The only thing that should be talking to
- * a local server is a proxy server based on this same code.
- **********/
-
-/*
- * We're reading from the perspective of MHD, which is calling us.  Return
- * -1 for EOF, other values (including zero) to indicate how much data we
- * filled.
- */
-int
-local_reader (void *ctx, uint64_t pos, char *buf, int max)
-{
-	int nb;
-
-	(void)pos;
-
-	nb = read(P2I(ctx),buf,max);
-	DPRINTF("got %d from %d\n",nb,P2I(ctx));
-
-	return (nb > 0) ? nb : (-1);
-}
-
-void
-local_closer (void *ctx)
-{
-	fsync(P2I(ctx));
-	close(P2I(ctx));
-}
-
-int
-local_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
-		const char *method, const char *version, const char *data,
-		size_t *data_size, void **rctx)
-{
-	struct MHD_Response	*resp;
-	int			 fd;
-	struct stat		 sb;
-
-	(void)cctx;
-	(void)method;
-	(void)version;
-	(void)data;
-	(void)data_size;
-	(void)rctx;
-
-	DPRINTF("LOCAL GET DATA %s\n",url);
-
-	fd = open(url+1,O_RDONLY);
-	if (fd >= 0) {
-		/* Clients like to know size, but it's not required. */
-		if (fstat(fd,&sb) < 0) {
-			sb.st_size = MHD_SIZE_UNKNOWN;
-		}
-		/* Hack for testing. */
-		if (!S_ISREG(sb.st_mode)) {
-			sb.st_size = MHD_SIZE_UNKNOWN;
-		}
-		resp = MHD_create_response_from_callback(
-			sb.st_size, 65536, &local_reader, I2P(fd),
-			&local_closer);
-		if (!resp) {
-			return MHD_NO;
-		}
-		MHD_queue_response(conn,MHD_HTTP_OK,resp);
-	}
-	else {
-		perror(url+1);
-		resp = MHD_create_response_from_data(
-			0,NULL,MHD_NO,MHD_NO);
-		if (!resp) {
-			return MHD_NO;
-		}
-		MHD_queue_response(conn,MHD_HTTP_NOT_FOUND,resp);
-	}
-	MHD_destroy_response(resp);
-
-	return MHD_YES;
-}
-
-int
-local_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
-		const char *method, const char *version, const char *data,
-		size_t *data_size, void **rctx)
-{
-	struct MHD_Response		*resp;
-	my_state			*ms;
-	int				 nb;
-	int				 rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
-
-	(void)cctx;
-	(void)method;
-	(void)version;
-
-	DPRINTF("LOCAL PUT DATA %s (%zu)\n",url,*data_size);
-
-	ms = *rctx;
-	if (ms->state == MS_NEW) {
-		if (!validate_put(conn) || !validate_url(url)) {
-			rc = MHD_HTTP_FORBIDDEN;
-			goto free_it;
-		}
-		ms->state = MS_NORMAL;
-		ms->fd = open(url+1,O_CREAT|O_TRUNC|O_WRONLY,0666);
-		if (ms->fd < 0) {
-			perror(url+1);
-			goto free_it;
-		}
-		return MHD_YES;
-	}
-
-	if (*data_size == 0) {
-		rc = MHD_HTTP_CREATED;
-		goto close_it;
-	}
-
-	nb = write(ms->fd,data,*data_size);
-	if (nb < 0) {
-		perror(url+1);
-		goto close_it;
-	}
-
-	*data_size -= nb;
-	return MHD_YES;
-
-close_it:
-	close(ms->fd);
-free_it:
-	free_ms(ms);
-	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
-	if (!resp) {
-		return MHD_NO;
-	}
-	MHD_queue_response(conn,rc,resp);
-	MHD_destroy_response(resp);
-	return MHD_YES;
-}
-
-int
-local_delete (void *cctx, struct MHD_Connection *conn, const char *url,
-	      const char *method, const char *version, const char *data,
-	      size_t *data_size, void **rctx)
-{
-	struct MHD_Response	*resp;
-
-	(void)cctx;
-	(void)method;
-	(void)version;
-	(void)data;
-	(void)data_size;
-	(void)rctx;
-
-	DPRINTF("LOCAL DELETE %s\n",url);
-	if (unlink(url+1) < 0) {
-		perror("unlink");
-	}
-
-	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
-	if (!resp) {
-		return MHD_NO;
-	}
-	MHD_queue_response(conn,MHD_HTTP_OK,resp);
-	MHD_destroy_response(resp);
-
-	return MHD_YES;
-}
-
-rule local_rules[] = {
-	{ /* get bucket list */
-	  "GET",	URL_ROOT,	NULL		},
-	{ /* get object list */
-	  "GET",	URL_BUCKET,	NULL		},
-	{ /* get object data */
-	  "GET",	URL_OBJECT,	local_get_data	},
-	{ /* get attribute data */
-	  "GET",	URL_ATTR,	NULL		},
-	{ /* create bucket */
-	  "PUT",	URL_BUCKET,	NULL		},
-	{ /* put object data */
-	  "PUT",	URL_OBJECT,	local_put_data	},
-	{ /* put attribute data */
-	  "PUT",	URL_ATTR,	NULL		},
-	{ /* query */
-	  "POST",	URL_ROOT,	NULL		},
-	{ /* delete bucket */
-	  "DELETE",	URL_BUCKET,	NULL		},
-	{ /* delete object */
-	  "DELETE",	URL_OBJECT,	local_delete	},
-	{ /* delete attribute */
-	  "DELETE",	URL_ATTR,	NULL		},
-	{ NULL, 0, NULL }
-};
-
-/**********
  * The proxy has MHD on one side and CURL on the other.  The CURL side is
  * always run in a child thread.  Yes, there are both context switches
  * and copies between the threads.  Get over it.  The focus here is on
@@ -1538,7 +1342,7 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
-rule proxy_rules[] = {
+rule my_rules[] = {
 	{ /* get bucket list */
 	  "GET",	URL_ROOT,	proxy_api_root  	},
 	{ /* get object list */
@@ -1626,7 +1430,6 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 	url_type		 utype;
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	rule		        *my_rules;
 
 	if (ms) {
 		return ms->handler(cctx,conn,url,method,version,
@@ -1639,8 +1442,6 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 	memset(ms,0,sizeof(*ms));
 
-	//my_rules = proxy_host ? proxy_rules : local_rules;
-	my_rules = proxy_rules;
 	utype = parse_url(url,ms);
 
 	for (i = 0; my_rules[i].method; ++i) {

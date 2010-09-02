@@ -35,9 +35,6 @@ GLOBAL(const char *,	db_host,	"localhost");
 GLOBAL(unsigned short,	db_port,	27017);
 GLOBAL(char *,          me,             "here");
 
-#define I2P(x)	((void *)(long)(x))
-#define P2I(x)	((int)(long)(x))
-
 #define DPRINTF(fmt,args...) do {	\
 	if (verbose) {			\
 		printf(fmt,##args);	\
