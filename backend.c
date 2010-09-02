@@ -26,12 +26,15 @@
 #include "backend.h"
 #include "state_defs.h"
 
-/* TBD: find proper locations for these */
-extern struct hstor_client	*hstor;
-extern const char 		*master_host;
-extern unsigned short		 master_port;
+struct hstor_client	*hstor;
 
 /***** Stub functions for unimplemented stuff. *****/
+
+void
+bad_init (void)
+{
+	DPRINTF("*** bad call to %s\n",__func__);
+}
 
 void *
 bad_get_child (void * ctx)
@@ -131,6 +134,20 @@ http_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 
 /***** S3-specific functions *****/
 
+void
+s3_init (void)
+{
+	char svc_acc[128];
+
+	snprintf(svc_acc,sizeof(svc_acc),"%s:%u",
+		proxy_host,proxy_port);
+	hstor = hstor_new(svc_acc,proxy_host,proxy_key,proxy_secret);
+	/* TBD: check return value */
+	if (verbose) {
+		hstor->verbose = 1;
+	}
+}
+
 /* Start an S3 _producer_. */
 void *
 s3_get_child (void * ctx)
@@ -219,6 +236,11 @@ s3_bcreate (char *bucket)
 }
 
 /***** CURL-specific functions *****/
+
+void
+curl_init (void)
+{
+}
 
 /* Start a CURL _producer_. */
 void *
@@ -379,6 +401,7 @@ curl_bcreate (char *bucket)
 /***** Function tables. ****/
 
 backend_func_tbl bad_func_tbl = {
+	bad_init,
 	bad_get_child,
 	bad_put_child,
 	bad_cache_child,
@@ -387,6 +410,7 @@ backend_func_tbl bad_func_tbl = {
 };
 
 backend_func_tbl s3_func_tbl = {
+	s3_init,
 	s3_get_child,
 	s3_put_child,
 	bad_cache_child,
@@ -395,6 +419,7 @@ backend_func_tbl s3_func_tbl = {
 };
 
 backend_func_tbl curl_func_tbl = {
+	curl_init,
 	curl_get_child,
 	curl_put_child,
 	curl_cache_child,

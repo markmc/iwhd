@@ -13,8 +13,8 @@
 #include <assert.h>
 
 #include <microhttpd.h>
+#include <hstor.h>	/* only for ARRAY_SIZE at this point */
 #include <curl/curl.h>
-#include <hstor.h>
 #include <glib.h>
 
 #include "repo.h"
@@ -48,16 +48,7 @@ typedef struct {
 } rule;
 
 int			 fs_mode	= 0;
-struct hstor_client	*hstor		= NULL;
 unsigned short		 my_port	= MY_PORT;
-
-/*
- * These values refer to a front end, but it's a fallback rather than a
- * primary front end.  Unlike the primary, which may use any of FS/S3/repod
- * mode, the master is always repod mode so it doesn't needs a key/secret.
- */
-const char 		*master_host	= NULL;
-unsigned short		 master_port	= MY_PORT;
 
 char *(reserved_name[]) = { "_default", "_query", "_new", NULL };
 char *(reserved_attr[]) = { "bucket", "key", "date", "etag", "loc", NULL };
@@ -1789,21 +1780,13 @@ args_done:
 	sem_init(&the_sem,0,0);
 	if (proxy_host) {
 		if (s3mode) {
-			char svc_acc[128];
-			snprintf(svc_acc,sizeof(svc_acc),"%s:%u",
-				proxy_host,proxy_port);
-			hstor = hstor_new(svc_acc,proxy_host,
-					     proxy_key,proxy_secret);
-			/* TBD: check return value */
-			if (verbose) {
-				hstor->verbose = 1;
-			}
 			main_func_tbl = &s3_func_tbl;
 		}
 		else {
 			main_func_tbl = &curl_func_tbl;
 		}
 	}
+	main_func_tbl->init_func();
 	meta_init();
 	repl_init();
 

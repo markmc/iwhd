@@ -1,9 +1,9 @@
 #define MY_PORT 9090
 
 #if defined(GLOBALS_IMPL)
-#define GLOBAL(type,name,value)	type name = value;
+#define GLOBAL(type,name,value)	type name = value
 #else
-#define GLOBAL(type,name,value)	extern type name;
+#define GLOBAL(type,name,value)	extern type name
 #endif
 
 /*
@@ -22,16 +22,18 @@
  * own keys/secrets.
  */
 
-GLOBAL(int,		verbose,	0)
-GLOBAL(char *,		cfg_file,	"repo.json")
-GLOBAL(const char *,	proxy_host,	NULL)		/* always */
-GLOBAL(unsigned short,	proxy_port,	MY_PORT+1)	/* repod/S3 */
-GLOBAL(const char *,	proxy_key,	"foo")		/* S3 only */
-GLOBAL(const char *,	proxy_secret,	"bar")		/* S3 only */
-GLOBAL(unsigned int,	s3mode,		0)		/* repod/S3 */
-GLOBAL(const char *,	db_host,	"localhost")
-GLOBAL(unsigned short,	db_port,	27017)
-GLOBAL(char *,          me,             "here")
+GLOBAL(int,		verbose,	0);
+GLOBAL(char *,		cfg_file,	"repo.json");
+GLOBAL(const char *,	proxy_host,	NULL);		/* always */
+GLOBAL(unsigned short,	proxy_port,	MY_PORT+1);	/* repod/S3 */
+GLOBAL(const char *,	proxy_key,	"foo");		/* S3 only */
+GLOBAL(const char *,	proxy_secret,	"bar");		/* S3 only */
+GLOBAL(const char *,	master_host,	NULL);
+GLOBAL(unsigned short,	master_port,	MY_PORT);
+GLOBAL(unsigned int,	s3mode,		0);		/* repod/S3 */
+GLOBAL(const char *,	db_host,	"localhost");
+GLOBAL(unsigned short,	db_port,	27017);
+GLOBAL(char *,          me,             "here");
 
 #define I2P(x)	((void *)(long)(x))
 #define P2I(x)	((int)(long)(x))
