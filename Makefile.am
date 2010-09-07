@@ -19,9 +19,18 @@ repod_SOURCES = \
   template.c	\
   template.h
 
-repod_CPPFLAGS	= @HAIL_CFLAGS@
-repod_LDADD	= -lmongoclient \
-		  @BOOST_FS_LIB@ @BOOST_PO_LIB@ @BOOST_SYS_LIB@ @BOOST_THR_LIB@\
-		  @CRYPTO_LIB@ @CURL_LIB@ @JANSSON_LIB@ @UHTTPD_LIB@ \
-		  @PTHREAD_LIB@ @XML2_LIB@ @GLIB2_LIB@ \
-		  @HAIL_LIBS@
+repod_CPPFLAGS	= $(HAIL_CFLAGS)
+repod_LDADD =		\
+  -lmongoclient		\
+  $(BOOST_FS_LIB)	\
+  $(BOOST_PO_LIB)	\
+  $(BOOST_SYS_LIB)	\
+  $(BOOST_THR_LIB)	\
+  $(CRYPTO_LIB)		\
+  $(CURL_LIB)		\
+  $(JANSSON_LIB)	\
+  $(UHTTPD_LIB)		\
+  $(PTHREAD_LIB)	\
+  $(XML2_LIB)		\
+  $(GLIB2_LIB)		\
+  $(HAIL_LIBS)
