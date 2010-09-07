@@ -9,12 +9,62 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <error.h>
 #include "query.h"
 
 char *arg_buf;
 int arg_off;
 int arg_len;
 value_t **cur_expr;
+
+static void
+xalloc_die (void)
+{
+  error (EXIT_FAILURE, 0, "%s", "memory exhausted");
+
+  /* The `noreturn' cannot be given to error, since it may return if
+     its first argument is 0.  To help compilers understand the
+     xalloc_die does not return, call abort.  Also, the abort is a
+     safety feature if exit_failure is 0 (which shouldn't happen).  */
+  abort ();
+}
+
+/* Allocate N bytes of memory dynamically, with error checking.  */
+static void *
+xmalloc (size_t n)
+{
+  void *p = malloc (n);
+  if (!p && n != 0)
+    xalloc_die ();
+  return p;
+}
+
+/* Change the size of an allocated block of memory P to N bytes,
+   with error checking.  */
+static void *
+xrealloc (void *p, size_t n)
+{
+  p = realloc (p, n);
+  if (!p && n != 0)
+    xalloc_die ();
+  return p;
+}
+
+/* Clone an object P of size S, with error checking.  There's no need
+   for xnmemdup (P, N, S), since xmemdup (P, N * S) works without any
+   need for an arithmetic overflow check.  */
+static void *
+xmemdup (void const *p, size_t s)
+{
+  return memcpy (xmalloc (s), p, s);
+}
+
+/* Clone STRING.  */
+static char *
+xstrdup (char const *string)
+{
+  return xmemdup (string, strlen (string) + 1);
+}
 
 /* TBD: use separate function to parse dates differently */
 value_t *
@@ -37,7 +87,7 @@ make_string (char *text, type_t t)
 
 	if (tmp) {
 		tmp->type = t;
-		tmp->as_str = strdup(text);
+		tmp->as_str = xstrdup(text);
 	}
 
 	return tmp;
