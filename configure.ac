@@ -49,10 +49,6 @@ AC_CHECK_LIB([xml2], [xmlInitParser],
 	[AC_MSG_ERROR([Missing required XML2 lib])])
 AC_SUBST(XML2_LIB)
 
-# Mongo builds a static lib (how 80s of them) so we have to deal with the
-# dependencies for that as well.
-#AC_CHECK_LIB([mongoclient], [_ZN5mongo3OID4initEv])
-
 AC_CHECK_LIB([boost_filesystem-mt], [_ZN5boost10filesystem6detail6throwsE],
 	BOOST_FS_LIB=-lboost_filesystem-mt,
 	[AC_MSG_ERROR([Missing required boost_filesystem lib])])
