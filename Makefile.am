@@ -1,7 +1,9 @@
 AM_CFLAGS	= -W -Wall -Wshadow -Wextra
 AM_CPPFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
 
-bin_PROGRAMS	= repod
+bin_PROGRAMS = repod
+EXTRA_DIST = query.leg
+
 repod_SOURCES = \
   backend.c	\
   backend.h	\
@@ -34,3 +36,19 @@ repod_LDADD =		\
   $(XML2_LIB)		\
   $(GLIB2_LIB)		\
   $(HAIL_LIBS)
+
+# leg is a lexer/parser-generator
+# http://piumarta.com/software/peg/peg-0.1.4.tar.gz
+query-orig.c: query.leg
+	leg < $(srcdir)/query.leg > $@-t && mv $@-t $@
+
+# Apply this patch to fix NULL-deref bugs in the generated query-orig.c:
+query.c: query-orig.c query.c.diff
+	patch --fuzz=0 query-orig.c $(srcdir)/query.c.diff --output=$@-t
+	mv $@-t $@
+
+BUILT_SOURCES = query.c
+CLEANFILES = query-orig.c
+MOSTLYCLEANFILES = query.c query-orig.c-t
+MAINTAINERCLEANFILES = query.c query-orig.c
+EXTRA_DIST += query.c.diff

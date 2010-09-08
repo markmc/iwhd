@@ -1,0 +1,47 @@
+--- query.c.~1~	2010-09-08 19:19:39.406647454 +0200
++++ query.c	2010-09-08 19:36:46.881772849 +0200
+@@ -453,7 +453,7 @@ YY_LOCAL(int) yyrefill(void)
+   while (yybuflen - yypos < 512)
+     {
+       yybuflen *= 2;
+-      yybuf= realloc(yybuf, yybuflen);
++      yybuf= xrealloc(yybuf, yybuflen);
+     }
+   YY_INPUT((yybuf + yypos), yyn, (yybuflen - yypos));
+   if (!yyn) return 0;
+@@ -518,7 +518,7 @@ YY_LOCAL(void) yyDo(yyaction action, int
+   while (yythunkpos >= yythunkslen)
+     {
+       yythunkslen *= 2;
+-      yythunks= realloc(yythunks, sizeof(yythunk) * yythunkslen);
++      yythunks= xrealloc(yythunks, sizeof(yythunk) * yythunkslen);
+     }
+   yythunks[yythunkpos].begin=  begin;
+   yythunks[yythunkpos].end=    end;
+@@ -536,7 +536,7 @@ YY_LOCAL(int) yyText(int begin, int end)
+       while (yytextlen < (yyleng - 1))
+ 	{
+ 	  yytextlen *= 2;
+-	  yytext= realloc(yytext, yytextlen);
++	  yytext= xrealloc(yytext, yytextlen);
+ 	}
+       memcpy(yytext, yybuf + begin, yyleng);
+     }
+@@ -1049,13 +1049,13 @@ YY_PARSE(int) YYPARSEFROM(yyrule yystart
+   if (!yybuflen)
+     {
+       yybuflen= 1024;
+-      yybuf= malloc(yybuflen);
++      yybuf= xmalloc(yybuflen);
+       yytextlen= 1024;
+-      yytext= malloc(yytextlen);
++      yytext= xmalloc(yytextlen);
+       yythunkslen= 32;
+-      yythunks= malloc(sizeof(yythunk) * yythunkslen);
++      yythunks= xmalloc(sizeof(yythunk) * yythunkslen);
+       yyvalslen= 32;
+-      yyvals= malloc(sizeof(YYSTYPE) * yyvalslen);
++      yyvals= xmalloc(sizeof(YYSTYPE) * yyvalslen);
+       yybegin= yyend= yypos= yylimit= yythunkpos= 0;
+     }
+   yybegin= yyend= yypos;
