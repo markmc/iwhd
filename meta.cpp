@@ -286,7 +286,7 @@ RepoQuery::RepoQuery (char * bucket, char * key, char *qstr, RepoMeta &p)
 		q = QUERY("key"<<key);
 	}
 	else {
-		assert(!"need at least bucket or key");
+		abort();
 	}
 
 	/*
