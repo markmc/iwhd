@@ -965,13 +965,40 @@ post_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 	       const char *transfer_encoding, const char *data,
 	       uint64_t off, size_t size)
 {
+	char		*old_val;
+	size_t		 old_len;
+	char		*new_val;
+
 	(void)kind;
 	(void)filename;
 	(void)content_type;
 	(void)transfer_encoding;
 	(void)off;
 
-	g_hash_table_insert(ctx,strdup(key),strndup(data,size));
+	printf("adding %s, size=%zu\n",key,size);
+
+	// TBD: don't assume that values are null-terminated strings
+	old_val = g_hash_table_lookup(ctx,key);
+	if (old_val) {
+		old_len = strlen(old_val);
+		new_val = malloc(old_len+size+1);
+		if (!new_val) {
+			return MHD_NO;
+		}
+		memcpy(new_val,old_val,old_len);
+		memcpy(new_val+old_len,data,size);
+		new_val[old_len+size] = '\0';
+	}
+	else {
+		new_val = malloc(size+1);
+		if (!new_val) {
+			return MHD_NO;
+		}
+		memcpy(new_val,data,size);
+		new_val[size] = '\0';
+	}
+
+	g_hash_table_insert(ctx,strdup(key),new_val);
 	/* TBD: check return value for strdups (none avail for insert) */
 	return MHD_YES;
 }
@@ -1080,6 +1107,41 @@ check_location (my_state *ms)
 }
 
 int
+bundle_ami (my_state *ms)
+{
+	char	*datum;
+
+	datum = g_hash_table_lookup(ms->dict,"cert");
+	if (datum) {
+		printf("cert follows:\n%s\n",datum);
+	}
+	else {
+		printf("cert MISSING\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	datum = g_hash_table_lookup(ms->dict,"pkey");
+	if (datum) {
+		printf("pkey follows:\n%s\n",datum);
+	}
+	else {
+		printf("pkey MISSING\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	datum = g_hash_table_lookup(ms->dict,"account");
+	if (datum) {
+		printf("account = %s\n",datum);
+	}
+	else {
+		printf("account MISSING\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	return MHD_HTTP_OK;
+}
+
+int
 proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		   const char *method, const char *version, const char *data,
 		   size_t *data_size, void **rctx)
@@ -1121,6 +1183,9 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 				}
 				else if (!strcmp(op,"check")) {
 					rc = check_location(ms);
+				}
+				else if (!strcmp(op,"bundle")) {
+					rc = bundle_ami(ms);
 				}
 				else {
 					DPRINTF("unknown op %s for %s/%s\n",
