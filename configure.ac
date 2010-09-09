@@ -4,7 +4,10 @@
 AC_PREREQ([2.65])
 AC_INIT([image-warehouse], [1.0], [FIXME@example.com])
 AC_CONFIG_AUX_DIR([build-aux])
-AM_INIT_AUTOMAKE
+
+AC_CONFIG_HEADERS([config.h:config.hin])
+AM_INIT_AUTOMAKE([1.11.1 color-tests parallel-tests])
+AM_SILENT_RULES([yes]) # make --enable-silent-rules the default.
 
 # Checks for programs.
 AC_PROG_CXX

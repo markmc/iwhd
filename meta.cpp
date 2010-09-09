@@ -1,3 +1,5 @@
+#include <config.h>
+
 #include <errno.h>
 #include <stdio.h>
 #include <sys/time.h>
@@ -450,4 +452,3 @@ meta_get_size (char * bucket, char * key)
 {
 	return it->GetSize(bucket,key);
 }
-
