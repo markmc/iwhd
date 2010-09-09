@@ -7,13 +7,10 @@ Makefile.in
 \#*\#
 aclocal.m4
 autom4te.cache/
-compile
+build-aux
 config.log
 config.status
 configure
-depcomp
-install-sh
-missing
 query-orig.c
 query.c
 repod

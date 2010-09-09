@@ -2,8 +2,12 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.65])
-AC_INIT([repod],[1.0])
-AM_INIT_AUTOMAKE
+AC_INIT([image-warehouse], [1.0], [FIXME@example.com])
+AC_CONFIG_AUX_DIR([build-aux])
+
+AC_CONFIG_HEADERS([config.h:config.hin])
+AM_INIT_AUTOMAKE([1.11.1 color-tests parallel-tests])
+AM_SILENT_RULES([yes]) # make --enable-silent-rules the default.
 
 # Checks for programs.
 AC_PROG_CXX
@@ -12,7 +16,7 @@ AM_PROG_CC_C_O
 
 leg -V > /dev/null 2>&1 ||
   AC_MSG_ERROR([you need the leg program to build this code;
-    <http://piumarta.com/software/peg/peg-0.1.4.tar.gz>])
+    <http://piumarta.com/software/peg/>])
 
 AC_CHECK_LIB([curl], [curl_easy_init],
 	[CURL_LIB=-lcurl],

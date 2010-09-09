@@ -1,3 +1,5 @@
+#include <config.h>
+
 #include <fcntl.h>
 #include <getopt.h>
 #include <poll.h>
@@ -25,6 +27,9 @@
 #include "backend.h"
 #include "state_defs.h"
 
+/* Define-away for now.  Eventually, define to gettext.  */
+#define _(msgid) (msgid)
+
 #if defined(DEBUG)
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION | MHD_USE_DEBUG
 //#define MY_MHD_FLAGS MHD_USE_SELECT_INTERNALLY | MHD_USE_DEBUG
@@ -50,6 +55,7 @@ typedef struct {
 
 int			 fs_mode	= 0;
 unsigned short		 my_port	= MY_PORT;
+const char *program_name;
 
 char *(reserved_name[]) = { "_default", "_query", "_new", NULL };
 char *(reserved_attr[]) = { "bucket", "key", "date", "etag", "loc", NULL };
@@ -1547,6 +1553,15 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
+/* These enum values cannot possibly conflict with the option values
+   ordinarily used by commands, including CHAR_MAX + 1, etc.  Avoid
+   CHAR_MIN - 1, as it may equal -1, the getopt end-of-options value.  */
+enum
+{
+  GETOPT_HELP_CHAR = (CHAR_MIN - 2),
+  GETOPT_VERSION_CHAR = (CHAR_MIN - 3)
+};
+
 struct option my_options[] = {
 	{ "config",  required_argument, NULL, 'c' },
 	{ "db",      required_argument, NULL, 'd' },
@@ -1554,21 +1569,45 @@ struct option my_options[] = {
 	{ "master",  required_argument, NULL, 'm' },
 	{ "port",    required_argument, NULL, 'p' },
 	{ "verbose", no_argument,       NULL, 'v' },
+	{ "version", no_argument,       NULL, GETOPT_VERSION_CHAR },
+	{ "help", no_argument,          NULL, GETOPT_HELP_CHAR },
 	{ NULL, 0, NULL, '\0' }
 };
 
 void
-exit_with_usage (char *prog)
+usage (int status)
 {
-	fprintf(stderr,"Usage: %s [options] [loc_id]\n",prog);
-	fprintf(stderr,"  -c file  config file (default repo.json)\n");
-	fprintf(stderr,"  -d db    database server as ip[:port]\n");
-	fprintf(stderr,"  -f name  local-filesystem mode for testing\n");
-	fprintf(stderr,"  -m addr  master (upstream) server as ip[:port]\n");
-	fprintf(stderr,"  -p port  alternate listen port (default 9090)\n");
-	fprintf(stderr,"  -v       verbose/debug output\n");
-	fprintf(stderr,"loc_id should be a unique string per location\n");
-	exit(!0);
+  if (status != EXIT_SUCCESS)
+    fprintf (stderr, _("Try `%s --help' for more information.\n"),
+             program_name);
+  else
+    {
+      printf (_("\
+Usage: %s [OPTION] [LOC_ID]\n\
+"),
+              program_name);
+      fputs (_("\
+Concatenate FILE(s), or standard input, to standard output.\n\
+\n\
+  -c, --config=FILE       config file (default repo.json)\n\
+  -d, --db=HOST_PORT      database server as ip[:port]\n\
+  -f, --fsmode=MODE       local-filesystem mode for testing\n\
+  -m, --master=HOST_PORT  master (upstream) server as ip[:port]\n\
+  -p, --port=PORT         alternate listen port (default 9090)\n\
+  -v, --verbose           verbose/debug output\n\
+\n\
+      --help     display this help and exit\n\
+      --version  output version information and exit\n\
+\n\
+LOC_ID should be a unique string per location\n\
+"), stdout);
+      printf (_("\
+\n\
+Report %s bugs to %s.\n\
+"),
+              program_name, PACKAGE_BUGREPORT);
+    }
+  exit (status);
 }
 
 int
@@ -1578,6 +1617,8 @@ main (int argc, char **argv)
 	sem_t			 the_sem;
 	char			*stctx = NULL;
 	char			*port_tmp;
+
+	program_name = argv[0];
 
 	for (;;) switch (getopt_long(argc,argv,"c:d:fm:p:v",my_options,NULL)) {
 	case 'c':
@@ -1609,10 +1650,18 @@ main (int argc, char **argv)
 	case 'v':
 		++verbose;
 		break;
+	case GETOPT_HELP_CHAR:
+		usage(EXIT_SUCCESS);
+		break;
+	case GETOPT_VERSION_CHAR:
+		printf ("%s version %s\n", program_name, PACKAGE_VERSION);
+		exit (EXIT_SUCCESS);
+		break;
+
 	case -1:
 		goto args_done;
 	default:
-		exit_with_usage(argv[0]);
+		usage(EXIT_FAILURE);
 		break;
 	}
 args_done:

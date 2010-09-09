@@ -1,3 +1,5 @@
+#include <config.h>
+
 #include <fcntl.h>
 #include <getopt.h>
 #include <poll.h>
@@ -199,7 +201,7 @@ s3_delete (char *bucket, char *key, char *url)
 
 	hstor_del(hstor,bucket,key);
 	/* TBD: check return value */
-	
+
 	return MHD_YES;
 }
 
@@ -466,7 +468,7 @@ fs_delete (char *bucket, char *key, char *url)
 		perror("unlink");
 		return MHD_NO;
 	}
-	
+
 	return MHD_YES;
 }
 
@@ -521,4 +523,3 @@ backend_func_tbl fs_func_tbl = {
 	fs_delete,
 	fs_bcreate,
 };
-

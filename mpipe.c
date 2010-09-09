@@ -1,3 +1,5 @@
+#include <config.h>
+
 #include "repo.h"
 #include "mpipe.h"
 
@@ -106,4 +108,3 @@ pipe_prod_finish (pipe_shared *ps)
 	} while (ps->cons_done < ps->cons_total);
 	pthread_mutex_unlock(&ps->lock);
 }
-
