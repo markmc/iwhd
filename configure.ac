@@ -2,7 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.65])
-AC_INIT([repod],[1.0])
+AC_INIT([image-warehouse], [1.0], [FIXME@example.com])
+AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE
 
 # Checks for programs.
