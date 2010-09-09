@@ -16,7 +16,7 @@ AM_PROG_CC_C_O
 
 leg -V > /dev/null 2>&1 ||
   AC_MSG_ERROR([you need the leg program to build this code;
-    <http://piumarta.com/software/peg/peg-0.1.4.tar.gz>])
+    <http://piumarta.com/software/peg/>])
 
 AC_CHECK_LIB([curl], [curl_easy_init],
 	[CURL_LIB=-lcurl],
