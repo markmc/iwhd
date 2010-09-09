@@ -10,6 +10,10 @@ AC_PROG_CXX
 AC_PROG_CC
 AM_PROG_CC_C_O
 
+leg -V > /dev/null 2>&1 ||
+  AC_MSG_ERROR([you need the leg program to build this code;
+    <http://piumarta.com/software/peg/peg-0.1.4.tar.gz>])
+
 AC_CHECK_LIB([curl], [curl_easy_init],
 	[CURL_LIB=-lcurl],
 	[AC_MSG_ERROR([Missing required CURL lib])])
