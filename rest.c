@@ -1566,7 +1566,10 @@ enum
 struct option my_options[] = {
 	{ "config",  required_argument, NULL, 'c' },
 	{ "db",      required_argument, NULL, 'd' },
-	{ "fsmode",  required_argument,	NULL, 'f' },
+
+	/* testing-only option: ---fs-mode=LOC_ID; do not document
+	   Use local file system, LOC_ID  */
+	{ "-fs-mode", required_argument, NULL, 'f' },
 	{ "master",  required_argument, NULL, 'm' },
 	{ "port",    required_argument, NULL, 'p' },
 	{ "verbose", no_argument,       NULL, 'v' },
@@ -1584,16 +1587,15 @@ usage (int status)
   else
     {
       printf (_("\
-Usage: %s [OPTION] [LOC_ID]\n\
+Usage: %s [OPTION]\n\
 "),
               program_name);
       fputs (_("\
 Concatenate FILE(s), or standard input, to standard output.\n\
-A configuration file name must be specified.\n\
+A configuration file must be specified.\n\
 \n\
-  -c, --config=FILE       config file [require]\n\
+  -c, --config=FILE       config file [required]\n\
   -d, --db=HOST_PORT      database server as ip[:port]\n\
-  -f, --fsmode=MODE       local-filesystem mode for testing\n\
   -m, --master=HOST_PORT  master (upstream) server as ip[:port]\n\
   -p, --port=PORT         alternate listen port (default 9090)\n\
   -v, --verbose           verbose/debug output\n\
@@ -1619,10 +1621,11 @@ main (int argc, char **argv)
 	sem_t			 the_sem;
 	char			*stctx = NULL;
 	char			*port_tmp;
+	bool			fsmode = false;
 
 	program_name = argv[0];
 
-	for (;;) switch (getopt_long(argc,argv,"c:d:fm:p:v",my_options,NULL)) {
+	for (;;) switch (getopt_long(argc,argv,"c:d:f:m:p:v",my_options,NULL)) {
 	case 'c':
 		cfg_file = optarg;
 		break;
@@ -1635,7 +1638,7 @@ main (int argc, char **argv)
 		}
 		break;
 	case 'f':
-		cfg_file = NULL;
+		fsmode = true;
 		me = optarg;
 		break;
 	case 'm':
@@ -1668,20 +1671,22 @@ main (int argc, char **argv)
 	}
 args_done:
 
-	if (!cfg_file) {
+	if (fsmode && cfg_file) {
+		error (0, 0, "-f and --config are mutually exclusive");
+		usage (EXIT_FAILURE);
+	}
+
+	if (!fsmode && !cfg_file) {
 		error (0, 0, "no configuration file specified");
 		usage (EXIT_FAILURE);
 	}
 
-	me = parse_config();
-	if (!me) {
-		fprintf(stderr,"could not parse %s\n",cfg_file);
-		return !0;
-	}
-
-	if (optind < argc) {
-		DPRINTF("overriding name %s with %s\n",me,argv[optind]);
-		me = argv[optind];
+	if (!fsmode) {
+		me = parse_config();
+		if (!me) {
+			fprintf(stderr,"could not parse %s\n",cfg_file);
+			return !0;
+		}
 	}
 
 	if (verbose) {
