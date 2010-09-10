@@ -1119,6 +1119,7 @@ register_image (my_state *ms)
 	char		*site;
 	provider_t	 prov;
 	int		 i;
+	char		*next;
 
 	site = g_hash_table_lookup(ms->dict,"site");
 	if (!site) {
@@ -1126,11 +1127,16 @@ register_image (my_state *ms)
 		return MHD_HTTP_BAD_REQUEST;
 	}
 
-	for (i = 1; get_provider(i,&prov); ++i) {
+	next = index(site,':');
+	if (next) {
+		*(next++) = '\0';
+	}
+
+	for (i = 0; get_provider(i,&prov); ++i) {
 		if (strcmp(prov.name,site)) {
 			continue;
 		}
-		return prov.func_tbl->register_func(ms,&prov);
+		return prov.func_tbl->register_func(ms,&prov,next);
 	}
 
 	DPRINTF("site %s not found\n",site);

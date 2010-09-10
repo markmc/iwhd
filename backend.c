@@ -86,10 +86,11 @@ bad_bcreate (char *bucket)
 }
 
 int
-bad_register (my_state *ms, provider_t *prov)
+bad_register (my_state *ms, provider_t *prov, char *next)
 {
 	(void)ms;
 	(void)prov;
+	(void)next;
 
 	DPRINTF("*** bad call to %s\n",__func__);
 	return MHD_HTTP_NOT_IMPLEMENTED;
@@ -229,13 +230,24 @@ s3_bcreate (char *bucket)
 }
 
 int
-s3_register (my_state *ms, provider_t *prov)
+s3_register (my_state *ms, provider_t *prov, char *next)
 {
-	(void)ms;
-	(void)prov;
+	if (next) {
+		DPRINTF("S3 register with next!=NULL\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
 
-	DPRINTF("*** register %s/%s to %s:%d\n",
-		ms->bucket, ms->key, prov->host, prov->port);
+	DPRINTF("*** register %s/%s via %s:%d with %s/%s\n",
+		ms->bucket, ms->key,
+		prov->host, prov->port, prov->username, prov->password);
+	DPRINTF("    fetch cert/key/account\n");
+	DPRINTF("    generate temp dir\n");
+	DPRINTF("    ec2-bundle-image using cert/key/account and temp dir\n");
+	DPRINTF("    generate temp bucket\n");
+	DPRINTF("    ec2-upload-bundle from temp dir to temp bucket\n");
+	DPRINTF("    ec2-register using temp bucket\n");
+	DPRINTF("    add AMI ID to original-image metadata\n");
+	DPRINTF("    delete temp dir\n");
 		
 	return MHD_HTTP_NOT_IMPLEMENTED;
 }
@@ -398,10 +410,28 @@ curl_bcreate (char *bucket)
 	return MHD_HTTP_OK;
 }
 
+/*
+ * We can proxy through any number of CURL/HTTP warehouses, but the chain
+ * eventually has to terminate at an S3 back end.
+ */
+
+int
+curl_register (my_state *ms, provider_t *prov, char *next)
+{
+	if (!next) {
+		DPRINTF("CURL register with next==NULL\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	DPRINTF("*** PROXY registration request for %s/%s to %s at %s:%d\n",
+		ms->bucket, ms->key, next, prov->host, prov->port);
+		
+	return MHD_HTTP_NOT_IMPLEMENTED;
+}
 
 /***** CF-specific functions (TBD) *****/
 
-/***** FS-specific functions (TBD) *****/
+/***** FS-specific functions *****/
 
 void
 fs_init (void)
@@ -540,7 +570,7 @@ backend_func_tbl curl_func_tbl = {
 	curl_cache_child,
 	curl_delete,
 	curl_bcreate,
-	bad_register,
+	curl_register,
 };
 
 backend_func_tbl fs_func_tbl = {
