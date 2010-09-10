@@ -85,6 +85,16 @@ bad_bcreate (char *bucket)
 	return MHD_HTTP_NOT_IMPLEMENTED;
 }
 
+int
+bad_register (my_state *ms, provider_t *prov)
+{
+	(void)ms;
+	(void)prov;
+
+	DPRINTF("*** bad call to %s\n",__func__);
+	return MHD_HTTP_NOT_IMPLEMENTED;
+}
+
 /***** Generic functions shared by the HTTP back ends. */
 
 /* Invoked from S3/CURL/CF. */
@@ -216,6 +226,18 @@ s3_bcreate (char *bucket)
 	}
 
 	return MHD_HTTP_OK;
+}
+
+int
+s3_register (my_state *ms, provider_t *prov)
+{
+	(void)ms;
+	(void)prov;
+
+	DPRINTF("*** register %s/%s to %s:%d\n",
+		ms->bucket, ms->key, prov->host, prov->port);
+		
+	return MHD_HTTP_NOT_IMPLEMENTED;
 }
 
 /***** CURL-specific functions *****/
@@ -495,6 +517,7 @@ backend_func_tbl bad_func_tbl = {
 	bad_cache_child,
 	bad_delete,
 	bad_bcreate,
+	bad_register,
 };
 
 backend_func_tbl s3_func_tbl = {
@@ -504,6 +527,7 @@ backend_func_tbl s3_func_tbl = {
 	bad_cache_child,
 	s3_delete,
 	s3_bcreate,
+	s3_register,
 };
 
 backend_func_tbl curl_func_tbl = {
@@ -513,6 +537,7 @@ backend_func_tbl curl_func_tbl = {
 	curl_cache_child,
 	curl_delete,
 	curl_bcreate,
+	bad_register,
 };
 
 backend_func_tbl fs_func_tbl = {
@@ -522,4 +547,5 @@ backend_func_tbl fs_func_tbl = {
 	bad_cache_child,
 	fs_delete,
 	fs_bcreate,
+	bad_register,
 };

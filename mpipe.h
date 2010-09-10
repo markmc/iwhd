@@ -1,3 +1,6 @@
+#if !defined(_MPIPE_H)
+#define _MPIPE_H
+
 #include <fcntl.h>
 #include <getopt.h>
 #include <poll.h>
@@ -77,3 +80,5 @@ void		 pipe_cons_signal	(pipe_private *pp);
 void		 pipe_prod_signal	(pipe_shared *ps,
 					 void *ptr, size_t total);
 void		 pipe_prod_finish	(pipe_shared *ps);
+
+#endif

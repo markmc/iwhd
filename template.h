@@ -1,3 +1,6 @@
+#if !defined(_TEMPLATE_H)
+#define _TEMPLATE_H
+
 #define TMPL_BUF_SIZE	1024
 
 typedef struct {
@@ -40,3 +43,5 @@ int		 tmpl_obj_entry		(tmpl_ctx_t *ctx,
 					 const char *bucket, const char *key);
 int		 tmpl_obj_footer	(tmpl_ctx_t *ctx);
 int		 tmpl_prov_footer	(tmpl_ctx_t *ctx);
+
+#endif

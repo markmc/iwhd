@@ -21,10 +21,10 @@
 
 #include "repo.h"
 #include "meta.h"
+#include "backend.h"
 #include "proxy.h"
 #include "template.h"
 #include "mpipe.h"
-#include "backend.h"
 #include "state_defs.h"
 
 /* Define-away for now.  Eventually, define to gettext.  */
@@ -1113,38 +1113,26 @@ check_location (my_state *ms)
 }
 
 int
-bundle_ami (my_state *ms)
+register_image (my_state *ms)
 {
-	char	*datum;
+	char		*site;
+	provider_t	 prov;
+	int		 i;
 
-	datum = g_hash_table_lookup(ms->dict,"cert");
-	if (datum) {
-		printf("cert follows:\n%s\n",datum);
-	}
-	else {
-		printf("cert MISSING\n");
+	site = g_hash_table_lookup(ms->dict,"site");
+	if (!site) {
+		printf("site MISSING\n");
 		return MHD_HTTP_BAD_REQUEST;
 	}
 
-	datum = g_hash_table_lookup(ms->dict,"pkey");
-	if (datum) {
-		printf("pkey follows:\n%s\n",datum);
-	}
-	else {
-		printf("pkey MISSING\n");
-		return MHD_HTTP_BAD_REQUEST;
+	for (i = 1; get_provider(i,&prov); ++i) {
+		if (strcmp(prov.name,site)) {
+			continue;
+		}
+		return prov.func_tbl->register_func(ms,&prov);
 	}
 
-	datum = g_hash_table_lookup(ms->dict,"account");
-	if (datum) {
-		printf("account = %s\n",datum);
-	}
-	else {
-		printf("account MISSING\n");
-		return MHD_HTTP_BAD_REQUEST;
-	}
-
-	return MHD_HTTP_OK;
+	return MHD_HTTP_BAD_REQUEST;
 }
 
 int
@@ -1190,8 +1178,8 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 				else if (!strcmp(op,"check")) {
 					rc = check_location(ms);
 				}
-				else if (!strcmp(op,"bundle")) {
-					rc = bundle_ami(ms);
+				else if (!strcmp(op,"register")) {
+					rc = register_image(ms);
 				}
 				else {
 					DPRINTF("unknown op %s for %s/%s\n",
@@ -1396,7 +1384,7 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 	rc = main_func_tbl->bcreate_func(ms->bucket);
 
 	if (rc == MHD_HTTP_OK) {
-		if (meta_set_value(ms->bucket,"_default","_policy","1") != 0) {
+		if (meta_set_value(ms->bucket,"_default","_policy","0") != 0) {
 			DPRINTF("default-policy create failed\n");
 			/* Non-fatal. */
 		}

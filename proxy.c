@@ -41,6 +41,11 @@
  * they like to both the config and to replication attributes on objects.
  */
 
+extern backend_func_tbl	bad_func_tbl;
+extern backend_func_tbl	s3_func_tbl;
+extern backend_func_tbl	curl_func_tbl;
+extern backend_func_tbl	fs_func_tbl;
+
 typedef enum { REPL_PUT, REPL_DEL } repl_t;
 
 typedef struct _repl_item {
@@ -693,6 +698,20 @@ get_provider (int i, provider_t *out)
 	/* Use empty strings instead of NULL. */
 	if (!out->username) out->username = "";
 	if (!out->password) out->password = "";
+
+	/* TBD: do this a cleaner way. */
+	if (!strcasecmp(out->type,"s3")) {
+		out->func_tbl = &s3_func_tbl;
+	}
+	else if (!strcasecmp(out->type,"http")) {
+		out->func_tbl = &curl_func_tbl;
+	}
+	else if (!strcasecmp(out->type,"fs")) {
+		out->func_tbl = &fs_func_tbl;
+	}
+	else {
+		out->func_tbl = &bad_func_tbl;
+	}
 
 	return 1;
 }

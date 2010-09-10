@@ -1,3 +1,5 @@
+#if !defined(_QUERY_H)
+
 #if defined(__CPLUSPLUS__) || defined(__cplusplus)
 extern "C" {
 #endif
@@ -42,3 +44,4 @@ void	 print_value	(value_t *);
 }
 #endif
 
+#endif
