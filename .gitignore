@@ -8,9 +8,12 @@ Makefile.in
 aclocal.m4
 autom4te.cache/
 build-aux
+config.h
+config.hin
 config.log
 config.status
 configure
+iwhd
 query-orig.c
 query.c
-iwhd
+stamp-h1
