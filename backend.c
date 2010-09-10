@@ -86,11 +86,12 @@ bad_bcreate (char *bucket)
 }
 
 int
-bad_register (my_state *ms, provider_t *prov, char *next)
+bad_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 {
 	(void)ms;
 	(void)prov;
 	(void)next;
+	(void)args;
 
 	DPRINTF("*** bad call to %s\n",__func__);
 	return MHD_HTTP_NOT_IMPLEMENTED;
@@ -230,16 +231,25 @@ s3_bcreate (char *bucket)
 }
 
 int
-s3_register (my_state *ms, provider_t *prov, char *next)
+s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 {
+	char	*kernel		= g_hash_table_lookup(args,"kernel");
+	char	*ramdisk	= g_hash_table_lookup(args,"ramdisk");
+
 	if (next) {
 		DPRINTF("S3 register with next!=NULL\n");
 		return MHD_HTTP_BAD_REQUEST;
 	}
 
-	DPRINTF("*** register %s/%s via %s:%d with %s/%s\n",
-		ms->bucket, ms->key,
+	DPRINTF("*** register %s/%s via %s (%s:%d) with %s/%s\n",
+		ms->bucket, ms->key, prov->name,
 		prov->host, prov->port, prov->username, prov->password);
+	if (kernel) {
+		DPRINTF("    (using kernel %s)\n",kernel);
+	}
+	if (ramdisk) {
+		DPRINTF("    (using ramdisk %s)\n",ramdisk);
+	}
 	DPRINTF("    fetch cert/key/account\n");
 	DPRINTF("    generate temp dir\n");
 	DPRINTF("    ec2-bundle-image using cert/key/account and temp dir\n");
@@ -298,8 +308,7 @@ curl_put_child (void * ctx)
 {
 	pipe_private	*pp	= ctx;
 	pipe_shared	*ps	= pp->shared;
-	my_state	*ms	= ps->owner;
-	curl_off_t	 llen;
+	my_state	*ms	= ps->owner; curl_off_t	 llen;
 	char		 fixed[1024];
 	CURL		*curl;
 	const char	*clen;
@@ -416,17 +425,55 @@ curl_bcreate (char *bucket)
  */
 
 int
-curl_register (my_state *ms, provider_t *prov, char *next)
+curl_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 {
+	char			 fixed[1024];
+	CURL			*curl;
+	struct curl_httppost	*first	= NULL;
+	struct curl_httppost	*last	= NULL;
+	char	*kernel		= g_hash_table_lookup(args,"kernel");
+	char	*ramdisk	= g_hash_table_lookup(args,"ramdisk");
+
 	if (!next) {
 		DPRINTF("CURL register with next==NULL\n");
 		return MHD_HTTP_BAD_REQUEST;
 	}
 
-	DPRINTF("*** PROXY registration request for %s/%s to %s at %s:%d\n",
-		ms->bucket, ms->key, next, prov->host, prov->port);
+	DPRINTF("*** PROXY registration request for %s/%s to %s (%s:%d)\n",
+		ms->bucket, ms->key, prov->name, prov->host, prov->port);
 		
-	return MHD_HTTP_NOT_IMPLEMENTED;
+	curl = curl_easy_init();
+	if (!curl) {
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	sprintf(fixed,"http://%s:%d/%s/%s",
+		prov->host,prov->port, ms->bucket, ms->key);
+	curl_easy_setopt(curl,CURLOPT_URL,fixed);
+	curl_formadd(&first,&last,
+		CURLFORM_COPYNAME, "op",
+		CURLFORM_COPYCONTENTS, "register",
+		CURLFORM_END);
+	curl_formadd(&first,&last,
+		CURLFORM_COPYNAME, "site",
+		CURLFORM_COPYCONTENTS, next,
+		CURLFORM_END);
+	if (kernel) {
+		curl_formadd(&first,&last,
+			CURLFORM_COPYNAME, "kernel",
+			CURLFORM_COPYCONTENTS, kernel,
+			CURLFORM_END);
+	}
+	if (ramdisk) {
+		curl_formadd(&first,&last,
+			CURLFORM_COPYNAME, "ramdisk",
+			CURLFORM_COPYCONTENTS, ramdisk,
+			CURLFORM_END);
+	}
+	curl_easy_setopt(curl,CURLOPT_HTTPPOST,first);
+	curl_easy_perform(curl);
+	curl_easy_cleanup(curl);
+
+	return MHD_HTTP_OK;
 }
 
 /***** CF-specific functions (TBD) *****/

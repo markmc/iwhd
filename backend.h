@@ -13,7 +13,7 @@ typedef void	*cache_child_func_t	(void *);
 typedef int	 delete_func_t		(char *bucket, char *key, char *url);
 typedef int	 bcreate_func_t		(char *bucket);
 typedef int	 register_func_t	(my_state *ms, struct _provider *prov,
-					 char *next);
+					 char *next, GHashTable *args);
 
 typedef struct {
 	const char		*name;

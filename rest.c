@@ -1136,7 +1136,7 @@ register_image (my_state *ms)
 		if (strcmp(prov.name,site)) {
 			continue;
 		}
-		return prov.func_tbl->register_func(ms,&prov,next);
+		return prov.func_tbl->register_func(ms,&prov,next,ms->dict);
 	}
 
 	DPRINTF("site %s not found\n",site);
