@@ -76,6 +76,7 @@ validate_server (unsigned int i)
 	json_t		*elem;
 	const char	*name;
 	const char	*type;
+	enum { NEED_NONE, NEED_SERVER, NEED_ALL } needs = NEED_ALL;
 
 	server = json_array_get(config,i);
 	if (!json_is_object(server)) {
@@ -98,6 +99,35 @@ validate_server (unsigned int i)
 	type = json_string_value(elem);
 
 	if (!strcasecmp(type,"s3") || !strcasecmp(type,"cf")) {
+		needs = NEED_ALL;
+	}
+	else if (!strcasecmp(type,"http")) {
+		needs = NEED_SERVER;
+	}
+	else if (!strcasecmp(type,"fs")) {
+		needs = NEED_NONE;
+	}
+	else {
+		fprintf(stderr,"config elem %u (%s): bad type\n",i,name);
+		return 0;
+	}
+
+	if (needs != NEED_NONE) {
+		elem = json_object_get(server,"host");
+		if (!json_is_string(elem)) {
+			fprintf(stderr,"config elem %u (%s): missing host\n",
+				i,name);
+			return 0;
+		}
+		elem = json_object_get(server,"port");
+		if (!json_is_integer(elem)) {
+			fprintf(stderr,"config elem %u (%s): missing port\n",
+				i,name);
+			return 0;
+		}
+	}
+
+	if (needs == NEED_ALL) {
 		elem = json_object_get(server,"key");
 		if (!json_is_string(elem)) {
 			fprintf(stderr,"config elem %u (%s): missing S3 key\n",
@@ -112,22 +142,6 @@ validate_server (unsigned int i)
 			return 0;
 		}
 	}
-	else if (strcasecmp(type,"http")) {
-		fprintf(stderr,"config elem %u (%s): bad type\n",i,name);
-		return 0;
-	}
-
-	elem = json_object_get(server,"host");
-	if (!json_is_string(elem)) {
-		fprintf(stderr,"config elem %u (%s): missing host\n",i,name);
-		return 0;
-	}
-
-	elem = json_object_get(server,"port");
-	if (!json_is_integer(elem)) {
-		fprintf(stderr,"config elem %u (%s): missing port\n",i,name);
-		return 0;
-	}
 
 	return 1;
 }
@@ -140,17 +154,22 @@ set_config (void)
 	const char	*type;
 
 	server = json_array_get(config,0);
-	proxy_host = json_string_value(json_object_get(server,"host"));
-	proxy_port = json_integer_value(json_object_get(server,"port"));
 	type = json_string_value(json_object_get(server,"type"));
-	if (!strcasecmp(type,"s3")) {
-		s3mode = 1;
-		proxy_key = json_string_value(json_object_get(server,"key"));
-		proxy_secret = json_string_value(json_object_get(
-			server,"secret"));
-	}
-	else {
-		s3mode = 0;
+	if (strcasecmp(type,"fs")) {
+		proxy_host = json_string_value(
+			json_object_get(server,"host"));
+		proxy_port = json_integer_value(
+			json_object_get(server,"port"));
+		if (!strcasecmp(type,"s3")) {
+			s3mode = 1;
+			proxy_key = json_string_value(
+				json_object_get(server,"key"));
+			proxy_secret = json_string_value(
+				json_object_get(server,"secret"));
+		}
+		else {
+			s3mode = 0;
+		}
 	}
 
 	return (char *)json_string_value(json_object_get(server,"name"));
@@ -162,6 +181,11 @@ parse_config (void)
 	json_error_t	 err;
 	unsigned int	 nservers;
 	unsigned int	 i;
+
+	if (access(cfg_file,R_OK) < 0) {
+		perror(cfg_file);
+		return NULL;
+	}
 
 	config = json_load_file(cfg_file,&err);
 	if (!config) {

@@ -15,6 +15,7 @@ typedef int	 bcreate_func_t		(char *bucket);
 typedef int	 register_func_t	(my_state *ms, struct _provider *prov);
 
 typedef struct {
+	const char		*name;
 	init_func_t		*init_func;
 	get_child_func_t	*get_child_func;
 	put_child_func_t	*put_child_func;

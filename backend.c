@@ -511,6 +511,7 @@ fs_bcreate (char *bucket)
 /***** Function tables. ****/
 
 backend_func_tbl bad_func_tbl = {
+	"uninitialized",
 	bad_init,
 	bad_get_child,
 	bad_put_child,
@@ -521,6 +522,7 @@ backend_func_tbl bad_func_tbl = {
 };
 
 backend_func_tbl s3_func_tbl = {
+	"S3",
 	s3_init,
 	s3_get_child,
 	s3_put_child,
@@ -531,6 +533,7 @@ backend_func_tbl s3_func_tbl = {
 };
 
 backend_func_tbl curl_func_tbl = {
+	"HTTP",
 	curl_init,
 	curl_get_child,
 	curl_put_child,
@@ -541,6 +544,7 @@ backend_func_tbl curl_func_tbl = {
 };
 
 backend_func_tbl fs_func_tbl = {
+	"FS",
 	fs_init,
 	fs_get_child,
 	fs_put_child,

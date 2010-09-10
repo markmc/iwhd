@@ -1133,6 +1133,7 @@ register_image (my_state *ms)
 		return prov.func_tbl->register_func(ms,&prov);
 	}
 
+	DPRINTF("site %s not found\n",site);
 	return MHD_HTTP_BAD_REQUEST;
 }
 
@@ -1554,10 +1555,6 @@ enum
 struct option my_options[] = {
 	{ "config",  required_argument, NULL, 'c' },
 	{ "db",      required_argument, NULL, 'd' },
-
-	/* testing-only option: ---fs-mode=LOC_ID; do not document
-	   Use local file system, LOC_ID  */
-	{ "-fs-mode", required_argument, NULL, 'f' },
 	{ "master",  required_argument, NULL, 'm' },
 	{ "port",    required_argument, NULL, 'p' },
 	{ "verbose", no_argument,       NULL, 'v' },
@@ -1579,7 +1576,7 @@ Usage: %s [OPTION]\n\
 "),
               program_name);
       fputs (_("\
-Concatenate FILE(s), or standard input, to standard output.\n\
+Deltacloud image-warehouse daemon.\n\
 A configuration file must be specified.\n\
 \n\
   -c, --config=FILE       config file [required]\n\
@@ -1590,8 +1587,6 @@ A configuration file must be specified.\n\
 \n\
       --help     display this help and exit\n\
       --version  output version information and exit\n\
-\n\
-LOC_ID should be a unique string per location\n\
 "), stdout);
       printf (_("\
 \n\
@@ -1609,7 +1604,6 @@ main (int argc, char **argv)
 	sem_t			 the_sem;
 	char			*stctx = NULL;
 	char			*port_tmp;
-	bool			fsmode = false;
 
 	program_name = argv[0];
 
@@ -1624,10 +1618,6 @@ main (int argc, char **argv)
 		if (port_tmp) {
 			db_port = (unsigned short)strtoul(port_tmp,NULL,10);
 		}
-		break;
-	case 'f':
-		fsmode = true;
-		me = optarg;
 		break;
 	case 'm':
 		assert (optarg);
@@ -1659,38 +1649,15 @@ main (int argc, char **argv)
 	}
 args_done:
 
-	if (fsmode && cfg_file) {
-		error (0, 0, "-f and --config are mutually exclusive");
-		usage (EXIT_FAILURE);
-	}
-
-	if (!fsmode && !cfg_file) {
+	if (!cfg_file) {
 		error (0, 0, "no configuration file specified");
 		usage (EXIT_FAILURE);
 	}
 
-	if (!fsmode) {
-		me = parse_config();
-		if (!me) {
-			fprintf(stderr,"could not parse %s\n",cfg_file);
-			return !0;
-		}
-	}
-
-	if (verbose) {
-		if (proxy_host) {
-			printf("primary storage in %s:%u as %s:%s (%s)\n",
-				proxy_host,proxy_port,proxy_key,proxy_secret,
-				s3mode ? "S3" : "HTTP");
-		}
-		if (master_host) {
-			printf("operating as slave to %s:%u\n",
-				master_host, master_port);
-		}
-		printf("db is at %s:%u\n",db_host,db_port);
-		printf("will listen on port %u\n",my_port);
-		printf("my location is \"%s\"\n",me);
-		fflush(stdout);
+	me = parse_config();
+	if (!me) {
+		fprintf(stderr,"could not parse %s\n",cfg_file);
+		return !0;
 	}
 
 	sem_init(&the_sem,0,0);
@@ -1705,6 +1672,19 @@ args_done:
 	else {
 		main_func_tbl = &fs_func_tbl;
 	}
+
+	if (verbose) {
+		printf("primary store type is %s\n",main_func_tbl->name);
+		if (master_host) {
+			printf("operating as slave to %s:%u\n",
+				master_host, master_port);
+		}
+		printf("db is at %s:%u\n",db_host,db_port);
+		printf("will listen on port %u\n",my_port);
+		printf("my location is \"%s\"\n",me);
+		fflush(stdout);
+	}
+
 	main_func_tbl->init_func();
 	meta_init();
 	repl_init();
