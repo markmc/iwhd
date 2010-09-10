@@ -18,7 +18,7 @@
 #include <hstor.h>
 #include <jansson.h>
 
-#include "repo.h"
+#include "iwh.h"
 #include "proxy.h"
 #include "query.h"
 #include "meta.h"

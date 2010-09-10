@@ -13,4 +13,4 @@ config.status
 configure
 query-orig.c
 query.c
-repod
+iwhd

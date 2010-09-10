@@ -20,7 +20,7 @@
 #include <glib.h>
 
 #define GLOBALS_IMPL
-#include "repo.h"
+#include "iwh.h"
 #include "meta.h"
 #include "proxy.h"
 #include "template.h"

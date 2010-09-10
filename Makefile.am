@@ -1,12 +1,15 @@
 AM_CFLAGS	= -W -Wall -Wshadow -Wextra
 AM_CPPFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
 
-bin_PROGRAMS = repod
+bin_PROGRAMS = iwhd
 EXTRA_DIST = query.leg
 
-repod_SOURCES = \
+# iwhd is short for Image WareHouse Daemon.
+
+iwhd_SOURCES = \
   backend.c	\
   backend.h	\
+  iwh.h		\
   meta.cpp	\
   meta.h	\
   mpipe.c	\
@@ -15,14 +18,13 @@ repod_SOURCES = \
   proxy.h	\
   query.c	\
   query.h	\
-  repo.h	\
   rest.c	\
   state_defs.h	\
   template.c	\
   template.h
 
-repod_CPPFLAGS	= $(HAIL_CFLAGS)
-repod_LDADD =		\
+iwhd_CPPFLAGS	= $(HAIL_CFLAGS)
+iwhd_LDADD =		\
   -lmongoclient		\
   $(BOOST_FS_LIB)	\
   $(BOOST_PO_LIB)	\
