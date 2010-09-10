@@ -1,5 +1,6 @@
 #include <config.h>
 
+#include <error.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <poll.h>
@@ -1588,8 +1589,9 @@ Usage: %s [OPTION] [LOC_ID]\n\
               program_name);
       fputs (_("\
 Concatenate FILE(s), or standard input, to standard output.\n\
+A configuration file name must be specified.\n\
 \n\
-  -c, --config=FILE       config file (default repo.json)\n\
+  -c, --config=FILE       config file [require]\n\
   -d, --db=HOST_PORT      database server as ip[:port]\n\
   -f, --fsmode=MODE       local-filesystem mode for testing\n\
   -m, --master=HOST_PORT  master (upstream) server as ip[:port]\n\
@@ -1666,12 +1668,15 @@ main (int argc, char **argv)
 	}
 args_done:
 
-	if (cfg_file) {
-		me = parse_config();
-		if (!me) {
-			fprintf(stderr,"could not parse %s\n",cfg_file);
-			return !0;
-		}
+	if (!cfg_file) {
+		error (0, 0, "no configuration file specified");
+		usage (EXIT_FAILURE);
+	}
+
+	me = parse_config();
+	if (!me) {
+		fprintf(stderr,"could not parse %s\n",cfg_file);
+		return !0;
 	}
 
 	if (optind < argc) {

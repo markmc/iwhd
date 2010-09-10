@@ -23,7 +23,7 @@
  */
 
 GLOBAL(int,		verbose,	0);
-GLOBAL(char *,		cfg_file,	"repo.json");
+GLOBAL(char *,		cfg_file,	NULL);
 GLOBAL(const char *,	proxy_host,	NULL);		/* always */
 GLOBAL(unsigned short,	proxy_port,	MY_PORT+1);	/* repod/S3 */
 GLOBAL(const char *,	proxy_key,	"foo");		/* S3 only */
