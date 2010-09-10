@@ -1,6 +1,7 @@
 #include <config.h>
 
 #include <errno.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <sys/time.h>
 #include <iostream>
@@ -20,6 +21,28 @@ using namespace mongo;
 
 /* TBD: parameterize */
 #define MAIN_TBL "repo.main"
+
+/*
+ * Since the client isn't inherently MT-safe, we serialize access to it
+ * ourselves.  Fortunately, none of our metadata operations should be very
+ * long-lived; if they are it probably means our connection is FUBAR and other
+ * threads will be affected anyway.
+ */
+
+#define SHOW_CONTENTION
+
+pthread_mutex_t		client_lock	= PTHREAD_MUTEX_INITIALIZER;
+#if defined(SHOW_CONTENTION)
+#define CLIENT_LOCK do {					\
+	if (pthread_mutex_trylock(&client_lock) != 0) {		\
+		cout << "contention in " << __func__ << endl;	\
+		pthread_mutex_lock(&client_lock);		\
+	}							\
+} while (0)
+#else
+#define CLIENT_LOCK	pthread_mutex_lock(&client_lock)
+#endif
+#define CLIENT_UNLOCK	pthread_mutex_unlock(&client_lock)
 
 void
 dbl_to_str (double *foo, char *optr)
@@ -166,9 +189,16 @@ RepoMeta::DidPut (char * bucket, char * key, char * loc, size_t size)
 extern "C" char *
 meta_did_put (char * bucket, char * key, char * loc, size_t size)
 {
+	char	*rc;
+
 	cout << "meta_did_put(" << bucket << "," << key << "," << loc << ")"
 	     << endl;
-	return it->DidPut(bucket,key,loc,size);
+
+	CLIENT_LOCK;
+	rc = it->DidPut(bucket,key,loc,size);
+	CLIENT_UNLOCK;
+
+	return rc;
 }
 
 void
@@ -192,7 +222,9 @@ RepoMeta::GotCopy (char * bucket, char * key, char * loc)
 extern "C" void
 meta_got_copy (char * bucket, char * key, char * loc)
 {
+	CLIENT_LOCK;
 	it->GotCopy(bucket,key,loc);
+	CLIENT_UNLOCK;
 }
 
 char *
@@ -223,7 +255,13 @@ RepoMeta::HasCopy (char * bucket, char * key, char * loc)
 extern "C" char *
 meta_has_copy (char * bucket, char * key, char * loc)
 {
-	return it->HasCopy(bucket,key,loc);
+	char	*rc;
+
+	CLIENT_LOCK;
+	rc = it->HasCopy(bucket,key,loc);
+	CLIENT_UNLOCK;
+
+	return rc;
 }
 
 int
@@ -239,7 +277,13 @@ RepoMeta::SetValue (char * bucket, char * key, char * mkey, char * mvalue)
 extern "C" int
 meta_set_value (char * bucket, char * key, char * mkey, char * mvalue)
 {
-	return it->SetValue(bucket,key,mkey,mvalue);
+	int	rc;
+
+	CLIENT_LOCK;
+	rc = it->SetValue(bucket,key,mkey,mvalue);
+	CLIENT_UNLOCK;
+
+	return rc;
 }
 
 int
@@ -270,7 +314,13 @@ RepoMeta::GetValue (char * bucket, char * key, char * mkey, char ** mvalue)
 extern "C" int
 meta_get_value (char * bucket, char * key, char * mkey, char ** mvalue)
 {
-	return it->GetValue(bucket,key,mkey,mvalue);
+	int	rc;
+
+	CLIENT_LOCK;
+	rc = it->GetValue(bucket,key,mkey,mvalue);
+	CLIENT_UNLOCK;
+
+	return rc;
 }
 
 RepoQuery::RepoQuery (char * bucket, char * key, char *qstr, RepoMeta &p)
@@ -328,7 +378,9 @@ RepoQuery::~RepoQuery ()
 extern "C" void
 meta_query_stop (void * qobj)
 {
+	CLIENT_LOCK;
 	delete (RepoQuery *)qobj;
+	CLIENT_UNLOCK;
 }
 
 extern "C" char *
@@ -370,10 +422,17 @@ RepoMeta::NewQuery (char * bucket, char * key, char *expr)
 extern "C" void *
 meta_query_new (char * bucket, char * key, char *expr)
 {
+	void	*rc;
+
 	if ((bucket && key) || (!bucket && !key)) {
 		return NULL;
 	}
-	return it->NewQuery(bucket,key,expr);
+
+	CLIENT_LOCK;
+	rc = it->NewQuery(bucket,key,expr);
+	CLIENT_UNLOCK;
+
+	return rc;
 }
 
 extern "C" int
@@ -381,9 +440,12 @@ meta_query_next (void * qobj, char ** bucket, char ** key)
 {
 	RepoQuery *	rq	= (RepoQuery *)qobj;
 
+	CLIENT_LOCK;
 	if (!rq->Next()) {
+		CLIENT_UNLOCK;
 		return 0;
 	}
+	CLIENT_UNLOCK;
 
 	*bucket = rq->bucket;
 	*key = rq->key;
@@ -424,7 +486,9 @@ extern "C"
 void
 meta_delete (char * bucket, char * key)
 {
+	CLIENT_LOCK;
 	it->Delete(bucket,key);
+	CLIENT_UNLOCK;
 }
 
 size_t
@@ -450,5 +514,11 @@ extern "C"
 size_t
 meta_get_size (char * bucket, char * key)
 {
-	return it->GetSize(bucket,key);
+	size_t	rc;
+
+	CLIENT_LOCK;
+	rc = it->GetSize(bucket,key);
+	CLIENT_UNLOCK;
+
+	return rc;
 }
