@@ -1,3 +1,6 @@
+#if !defined(_META_H)
+#define _META_H
+
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -22,4 +25,6 @@ size_t meta_get_size (char * bucket, char * key);
 
 #if defined(__cplusplus)
 }
+#endif
+
 #endif

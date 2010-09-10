@@ -1,3 +1,9 @@
+#if !defined(_STATE_DEFS_H)
+#define _STATE_DEFS_H
+
+#include "mpipe.h"
+#include "template.h"
+
 #define MAX_FIELD_LEN	64
 
 typedef enum {
@@ -48,3 +54,5 @@ typedef struct {
 
 
 void free_ms (my_state *ms);
+
+#endif
