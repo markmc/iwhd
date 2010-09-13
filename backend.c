@@ -258,7 +258,7 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	DPRINTF("    ec2-register using temp bucket\n");
 	DPRINTF("    add AMI ID to original-image metadata\n");
 	DPRINTF("    delete temp dir\n");
-		
+
 	return MHD_HTTP_NOT_IMPLEMENTED;
 }
 
@@ -308,7 +308,8 @@ curl_put_child (void * ctx)
 {
 	pipe_private	*pp	= ctx;
 	pipe_shared	*ps	= pp->shared;
-	my_state	*ms	= ps->owner; curl_off_t	 llen;
+	my_state	*ms	= ps->owner;
+	curl_off_t	 llen;
 	char		 fixed[1024];
 	CURL		*curl;
 	const char	*clen;
@@ -441,7 +442,7 @@ curl_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 
 	DPRINTF("*** PROXY registration request for %s/%s to %s (%s:%d)\n",
 		ms->bucket, ms->key, prov->name, prov->host, prov->port);
-		
+
 	curl = curl_easy_init();
 	if (!curl) {
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
