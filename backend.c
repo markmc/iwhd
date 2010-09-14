@@ -12,6 +12,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <assert.h>
 
 #include <microhttpd.h>
@@ -233,33 +234,91 @@ s3_bcreate (char *bucket)
 int
 s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 {
-	char	*kernel		= g_hash_table_lookup(args,"kernel");
-	char	*ramdisk	= g_hash_table_lookup(args,"ramdisk");
+	char		*kernel		= g_hash_table_lookup(args,"kernel");
+	char		*ramdisk	= g_hash_table_lookup(args,"ramdisk");
+	char		*ami_cert;
+	char		*ami_key;
+	char		*ami_uid;
+	const char	*argv[11];
+	int	 	 argc = 0;
+	pid_t	 	 pid;
 
 	if (next) {
 		DPRINTF("S3 register with next!=NULL\n");
 		return MHD_HTTP_BAD_REQUEST;
 	}
 
-	DPRINTF("*** register %s/%s via %s (%s:%d) with %s/%s\n",
-		ms->bucket, ms->key, prov->name,
-		prov->host, prov->port, prov->username, prov->password);
+	DPRINTF("*** register %s/%s via %s (%s:%d)\n",
+		ms->bucket, ms->key, prov->name, prov->host, prov->port);
 	if (kernel) {
 		DPRINTF("    (using kernel %s)\n",kernel);
 	}
 	if (ramdisk) {
 		DPRINTF("    (using ramdisk %s)\n",ramdisk);
 	}
-	DPRINTF("    fetch cert/key/account\n");
-	DPRINTF("    generate temp dir\n");
-	DPRINTF("    ec2-bundle-image using cert/key/account and temp dir\n");
-	DPRINTF("    generate temp bucket\n");
-	DPRINTF("    ec2-upload-bundle from temp dir to temp bucket\n");
-	DPRINTF("    ec2-register using temp bucket\n");
-	DPRINTF("    add AMI ID to original-image metadata\n");
-	DPRINTF("    delete temp dir\n");
 
-	return MHD_HTTP_NOT_IMPLEMENTED;
+
+	if (!prov->username) {
+		printf("missing EC2 API key\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	if (!prov->password) {
+		printf("missing EC2 API key\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	ami_cert = get_provider_value(prov->index,"ami-cert");
+	if (!ami_cert) {
+		printf("missing EC2 AMI cert\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	ami_key = get_provider_value(prov->index,"ami-key");
+	if (!ami_key) {
+		printf("missing EC2 AMI key\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	ami_uid = get_provider_value(prov->index,"ami-uid");
+	if (!ami_uid) {
+		printf("missing EC2 AMI uid\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	argv[argc++] = "dc-register-image";
+	argv[argc++] = ms->bucket;
+	argv[argc++] = ms->key;
+	argv[argc++] = prov->username;
+	argv[argc++] = prov->password;
+	argv[argc++] = ami_cert;
+	argv[argc++] = ami_key;
+	argv[argc++] = ami_uid;
+	argv[argc++] = kernel ? kernel : "_default_";
+	argv[argc++] = ramdisk ? ramdisk : "_default_";
+	argv[argc] = NULL;
+
+	pid = fork();
+	if (pid < 0) {
+		perror("fork");
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	if (pid == 0) {
+		if (execvp("dc-register-image",(char* const*)argv) < 0) {
+			perror("execvp");
+		}
+	}
+	else {
+		DPRINTF("waiting for child...\n");
+		if (waitpid(pid,NULL,0) < 0) {
+			perror("waitpid");
+		}
+		/* TBD: check identity/status from waitpid */
+		DPRINTF("...child exited\n");
+	}
+
+	return MHD_HTTP_OK;
 }
 
 /***** CURL-specific functions *****/

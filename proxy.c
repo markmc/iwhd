@@ -774,6 +774,7 @@ get_provider (int i, provider_t *out)
 		return 0;
 	}
 
+	out->index = i;
 	out->name = json_string_value(json_object_get(server,"name"));
 	out->type = json_string_value(json_object_get(server,"type"));
 	out->host = json_string_value(json_object_get(server,"host"));
@@ -801,6 +802,27 @@ get_provider (int i, provider_t *out)
 	}
 
 	return 1;
+}
+
+char *
+get_provider_value (int i, char *fname)
+{
+	json_t	*server;
+	json_t	*field;
+
+	server = json_array_get(config,i);
+	if (!server) {
+		DPRINTF("no such entry %d\n",i);
+		return NULL;
+	}
+
+	field = json_object_get(server,fname);
+	if (!field) {
+		DPRINTF("no such field %s on server %d\n",fname,i);
+		return NULL;
+	}
+
+	return (char *)json_string_value(field);
 }
 
 void
