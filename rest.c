@@ -486,6 +486,7 @@ proxy_get_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	char			*fixed;
 	my_state		*ms	= *rctx;
+	int			 rc	= MHD_HTTP_NOT_FOUND;
 
 	(void)cctx;
 	(void)method;
@@ -495,14 +496,18 @@ proxy_get_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	DPRINTF("PROXY GET ATTR %s\n",url);
 
-	meta_get_value(ms->bucket,ms->key,ms->attr,&fixed);
-
-	resp = MHD_create_response_from_data(strlen(fixed),fixed,
-		MHD_YES,MHD_NO);
+	if (meta_get_value(ms->bucket,ms->key,ms->attr,&fixed) == 0) {
+		resp = MHD_create_response_from_data(strlen(fixed),fixed,
+			MHD_YES,MHD_NO);
+		rc = MHD_HTTP_OK;
+	}
+	else {
+		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
+	}
 	if (!resp) {
 		return MHD_NO;
 	}
-	MHD_queue_response(conn,MHD_HTTP_CREATED,resp);
+	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
 
 	return MHD_YES;

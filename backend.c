@@ -242,6 +242,11 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	const char	*argv[11];
 	int	 	 argc = 0;
 	pid_t	 	 pid;
+	int		 organ[2];
+	FILE		*fp;
+	char		 buf[80];
+	char		*p;
+	char		*ami_id	= NULL;
 
 	if (next) {
 		DPRINTF("S3 register with next!=NULL\n");
@@ -298,16 +303,27 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	argv[argc++] = ramdisk ? ramdisk : "_default_";
 	argv[argc] = NULL;
 
+	if (pipe(organ) < 0) {
+		perror("pipe");
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
 	pid = fork();
 	if (pid < 0) {
 		perror("fork");
+		close(organ[0]);
+		close(organ[1]);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 
 	if (pid == 0) {
+		(void)dup2(organ[1],STDOUT_FILENO);
+		(void)dup2(organ[1],STDERR_FILENO);
 		if (execvp("dc-register-image",(char* const*)argv) < 0) {
 			perror("execvp");
 		}
+		/* Just in case... */
+		exit(!0);
 	}
 	else {
 		DPRINTF("waiting for child...\n");
@@ -316,6 +332,36 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 		}
 		/* TBD: check identity/status from waitpid */
 		DPRINTF("...child exited\n");
+		close(organ[1]);
+		fp = fdopen(organ[0],"r");
+		if (!fp) {
+			DPRINTF("could not open parent pipe\n");
+			close(organ[0]);
+			return MHD_HTTP_INTERNAL_SERVER_ERROR;
+		}
+		while (fgets(buf,sizeof(buf)-1,fp)) {
+			buf[sizeof(buf)-1] = '\0';
+			if (!strncmp(buf,"IMAGE ",6)) {
+				for (p = buf+6; *p; ++p) {
+					if ((*p == '\n') || (*p == '\r')) {
+						*p = '\0';
+						break;
+					}
+				}
+				if (ami_id) {
+					free(ami_id);
+				}
+				ami_id = strdup(buf+6);
+				break;
+			}
+		}
+		fclose(fp);
+		if (ami_id) {
+			DPRINTF("found AMI ID <%s>\n",buf+6);
+			(void)meta_set_value(ms->bucket,ms->key,
+				"ami-id",ami_id);
+			free(ami_id);
+		}
 	}
 
 	return MHD_HTTP_OK;
