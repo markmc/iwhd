@@ -113,9 +113,23 @@ make_comp (comp_t c, value_t *left, value_t *right)
 	return tmp;
 }
 
+value_t *
+make_link (value_t *left, value_t *right)
+{
+	char	*copy;
+	
+	copy = strdup((char *)right);
+	if (!copy) {
+		return NULL;
+	}
+
+	return make_tree(T_LINK,left,(value_t *)copy);
+}
+
 #if defined(UNIT_TEST)
 struct { char *name; char *value; } hacked_obj_fields[] = {
 	{ "a", "2" }, { "b", "7" }, { "c", "11" },
+	{ "template", "templates/the_tmpl" },
 	{ NULL }
 };
 
@@ -140,11 +154,39 @@ unit_sget_func (void * notused, char *text)
 	return "never";
 }
 getter_t unit_sget = { unit_sget_func };
+
+struct { char *obj; char *key; char *value; } hacked_links[] = {
+	{ "templates/the_tmpl", "owner", "users/the_user" },
+	{ "users/the_user", "name", "Jeff Darcy" },
+	{ NULL }
+};
+
+char *
+follow_link (char *object, char *key)
+{
+	int i;
+
+	for (i = 0; hacked_obj_fields[i].name; ++i) {
+		if (strcmp(object,hacked_links[i].obj)) {
+			continue;
+		}
+		if (strcmp(key,hacked_links[i].key)) {
+			continue;
+		}
+		return hacked_links[i].value;
+	}
+
+	return NULL;
+}
+#else
+extern char *follow_link (char *object, char *key);
 #endif
 
 char *
 string_value (value_t *v, getter_t *oget, getter_t *sget)
 {
+	int	left;
+
 	switch (v->type) {
 	case T_STRING:
 		return v->as_str;
@@ -152,6 +194,17 @@ string_value (value_t *v, getter_t *oget, getter_t *sget)
 		return oget ? CALL_GETTER(oget,v->as_str) : "";
 	case T_SFIELD:
 		return sget ? CALL_GETTER(sget,v->as_str) : "";
+	case T_LINK:
+		left = string_value(v->as_tree.left,oget,sget);
+		switch (left) {
+		case 0:
+		case 1:
+		case -1:
+			return NULL;
+		default:
+			return follow_link((char *)left,
+				(char *)v->as_tree.right);
+		}
 	default:
 		return NULL;
 	}
@@ -294,6 +347,11 @@ _print_value (value_t *v, int level)
 		_print_value(v->as_tree.left,level+2);
 		_print_value(v->as_tree.right,level+2);
 		break;
+	case T_LINK:
+		printf("%*sLINK\n",level,"");
+		_print_value(v->as_tree.left,level+2);
+		printf("%*s.%s\n",level+2,"",(char *)v->as_tree.right);
+		break;
 	default:
 		printf("%*sUNKNOWN %d\n",level,"",v->type);
 	}
@@ -317,6 +375,12 @@ free_value (value_t *v)
 	case T_OFIELD:
 	case T_SFIELD:
 		free(v->as_str);
+		free(v);
+		break;
+	case T_LINK:
+		free_value(v->as_tree.left);
+		free(v->as_tree.right);
+		free(v);
 		break;
 	case T_COMP:
 	case T_AND:
@@ -334,15 +398,21 @@ free_value (value_t *v)
 int
 eval (value_t *v, getter_t *oget, getter_t *sget)
 {
-	int	res;
+	int	 res;
+	char	*str;
 
 	switch (v->type) {
 	case T_NUMBER:
 		return v->as_num != 0;
 	case T_STRING:
+		return (int)v->as_str;
 	case T_OFIELD:
+		return (int)CALL_GETTER(oget,v->as_str);
 	case T_SFIELD:
-		return -1;
+		return (int)CALL_GETTER(sget,v->as_str);
+	case T_LINK:
+		str = string_value(v->as_tree.left,oget,sget);
+		return (int)follow_link(str,(char *)v->as_tree.right);
 	case T_COMP:
 		return compare(v->as_tree.left,(comp_t)v->as_tree.op,
 			v->as_tree.right, oget, sget);
@@ -374,11 +444,15 @@ eval (value_t *v, getter_t *oget, getter_t *sget)
 #define YYSTYPE value_t *
 %}
 
-Stmt = - BoolExpr EOL { *cur_expr = $$; }
+Stmt = - BoolExpr - EOL { *cur_expr = $$; }
      | ( !EOL . )* EOL
 
-BoolExpr = l:CompExpr ( - ( AND - r:CompExpr ) { $$ = make_tree(T_AND,l,r); }
-                      | - ( OR - r:CompExpr ) { $$ = make_tree(T_OR,l,r); } )* -
+BoolExpr = l:CompExpr (
+	( - AND - r:CompExpr )
+		{ $$ = l = make_tree(T_AND,l,r); }
+	( - OR - r:CompExpr )
+		{ $$ = l = make_tree(T_OR,l,r); }
+)* -
 
 CompExpr = l:Unary
          ( ( LESS - r:Unary { $$ = make_comp(C_LESSTHAN,l,r); } )
@@ -388,20 +462,21 @@ CompExpr = l:Unary
          | ( GREATER EQUAL - r:Unary { $$ = make_comp(C_GREATEROREQ,l,r); } )
          | ( GREATER - r:Unary { $$ = make_comp(C_GREATERTHAN,l,r); } ) )? -
 
-Unary = Atom
-      | NOT - e:Atom - { $$ = make_tree(T_NOT,e,NULL); }
+Unary = Atom -
       | NOT - e:Unary - { $$ = make_tree(T_NOT,e,NULL); }
 
-Atom = ( Literal | Field | ParenExpr ) -
+Atom = ( Literal | LinkField | ParenExpr ) -
 
 Literal = NUMBER | STRING | TIME
 
-Field = DOLLAR i:ID { $$ = make_string((char *)$$,T_OFIELD); }
-      | WAFFLE i:ID { $$ = make_string((char *)$$,T_SFIELD); }
+LinkField = f:Field ( DOT i:ID { $$ = f = make_link(f,i); } )* -
+
+Field = DOLLAR i:ID - { $$ = make_string((char *)i,T_OFIELD); }
+      | WAFFLE i:ID - { $$ = make_string((char *)i,T_SFIELD); }
 
 ParenExpr = OPEN v:BoolExpr CLOSE - { $$ = v; }
 
-NUMBER	= < [0-9]+ >		{ $$= make_number(yytext); }
+NUMBER	= < [0-9]+ >		{ $$ = make_number(yytext); }
 STRING	= '"' < [^"]* > '"'	{ $$ = make_string(yytext,T_STRING); }
 TIME	= '~' < [^~]* > '~'	{ $$ = make_number(yytext); }
 ID	= < [a-z_]+ >		{ $$ = (YYSTYPE)yytext; }
@@ -415,6 +490,7 @@ EQUAL	= '='
 NOT	= '!'
 AND	= '&&'
 OR	= '||'
+DOT	= '.'
 
 -	= [ \t]*
 EOL	= '\n' | '\r\n' | '\r' | ';'
@@ -441,14 +517,24 @@ parse (const char *text)
 int
 main (int argc, char **argv)
 {
-	int	i;
+	int	 i;
 	value_t *expr;
+	int	 res;
 
 	for (i = 1; i < argc; ++i) {
 		expr = parse(argv[i]);
 		if (expr) {
 			print_value(expr);
-			printf("= %d\n",eval(expr,&unit_oget,&unit_sget));
+			res = eval(expr,&unit_oget,&unit_sget);
+			switch (res) {
+			case 0:
+			case 1:
+			case -1:
+				printf("= %d\n",res);
+				break;
+			default:
+				printf("= %s\n",(char *)res);
+			}
 		}
 		else {
 			printf("could not parse '%s'\n",argv[i]);

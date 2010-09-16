@@ -12,7 +12,7 @@ typedef enum {
 
 typedef enum {
 	T_NUMBER, T_STRING, T_OFIELD, T_SFIELD,
-	T_COMP, T_NOT, T_AND, T_OR
+	T_COMP, T_NOT, T_AND, T_OR, T_LINK
 } type_t;
 
 typedef struct _value {

@@ -848,3 +848,10 @@ update_provider (char *provider, char *username, char *password)
 		}
 	}
 }
+
+/* Part of our API to the query module. */
+char *
+follow_link (char *object, char *key)
+{
+	return "no_such_object";
+}
