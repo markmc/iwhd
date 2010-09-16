@@ -231,11 +231,53 @@ s3_bcreate (char *bucket)
 	return MHD_HTTP_OK;
 }
 
+char *
+init_tmpfile (char *value)
+{
+	char	*path;
+	int	 fd;
+	size_t	 len;
+	ssize_t	 written;
+
+	path = strdup("/tmp/iwtmp.XXXXXX");
+	if (!path) {
+		return NULL;
+	}
+
+	fd = mkstemp(path);
+	if (fd < 0) {
+		perror("mkstemp");
+		free(path);
+		return NULL;
+	}
+
+	len = strlen(value);
+	if (len > 0) {
+		written = write(fd,value,len);
+		close(fd);
+		if (written != (ssize_t)len) {
+			if (written < 0) {
+				perror("init_tmpfile write");
+			}
+			else {
+				fprintf(stderr,"bad write length %zd in %s\n",
+					written, __func__);
+			}
+			unlink(path);
+			return NULL;
+		}
+	}
+
+	return path;
+}
+
 int
 s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 {
 	char		*kernel		= g_hash_table_lookup(args,"kernel");
 	char		*ramdisk	= g_hash_table_lookup(args,"ramdisk");
+	char		*api_key;
+	char		*api_secret;
 	char		*ami_cert;
 	char		*ami_key;
 	char		*ami_uid;
@@ -247,10 +289,13 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	char		 buf[80];
 	char		*p;
 	char		*ami_id	= NULL;
+	char		*cval	= NULL;
+	char		*kval	= NULL;
+	int		 rc	= MHD_HTTP_BAD_REQUEST;
 
 	if (next) {
 		DPRINTF("S3 register with next!=NULL\n");
-		return MHD_HTTP_BAD_REQUEST;
+		goto cleanup;
 	}
 
 	DPRINTF("*** register %s/%s via %s (%s:%d)\n",
@@ -262,40 +307,70 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 		DPRINTF("    (using ramdisk %s)\n",ramdisk);
 	}
 
-
-	if (!prov->username) {
-		printf("missing EC2 API key\n");
-		return MHD_HTTP_BAD_REQUEST;
+	api_key = g_hash_table_lookup(args,"api-key");
+	if (!api_key) {
+		api_key = (char *)prov->username;
+		if (!api_key) {
+			printf("missing EC2 API key\n");
+			goto cleanup;
+		}
 	}
 
-	if (!prov->password) {
-		printf("missing EC2 API key\n");
-		return MHD_HTTP_BAD_REQUEST;
+	api_secret = g_hash_table_lookup(args,"api-secret");
+	if (!api_secret) {
+		api_secret = (char *)prov->password;
+		if (!prov->password) {
+			printf("missing EC2 API key\n");
+			goto cleanup;
+		}
 	}
 
-	ami_cert = get_provider_value(prov->index,"ami-cert");
+	cval = g_hash_table_lookup(args,"ami-cert");
+	if (cval) {
+		ami_cert = init_tmpfile(cval);
+	}
+	else {
+		ami_cert = NULL;
+	}
 	if (!ami_cert) {
-		printf("missing EC2 AMI cert\n");
-		return MHD_HTTP_BAD_REQUEST;
+		ami_cert = get_provider_value(prov->index,"ami-cert");
+		if (!ami_cert) {
+			printf("missing EC2 AMI cert\n");
+			goto cleanup;
+		}
 	}
 
-	ami_key = get_provider_value(prov->index,"ami-key");
+	kval = g_hash_table_lookup(args,"ami-key");
+	if (kval) {
+		ami_key = init_tmpfile(kval);
+	}
+	else {
+		ami_key = NULL;
+	}
 	if (!ami_key) {
-		printf("missing EC2 AMI key\n");
-		return MHD_HTTP_BAD_REQUEST;
+		ami_key = get_provider_value(prov->index,"ami-key");
+		if (!ami_key) {
+			printf("missing EC2 AMI key\n");
+			goto cleanup;
+		}
 	}
 
-	ami_uid = get_provider_value(prov->index,"ami-uid");
+	ami_uid = g_hash_table_lookup(args,"ami-uid");
 	if (!ami_uid) {
-		printf("missing EC2 AMI uid\n");
-		return MHD_HTTP_BAD_REQUEST;
+		ami_uid = get_provider_value(prov->index,"ami-uid");
+		if (!ami_uid) {
+			printf("missing EC2 AMI uid\n");
+			goto cleanup;
+		}
 	}
+
+	rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
 	argv[argc++] = "dc-register-image";
 	argv[argc++] = ms->bucket;
 	argv[argc++] = ms->key;
-	argv[argc++] = prov->username;
-	argv[argc++] = prov->password;
+	argv[argc++] = api_key;
+	argv[argc++] = api_secret;
 	argv[argc++] = ami_cert;
 	argv[argc++] = ami_key;
 	argv[argc++] = ami_uid;
@@ -303,9 +378,15 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	argv[argc++] = ramdisk ? ramdisk : "_default_";
 	argv[argc] = NULL;
 
+	DPRINTF("api-key = %s\n",api_key);
+	DPRINTF("api-secret = %s\n",api_secret);
+	DPRINTF("ami-cert = %s\n",ami_cert);
+	DPRINTF("ami-key = %s\n",ami_key);
+	DPRINTF("ami-uid = %s\n",ami_uid);
+
 	if (pipe(organ) < 0) {
 		perror("pipe");
-		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+		goto cleanup;
 	}
 
 	pid = fork();
@@ -313,7 +394,7 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 		perror("fork");
 		close(organ[0]);
 		close(organ[1]);
-		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+		goto cleanup;
 	}
 
 	if (pid == 0) {
@@ -337,7 +418,7 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 		if (!fp) {
 			DPRINTF("could not open parent pipe\n");
 			close(organ[0]);
-			return MHD_HTTP_INTERNAL_SERVER_ERROR;
+			goto cleanup;
 		}
 		while (fgets(buf,sizeof(buf)-1,fp)) {
 			buf[sizeof(buf)-1] = '\0';
@@ -364,7 +445,18 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 		}
 	}
 
-	return MHD_HTTP_OK;
+	rc = MHD_HTTP_OK;
+
+cleanup:
+	if (ami_cert) {
+		//unlink(ami_cert);
+		free(ami_cert);
+	}
+	if (ami_key) {
+		//unlink(ami_key);
+		free(ami_key);
+	}
+	return rc;
 }
 
 /***** CURL-specific functions *****/

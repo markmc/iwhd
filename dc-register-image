@@ -49,5 +49,3 @@ if [ $? != 0 ]; then
 	echo "register stage failed"
 	exit 1
 fi
-
-
