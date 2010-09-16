@@ -1618,7 +1618,7 @@ main (int argc, char **argv)
 
 	program_name = argv[0];
 
-	for (;;) switch (getopt_long(argc,argv,"c:d:f:m:p:v",my_options,NULL)) {
+	for (;;) switch (getopt_long(argc,argv,"c:d:m:p:v",my_options,NULL)) {
 	case 'c':
 		cfg_file = optarg;
 		break;
