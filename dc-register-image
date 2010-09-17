@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Uncomment for debugging.
-ECHO=echo
+#ECHO=echo
 
 bucket=$1; shift
 object=$1; shift
@@ -10,18 +10,17 @@ api_secret=$1; shift
 cert_file=$1; shift
 key_file=$1; shift
 api_uid=$1; shift
+ami_bkt=$1; shift
 kernel=$1; shift
 ramdisk=$1; shift
 
 # TBD: figure out what to do about these paths.
-export EC2_HOME=~/ec2-api-tools-1.3-42584/
+export EC2_HOME=~/jdarcy/ec2-api-tools-1.3-53907
 export PATH=$PATH:$EC2_HOME/bin
 export JAVA_HOME=/usr
 
 tmpdir=$(mktemp -d -p $PWD/$bucket)
 trap "rm -rf $tmpdir" EXIT
-# TBD: make new bucket using configured prefix and random suffix
-tmpbkt="jdarcy_test2"
 
 bundle_args="--batch --arch x86_64 -c $cert_file -k $key_file -u $api_uid"
 if [ "$kernel" != "_default_" ]; then
@@ -33,19 +32,24 @@ fi
 $ECHO ec2-bundle-image -i $bucket/$object -d $tmpdir $bundle_args
 if [ $? != 0 ]; then
 	echo "bundle stage failed"
+	echo ec2-bundle-image -i $bucket/$object -d $tmpdir $bundle_args
 	exit 1
 fi
 
-upload_args="--batch -b $tmpbkt -a $api_key -s $api_secret"
-$ECHO ec2-upload-bundle -m $tmpdir/image.manifest.xml $upload_args
+upload_args="--batch --retry -b $ami_bkt -a $api_key -s $api_secret"
+$ECHO ec2-upload-bundle -m $tmpdir/$object.manifest.xml $upload_args
 if [ $? != 0 ]; then
 	echo "upload stage failed"
+	echo ec2-upload-bundle -m $tmpdir/$object.manifest.xml $upload_args
 	exit 1
 fi
 
-upload_args="-C $cert_file -K $key_file"
-$ECHO ec2-register $upload_args $tmpbkt/image.manifest.xml
+register_args="-C $cert_file -K $key_file"
+$ECHO ec2-register $register_args $ami_bkt/$object.manifest.xml -n $object
 if [ $? != 0 ]; then
 	echo "register stage failed"
+	echo ec2-register $register_args $ami_bkt/$object.manifest.xml -n $object
 	exit 1
 fi
+
+

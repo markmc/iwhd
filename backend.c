@@ -282,17 +282,19 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	char		*ami_cert;
 	char		*ami_key;
 	char		*ami_uid;
-	const char	*argv[11];
+	const char	*argv[12];
 	int	 	 argc = 0;
 	pid_t	 	 pid;
 	int		 organ[2];
 	FILE		*fp;
-	char		 buf[80];
+	char		 buf[1024];
 	char		*p;
 	char		*ami_id	= NULL;
+	char		*new_id	= NULL;
 	char		*cval	= NULL;
 	char		*kval	= NULL;
 	int		 rc	= MHD_HTTP_BAD_REQUEST;
+	char		*ami_bkt;
 
 	if (next) {
 		DPRINTF("S3 register with next!=NULL\n");
@@ -365,6 +367,11 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 		}
 	}
 
+	ami_bkt = g_hash_table_lookup(args,"ami-bkt");
+	if (!ami_bkt) {
+		ami_bkt = ms->bucket;
+	}
+
 	rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
 	argv[argc++] = "dc-register-image";
@@ -375,6 +382,7 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	argv[argc++] = ami_cert;
 	argv[argc++] = ami_key;
 	argv[argc++] = ami_uid;
+	argv[argc++] = ami_bkt;
 	argv[argc++] = kernel ? kernel : "_default_";
 	argv[argc++] = ramdisk ? ramdisk : "_default_";
 	argv[argc] = NULL;
@@ -384,6 +392,7 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	DPRINTF("ami-cert = %s\n",ami_cert);
 	DPRINTF("ami-key = %s\n",ami_key);
 	DPRINTF("ami-uid = %s\n",ami_uid);
+	DPRINTF("ami-bkt = %s\n",ami_bkt);
 
 	if (pipe(organ) < 0) {
 		perror("pipe");
@@ -423,23 +432,45 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 		}
 		while (fgets(buf,sizeof(buf)-1,fp)) {
 			buf[sizeof(buf)-1] = '\0';
-			if (!strncmp(buf,"IMAGE ",6)) {
-				for (p = buf+6; *p; ++p) {
+			new_id = strstr(buf,"IMAGE");
+			/*
+			 * You may well wonder what's going on here.  One
+			 * version of Amazon's API tools uses space, another
+			 * uses tab.  That prevents strstr alone from doing
+			 * the job.  Just to make it extra fun, xterm would
+			 * convert the unexpected tabs back into spaces so I
+			 * couldn't even see the difference.
+			 * 
+			 * Amazon, you owe me a beer.
+			 */
+			if (new_id) {
+				if ((*new_id != ' ') && (*new_id != '\t')) {
+					new_id = NULL;
+				}
+			}
+			if (new_id) {
+				new_id += 6;
+				while ((*new_id == ' ') || (*new_id == '\t')) {
+					++new_id;
+				}
+				for (p = new_id; *p; ++p) {
 					if ((*p == '\n') || (*p == '\r')) {
 						*p = '\0';
 						break;
 					}
 				}
-				if (ami_id) {
-					free(ami_id);
+				if (*new_id) {
+					if (ami_id) {
+						free(ami_id);
+					}
+					ami_id = strdup(new_id);
 				}
-				ami_id = strdup(buf+6);
 				break;
 			}
 		}
 		fclose(fp);
 		if (ami_id) {
-			DPRINTF("found AMI ID <%s>\n",buf+6);
+			DPRINTF("found AMI ID <%s>\n",ami_id);
 			(void)meta_set_value(ms->bucket,ms->key,
 				"ami-id",ami_id);
 			free(ami_id);
