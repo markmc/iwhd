@@ -264,6 +264,7 @@ init_tmpfile (char *value)
 					written, __func__);
 			}
 			unlink(path);
+			free(path);
 			return NULL;
 		}
 	}
@@ -328,11 +329,11 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	cval = g_hash_table_lookup(args,"ami-cert");
 	if (cval) {
 		ami_cert = init_tmpfile(cval);
+		if (!ami_cert) {
+			goto cleanup;
+		}
 	}
 	else {
-		ami_cert = NULL;
-	}
-	if (!ami_cert) {
 		ami_cert = get_provider_value(prov->index,"ami-cert");
 		if (!ami_cert) {
 			printf("missing EC2 AMI cert\n");
@@ -343,11 +344,11 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	kval = g_hash_table_lookup(args,"ami-key");
 	if (kval) {
 		ami_key = init_tmpfile(kval);
+		if (!ami_cert) {
+			goto cleanup;
+		}
 	}
 	else {
-		ami_key = NULL;
-	}
-	if (!ami_key) {
 		ami_key = get_provider_value(prov->index,"ami-key");
 		if (!ami_key) {
 			printf("missing EC2 AMI key\n");
@@ -448,12 +449,21 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	rc = MHD_HTTP_OK;
 
 cleanup:
-	if (ami_cert) {
-		//unlink(ami_cert);
+	/*
+	 * This is a bit tricky.  If we found the cert in the HTTP request and
+	 * succeeded in creating a temp file, then this condition will succeed.
+	 * If we failed to create the temp file, or never found a cert
+	 * anywhere, there will be no ami_cert to clean up.  If we got a cert
+	 * from the config, then ami_cert will be set but we'll (correctly)
+	 * skip cleanup because cval is null.
+	 */
+	if (cval && ami_cert) {
+		unlink(ami_cert);
 		free(ami_cert);
 	}
-	if (ami_key) {
-		//unlink(ami_key);
+	/* Same reasoning as above, with kval/ami_key. */
+	if (kval && ami_key) {
+		unlink(ami_key);
 		free(ami_key);
 	}
 	return rc;
