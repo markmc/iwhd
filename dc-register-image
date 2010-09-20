@@ -31,7 +31,7 @@ if [ "$ramdisk" != "_default_" ]; then
 fi
 $ECHO ec2-bundle-image -i $bucket/$object -d $tmpdir $bundle_args
 if [ $? != 0 ]; then
-	echo "bundle stage failed"
+	echo "ERROR bundling_failed"
 	echo ec2-bundle-image -i $bucket/$object -d $tmpdir $bundle_args
 	exit 1
 fi
@@ -39,7 +39,7 @@ fi
 upload_args="--batch --retry -b $ami_bkt -a $api_key -s $api_secret"
 $ECHO ec2-upload-bundle -m $tmpdir/$object.manifest.xml $upload_args
 if [ $? != 0 ]; then
-	echo "upload stage failed"
+	echo "ERROR uploading_failed"
 	echo ec2-upload-bundle -m $tmpdir/$object.manifest.xml $upload_args
 	exit 1
 fi
@@ -47,7 +47,7 @@ fi
 register_args="-C $cert_file -K $key_file"
 $ECHO ec2-register $register_args $ami_bkt/$object.manifest.xml -n $object
 if [ $? != 0 ]; then
-	echo "register stage failed"
+	echo "ERROR registration_failed"
 	echo ec2-register $register_args $ami_bkt/$object.manifest.xml -n $object
 	exit 1
 fi

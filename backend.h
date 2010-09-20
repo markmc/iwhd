@@ -28,4 +28,6 @@ typedef struct {
 
 #define THREAD_FAILED	((void *)(-1))
 
+void backend_init (void);
+
 #endif

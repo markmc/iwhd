@@ -1696,6 +1696,7 @@ args_done:
 		fflush(stdout);
 	}
 
+	backend_init();
 	main_func_tbl->init_func();
 	meta_init();
 	repl_init();

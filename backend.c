@@ -4,6 +4,7 @@
 #include <getopt.h>
 #include <poll.h>
 #include <pthread.h>
+#include <regex.h>
 #include <semaphore.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -30,6 +31,32 @@
 #include "state_defs.h"
 
 struct hstor_client	*hstor;
+
+/***** Generic module stuff, not specific to one back end *****/
+
+#define S3_IMAGE_PATTERN "^IMAGE[[:blank:]]+([^[:space:]]+)"
+#define S3_ERROR_PATTERN "^ERROR[[:blank:]]+([^[:space:]]+)"
+
+regex_t s3_success_pat;
+regex_t s3_failure_pat;
+int	regex_ok = FALSE;
+
+void
+backend_init (void)
+{
+	regex_ok = TRUE;
+
+	if (regcomp(&s3_success_pat,S3_IMAGE_PATTERN,REG_EXTENDED) != 0){
+		DPRINTF("could not compile S3 success pattern\n");
+		regex_ok = FALSE;
+	}
+
+	if (regcomp(&s3_failure_pat,S3_ERROR_PATTERN,REG_EXTENDED) != 0){
+		DPRINTF("could not compile S3 failure pattern\n");
+		regex_ok = FALSE;
+	}
+}
+
 
 /***** Stub functions for unimplemented stuff. *****/
 
@@ -157,9 +184,13 @@ s3_init (void)
 	snprintf(svc_acc,sizeof(svc_acc),"%s:%u",
 		proxy_host,proxy_port);
 	hstor = hstor_new(svc_acc,proxy_host,proxy_key,proxy_secret);
-	/* TBD: check return value */
-	if (verbose) {
-		hstor->verbose = 1;
+	if (hstor) {
+		if (verbose) {
+			hstor->verbose = 1;
+		}
+	}
+	else {
+		DPRINTF("could not create S3 client\n");
 	}
 }
 
@@ -232,7 +263,7 @@ s3_bcreate (char *bucket)
 }
 
 char *
-init_tmpfile (char *value)
+s3_init_tmpfile (char *value)
 {
 	char	*path;
 	int	 fd;
@@ -257,7 +288,7 @@ init_tmpfile (char *value)
 		close(fd);
 		if (written != (ssize_t)len) {
 			if (written < 0) {
-				perror("init_tmpfile write");
+				perror("s3_init_tmpfile write");
 			}
 			else {
 				fprintf(stderr,"bad write length %zd in %s\n",
@@ -288,13 +319,16 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	int		 organ[2];
 	FILE		*fp;
 	char		 buf[1024];
-	char		*p;
-	char		*ami_id	= NULL;
-	char		*new_id	= NULL;
 	char		*cval	= NULL;
 	char		*kval	= NULL;
 	int		 rc	= MHD_HTTP_BAD_REQUEST;
 	char		*ami_bkt;
+	char		 ami_id_buf[64];
+	regmatch_t	 match[2];
+	
+	if (!regex_ok) {
+		return MHD_HTTP_BAD_REQUEST;
+	}
 
 	if (next) {
 		DPRINTF("S3 register with next!=NULL\n");
@@ -330,7 +364,7 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 
 	cval = g_hash_table_lookup(args,"ami-cert");
 	if (cval) {
-		ami_cert = init_tmpfile(cval);
+		ami_cert = s3_init_tmpfile(cval);
 		if (!ami_cert) {
 			goto cleanup;
 		}
@@ -345,7 +379,7 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 
 	kval = g_hash_table_lookup(args,"ami-key");
 	if (kval) {
-		ami_key = init_tmpfile(kval);
+		ami_key = s3_init_tmpfile(kval);
 		if (!ami_cert) {
 			goto cleanup;
 		}
@@ -372,6 +406,16 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 		ami_bkt = ms->bucket;
 	}
 
+	/*
+	 * This is the point where we go from validation to execution.  If we
+	 * were double-forking so this could all be asynchronous, or for that
+	 * matter to return an early 100-continue, this would probably be the
+	 * place to do it.  Even without that, we set the ami-id here so that
+	 * the caller can know things are actually in progress.
+	 */
+	sprintf(ami_id_buf,"pending %lld",(long long)time(NULL));
+	DPRINTF("temporary ami-id = \"%s\"\n",ami_id_buf);
+	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
 	rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
 	argv[argc++] = "dc-register-image";
@@ -416,68 +460,38 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 		/* Just in case... */
 		exit(!0);
 	}
-	else {
-		DPRINTF("waiting for child...\n");
-		if (waitpid(pid,NULL,0) < 0) {
-			perror("waitpid");
-		}
-		/* TBD: check identity/status from waitpid */
-		DPRINTF("...child exited\n");
-		close(organ[1]);
-		fp = fdopen(organ[0],"r");
-		if (!fp) {
-			DPRINTF("could not open parent pipe\n");
-			close(organ[0]);
-			goto cleanup;
-		}
-		while (fgets(buf,sizeof(buf)-1,fp)) {
-			buf[sizeof(buf)-1] = '\0';
-			new_id = strstr(buf,"IMAGE");
-			/*
-			 * You may well wonder what's going on here.  One
-			 * version of Amazon's API tools uses space, another
-			 * uses tab.  That prevents strstr alone from doing
-			 * the job.  Just to make it extra fun, xterm would
-			 * convert the unexpected tabs back into spaces so I
-			 * couldn't even see the difference.
-			 * 
-			 * Amazon, you owe me a beer.
-			 */
-			if (new_id) {
-				if ((*new_id != ' ') && (*new_id != '\t')) {
-					new_id = NULL;
-				}
-			}
-			if (new_id) {
-				new_id += 6;
-				while ((*new_id == ' ') || (*new_id == '\t')) {
-					++new_id;
-				}
-				for (p = new_id; *p; ++p) {
-					if ((*p == '\n') || (*p == '\r')) {
-						*p = '\0';
-						break;
-					}
-				}
-				if (*new_id) {
-					if (ami_id) {
-						free(ami_id);
-					}
-					ami_id = strdup(new_id);
-				}
-				break;
-			}
-		}
-		fclose(fp);
-		if (ami_id) {
-			DPRINTF("found AMI ID <%s>\n",ami_id);
-			(void)meta_set_value(ms->bucket,ms->key,
-				"ami-id",ami_id);
-			free(ami_id);
-		}
-	}
 
-	rc = MHD_HTTP_OK;
+	DPRINTF("waiting for child...\n");
+	if (waitpid(pid,NULL,0) < 0) {
+		perror("waitpid");
+	}
+	/* TBD: check identity/status from waitpid */
+	DPRINTF("...child exited\n");
+
+	close(organ[1]);
+	fp = fdopen(organ[0],"r");
+	if (!fp) {
+		DPRINTF("could not open parent pipe\n");
+		close(organ[0]);
+		goto cleanup;
+	}
+	while (fgets(buf,sizeof(buf)-1,fp)) {
+		buf[sizeof(buf)-1] = '\0';
+		if (regexec(&s3_success_pat,buf,2,match,0) == 0) {
+			buf[match[1].rm_eo] = '\0';
+			DPRINTF("found AMI ID: %s\n",buf+match[1].rm_so);
+			sprintf(ami_id_buf,"OK %.60s",buf+match[1].rm_so);
+			rc = MHD_HTTP_OK;
+		}
+		else if (regexec(&s3_failure_pat,buf,2,match,0) == 0) {
+			buf[match[1].rm_eo] = '\0';
+			DPRINTF("found error marker: %s\n",buf+match[1].rm_so);
+			sprintf(ami_id_buf,"failed %.56s",buf+match[1].rm_so);
+			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+		}
+
+	}
+	fclose(fp);
 
 cleanup:
 	/*
@@ -497,6 +511,8 @@ cleanup:
 		unlink(ami_key);
 		free(ami_key);
 	}
+	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
+		
 	return rc;
 }
 
