@@ -489,7 +489,9 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 			sprintf(ami_id_buf,"failed %.56s",buf+match[1].rm_so);
 			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 		}
-
+		else {
+			DPRINTF("ignoring line: <%s>\n",buf);
+		}
 	}
 	fclose(fp);
 
