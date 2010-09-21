@@ -853,5 +853,8 @@ update_provider (char *provider, char *username, char *password)
 char *
 follow_link (char *object, char *key)
 {
+	(void)object;
+	(void)key;
+
 	return "no_such_object";
 }

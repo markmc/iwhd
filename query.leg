@@ -6,7 +6,7 @@
 #include <error.h>
 #include "query.h"
 
-char *arg_buf;
+const char *arg_buf;
 int arg_off;
 int arg_len;
 value_t **cur_expr;
@@ -117,7 +117,7 @@ value_t *
 make_link (value_t *left, value_t *right)
 {
 	char	*copy;
-	
+
 	copy = strdup((char *)right);
 	if (!copy) {
 		return NULL;
@@ -185,7 +185,7 @@ extern char *follow_link (char *object, char *key);
 char *
 string_value (value_t *v, getter_t *oget, getter_t *sget)
 {
-	int	left;
+	char	*left;
 
 	switch (v->type) {
 	case T_STRING:
@@ -498,6 +498,7 @@ EOL	= '\n' | '\r\n' | '\r' | ';'
 
 %%
 
+/* TBD: This isn't thread safe. */
 value_t *
 parse (const char *text)
 {
