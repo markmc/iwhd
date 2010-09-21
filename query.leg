@@ -166,7 +166,7 @@ follow_link (char *object, char *key)
 {
 	int i;
 
-	for (i = 0; hacked_obj_fields[i].name; ++i) {
+	for (i = 0; hacked_links[i].obj; ++i) {
 		if (strcmp(object,hacked_links[i].obj)) {
 			continue;
 		}
@@ -191,20 +191,16 @@ string_value (value_t *v, getter_t *oget, getter_t *sget)
 	case T_STRING:
 		return v->as_str;
 	case T_OFIELD:
-		return oget ? CALL_GETTER(oget,v->as_str) : "";
+		return oget ? CALL_GETTER(oget,v->as_str) : NULL;
 	case T_SFIELD:
-		return sget ? CALL_GETTER(sget,v->as_str) : "";
+		return sget ? CALL_GETTER(sget,v->as_str) : NULL;
 	case T_LINK:
 		left = string_value(v->as_tree.left,oget,sget);
-		switch (left) {
-		case 0:
-		case 1:
-		case -1:
-			return NULL;
-		default:
+		if (left) {
 			return follow_link((char *)left,
 				(char *)v->as_tree.right);
 		}
+		/* Fall through. */
 	default:
 		return NULL;
 	}
@@ -350,7 +346,7 @@ _print_value (value_t *v, int level)
 	case T_LINK:
 		printf("%*sLINK\n",level,"");
 		_print_value(v->as_tree.left,level+2);
-		printf("%*s.%s\n",level+2,"",(char *)v->as_tree.right);
+		printf("%*sDEST FIELD%s\n",level+2,"",(char *)v->as_tree.right);
 		break;
 	default:
 		printf("%*sUNKNOWN %d\n",level,"",v->type);
@@ -405,14 +401,19 @@ eval (value_t *v, getter_t *oget, getter_t *sget)
 	case T_NUMBER:
 		return v->as_num != 0;
 	case T_STRING:
-		return (int)v->as_str;
+		return v->as_str && *v->as_str;
 	case T_OFIELD:
-		return (int)CALL_GETTER(oget,v->as_str);
+		str = CALL_GETTER(oget,v->as_str);
+		return str && *str;
 	case T_SFIELD:
-		return (int)CALL_GETTER(sget,v->as_str);
+		str = CALL_GETTER(sget,v->as_str);
+		return str && *str;
 	case T_LINK:
 		str = string_value(v->as_tree.left,oget,sget);
-		return (int)follow_link(str,(char *)v->as_tree.right);
+		if (str) {
+			str = follow_link(str,(char *)v->as_tree.right);
+		}
+		return str && *str;
 	case T_COMP:
 		return compare(v->as_tree.left,(comp_t)v->as_tree.op,
 			v->as_tree.right, oget, sget);
@@ -520,25 +521,22 @@ main (int argc, char **argv)
 	int	 i;
 	value_t *expr;
 	int	 res;
+	char	*str;
 
 	for (i = 1; i < argc; ++i) {
 		expr = parse(argv[i]);
-		if (expr) {
-			print_value(expr);
-			res = eval(expr,&unit_oget,&unit_sget);
-			switch (res) {
-			case 0:
-			case 1:
-			case -1:
-				printf("= %d\n",res);
-				break;
-			default:
-				printf("= %s\n",(char *)res);
-			}
-		}
-		else {
+		if (!expr) {
 			printf("could not parse '%s'\n",argv[i]);
+			continue;
 		}
+		print_value(expr);
+		str = string_value(expr,&unit_oget,&unit_sget);
+		if (str) {
+			printf("s= %s\n",str);
+			continue;
+		}
+		res = eval(expr,&unit_oget,&unit_sget);
+		printf("d= %d\n",res);
 	}
 
 	return 0;
