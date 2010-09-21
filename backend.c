@@ -142,7 +142,7 @@ http_get_prod (void *ptr, size_t size, size_t nmemb, void *stream)
 	DPRINTF("producer posting %zu bytes as %ld\n",total,ps->sequence+1);
 	pipe_prod_signal(ps,ptr,total);
 
-	DPRINTF("producer chunk finished\n");
+	DPRINTF("producer finished chunk\n");
 	return total;
 }
 

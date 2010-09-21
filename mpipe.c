@@ -13,7 +13,7 @@ pipe_init_shared (pipe_shared *ps, void *owner, unsigned short ncons)
 	ps->data_ptr = NULL;
 	ps->data_len = 0;
 	ps->sequence = 0;	/* TBD: randomize? */
-	ps->in_init = 1;	/* TBD: use sequence == 0 or something? */
+	ps->in_init = 1;
 	ps->cons_total = ncons;
 	ps->cons_done = 0;
 	ps->cons_error = 0;
@@ -60,9 +60,6 @@ pipe_cons_wait (pipe_private *pp)
 	return rc;
 }
 
-/*
- * TBD: maybe return to pipe_cons_signal that cannot report errors.
- */
 void
 pipe_cons_signal (pipe_private *pp, int error)
 {
