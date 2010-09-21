@@ -139,25 +139,6 @@ validate_url (const char *url)
 	return !is_reserved(slash+1,reserved_name);
 }
 
-int
-check_reserved (struct MHD_Connection *conn, char *bucket)
-{
-	struct MHD_Response	*resp;
-
-	if (is_reserved(bucket,reserved_name)) {
-
-		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
-		if (!resp) {
-			fprintf(stderr,"MHD_crfd failed\n");
-			return -1;
-		}
-		MHD_queue_response(conn,MHD_HTTP_BAD_REQUEST,resp);
-		MHD_destroy_response(resp);
-		return 1;
-	}
-	return 0;
-}
-
 /**********
  * The proxy has MHD on one side and CURL on the other.  The CURL side is
  * always run in a child thread.  Yes, there are both context switches
@@ -1102,6 +1083,27 @@ post_foreach (gpointer key, gpointer value, gpointer ctx)
 }
 
 int
+create_bucket (char *name)
+{
+	int	rc;
+
+	if (is_reserved(name,reserved_name)) {
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	rc = main_func_tbl->bcreate_func(name);
+	if (rc == MHD_HTTP_OK) {
+		if (meta_set_value(name,"_default", "_policy","0") != 0) {
+			DPRINTF("default-policy " "create failed\n");
+			/* Non-fatal. */
+		}
+	}
+
+	DPRINTF("created bucket %s\n",name);
+	return rc;
+}
+
+int
 proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		   const char *method, const char *version, const char *data,
 		   size_t *data_size, void **rctx)
@@ -1144,19 +1146,10 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 				rc = MHD_HTTP_OK;
 			}
 		}
-		else if ((key = g_hash_table_lookup(ms->dict,"name")) != NULL) {
-			if ((rc = check_reserved(conn, key)) != 0) {
-				DPRINTF("decline reserved (%s)\n", key);
-				return (rc < 0) ? MHD_NO : MHD_YES;
-			}
-			rc = main_func_tbl->bcreate_func(key);
-			if (rc == MHD_HTTP_OK) {
-				if (meta_set_value(key,
-					"_default","_policy","0") != 0) {
-					DPRINTF("default-policy "
-						"create failed\n");
-					/* Non-fatal. */
-				}
+		else if (!strcmp(ms->bucket,"_new")) {
+			key = g_hash_table_lookup(ms->dict,"name");
+			if (key != NULL) {
+				rc = create_bucket(key);
 			}
 		}
 		else  {
@@ -1468,21 +1461,10 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)version;
 	(void)data;
 	(void)data_size;
+	(void)url;
 
 	/* curl -T moo.empty http://localhost:9090/_new   by accident */
-	if ((rc = check_reserved(conn, ms->bucket)) != 0) {
-		DPRINTF("PROXY PUT BUCKET %s: decline reserved (%s)\n",
-			url, ms->bucket);
-		return (rc < 0) ? MHD_NO : MHD_YES;
-	}
-	rc = main_func_tbl->bcreate_func(ms->bucket);
-
-	if (rc == MHD_HTTP_OK) {
-		if (meta_set_value(ms->bucket,"_default","_policy","0") != 0) {
-			DPRINTF("default-policy create failed\n");
-			/* Non-fatal. */
-		}
-	}
+	rc = create_bucket(ms->bucket);
 
 	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 	if (!resp) {
