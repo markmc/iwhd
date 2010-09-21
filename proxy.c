@@ -624,7 +624,7 @@ repl_init (void)
 }
 
 char *
-repl_oget (void *ctx, char *id)
+repl_oget (void *ctx, const char *id)
 {
 	query_ctx_t	*qctx = ctx;
 	char		*cur_value;
@@ -635,7 +635,7 @@ repl_oget (void *ctx, char *id)
 }
 
 char *
-repl_sget (void *ctx, char *id)
+repl_sget (void *ctx, const char *id)
 {
 	query_ctx_t	*qctx = ctx;
 	json_t		*elem = json_object_get(qctx->cur_server,id);

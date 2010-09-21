@@ -18,8 +18,6 @@ int meta_set_value (const char *bucket, const char *key, const char *mkey,
 int meta_get_value (const char *bucket, const char *key, const char *mkey,
 		    char **mvalue);
 
-typedef void qcb_t (char *, char *, void *);
-int meta_query (const char *mkey, const char *mvalue, qcb_t *cb, void *ctx);
 void *meta_query_new (const char *bucket, const char *key, const char *expr);
 int meta_query_next (void *qobj, char **bucket, char **key);
 void meta_query_stop (void *qobj);

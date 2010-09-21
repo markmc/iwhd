@@ -395,7 +395,7 @@ meta_query_stop (void * qobj)
 }
 
 extern "C" char *
-query_getter (void *ctx, char *id)
+query_getter (void *ctx, const char *id)
 {
 	BSONObj *cur_bo = (BSONObj *)ctx;
 

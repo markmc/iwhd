@@ -29,7 +29,7 @@ typedef struct _value {
 } value_t;
 
 typedef struct {
-	char	*(*func)	(void *, char *);
+	char	*(*func)	(void *, const char *);
 	void	*ctx;
 } getter_t;
 #define CALL_GETTER(g,x)	g->func(g->ctx,x)
