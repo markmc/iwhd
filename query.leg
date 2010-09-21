@@ -422,7 +422,7 @@ EOL	= '\n' | '\r\n' | '\r' | ';'
 %%
 
 value_t *
-parse (char *text)
+parse (const char *text)
 {
 	value_t *expr = NULL;
 

@@ -35,7 +35,7 @@ typedef struct {
 #define CALL_GETTER(g,x)	g->func(g->ctx,x)
 
 
-value_t	*parse		(char *text);
+value_t	*parse		(const char *text);
 int	 eval		(value_t *expr, getter_t *oget, getter_t *sget);
 void	 free_value	(value_t *);
 void	 print_value	(value_t *);
