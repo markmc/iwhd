@@ -462,9 +462,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		free_ms(ms);
 		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 		if (!resp) {
-			if (etag) {
-				free(etag);
-			}
+			free(etag);
 			return MHD_NO;
 		}
 		if (etag) {

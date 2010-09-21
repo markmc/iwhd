@@ -316,9 +316,7 @@ free_value (value_t *v)
 	case T_STRING:
 	case T_OFIELD:
 	case T_SFIELD:
-		if (v->as_str) {
-			free(v->as_str);
-		}
+		free(v->as_str);
 		break;
 	case T_COMP:
 	case T_AND:

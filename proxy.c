@@ -722,9 +722,7 @@ replicate (char *url, size_t size, char *policy)
 	if (expr) {
 		free_value(expr);
 	}
-	if (url2) {
-		free(url2);
-	}
+	free(url2);
 }
 
 void
