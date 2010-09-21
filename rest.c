@@ -216,7 +216,7 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
 			done, pp->offset);
 		if (pp->offset == ps->data_len) {
 			DPRINTF("consumer finished chunk\n");
-			pipe_cons_signal(pp);
+			pipe_cons_signal(pp, 0);
 		}
 	}
 	else {
@@ -433,6 +433,44 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		pthread_create(&ms->backend_th,NULL,
 			main_func_tbl->put_child_func,pp);
 		/* TBD: check return value */
+
+		/*
+		 * Do the initial handshake with children. If we return from
+		 * this callback without an error response, Microhttpd posts
+		 * the "100 Continue" header and the client starts sending
+		 * the data. We must report errors here or forever keep
+		 * out peace.
+		 */
+		rc = pipe_prod_wait_init(&ms->pipe);
+		if (rc < 0) {
+			DPRINTF("producer wait failed\n");
+			resp = MHD_create_response_from_data(0,NULL,
+				MHD_NO,MHD_NO);
+			if (!resp) {
+				return MHD_NO;
+			}
+			MHD_queue_response(conn,MHD_HTTP_INTERNAL_SERVER_ERROR,
+				resp);
+			MHD_destroy_response(resp);
+		} else if (rc > 0) {
+			/*
+			 * Note that we fail here even if 1 of N replicas fail.
+			 * Might want to fix this when we start looping over
+			 * pipe_init_private() above.
+			 */
+			DPRINTF("producer replicas failed (%u of %u)\n",
+				rc, ms->pipe.cons_total);
+			resp = MHD_create_response_from_data(0,NULL,
+				MHD_NO,MHD_NO);
+			if (!resp) {
+				return MHD_NO;
+			}
+			MHD_queue_response(conn,MHD_HTTP_INTERNAL_SERVER_ERROR,
+				resp);
+			MHD_destroy_response(resp);
+		} else {
+			DPRINTF("producer proceeding\n");
+		}
 	}
 	else if (*data_size) {
 		pipe_prod_signal(&ms->pipe,(void *)data,*data_size);
@@ -444,6 +482,12 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		pipe_prod_finish(&ms->pipe);
 		pthread_join(ms->backend_th,&child_res);
 		if (child_res == THREAD_FAILED) {
+			DPRINTF("thread failed\n");
+			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+		}
+		else if (ms->pipe.cons_error == ms->pipe.cons_total) {
+			DPRINTF("all %u consumers failed\n",
+				ms->pipe.cons_error);
 			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 		}
 		else {

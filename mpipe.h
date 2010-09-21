@@ -51,6 +51,9 @@
  * out of sync.  Instead of corrupting data and continuing, consumers block
  * waiting for the "right" sequence number while the producer blocks waiting
  * for a signal that will never come.
+ *
+ * The cons_error is the "deadweight" that only increments. This way the
+ * thread ping-pong and zeroing of cons_done are left alone.
  */
 
 typedef struct {
@@ -61,8 +64,10 @@ typedef struct {
 	void		*data_ptr;
 	size_t		 data_len;
 	unsigned long	 sequence;
+	int		 in_init;
 	unsigned short	 cons_total;
 	unsigned short	 cons_done;
+	unsigned short   cons_error;
 } pipe_shared;
 
 typedef struct {
@@ -76,7 +81,9 @@ void		 pipe_init_shared	(pipe_shared *ps,
 					 void *owner, unsigned short ncons);
 pipe_private	*pipe_init_private	(pipe_shared *ps);
 int		 pipe_cons_wait		(pipe_private *pp);
-void		 pipe_cons_signal	(pipe_private *pp);
+void		 pipe_cons_signal	(pipe_private *pp, int error);
+void		 pipe_cons_siginit	(pipe_shared *ps, int error);
+int		 pipe_prod_wait_init	(pipe_shared *ps);
 void		 pipe_prod_signal	(pipe_shared *ps,
 					 void *ptr, size_t total);
 void		 pipe_prod_finish	(pipe_shared *ps);

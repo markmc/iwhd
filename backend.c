@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <assert.h>
+#include <errno.h>
 
 #include <microhttpd.h>
 #include <curl/curl.h>
@@ -78,10 +79,13 @@ bad_get_child (void * ctx)
 void *
 bad_put_child (void * ctx)
 {
-	(void)ctx;
+	pipe_private	*pp	= ctx;
+	pipe_shared	*ps	= pp->shared;
 
 	DPRINTF("*** bad call to %s\n",__func__);
-	return NULL;
+	pipe_cons_siginit(ps, -1);
+	free(pp);
+	return THREAD_FAILED;
 }
 
 void *
@@ -153,6 +157,8 @@ http_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 
 	DPRINTF("consumer asked to read %zu\n",total);
 
+	pipe_cons_siginit(ps, 0);
+
 	if (!pipe_cons_wait(pp)) {
 		return 0;
 	}
@@ -169,7 +175,7 @@ http_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 		done, pp->offset);
 	if (pp->offset == ps->data_len) {
 		DPRINTF("consumer finished chunk\n");
-		pipe_cons_signal(pp);
+		pipe_cons_signal(pp, 0);
 	}
 
 	return done;
@@ -219,6 +225,7 @@ s3_put_child (void * ctx)
 	my_state	*ms	= ps->owner;
 	curl_off_t	 llen;
 	const char	*clen;
+	bool		 rcb;
 
 	clen = MHD_lookup_connection_value(
 		ms->conn, MHD_HEADER_KIND, "Content-Length");
@@ -230,9 +237,13 @@ s3_put_child (void * ctx)
 		llen = (curl_off_t)MHD_SIZE_UNKNOWN;
 	}
 
-	hstor_put(hstor,ms->bucket,ms->key,
-		     http_put_cons,llen,pp,NULL);
-	/* TBD: check return value */
+	rcb = hstor_put(hstor,ms->bucket,ms->key,http_put_cons,llen,pp,NULL);
+	if (!rcb) {
+		DPRINTF("%s returning with error\n",__func__);
+		pipe_cons_siginit(ps, -1);
+		free(pp);
+		return THREAD_FAILED;
+	}
 
 	DPRINTF("%s returning\n",__func__);
 	free(pp);
@@ -584,6 +595,8 @@ curl_put_child (void * ctx)
 
 	curl = curl_easy_init();
 	if (!curl) {
+		pipe_cons_siginit(ps, -1);
+		free(pp);
 		return THREAD_FAILED;
 	}
 	sprintf(fixed,"http://%s:%u%s",proxy_host,proxy_port,
@@ -790,8 +803,12 @@ fs_put_child (void * ctx)
 
 	fd = open(ms->url+1,O_WRONLY|O_CREAT,0666);
 	if (fd < 0) {
+		pipe_cons_siginit(ps, errno);
+		free(pp);
 		return THREAD_FAILED;
 	}
+
+	pipe_cons_siginit(ps, 0);
 
 	while (pipe_cons_wait(pp)) {
 		offset = 0;
@@ -802,11 +819,12 @@ fs_put_child (void * ctx)
 				if (bytes < 0) {
 					perror("write");
 				}
+				pipe_cons_signal(pp, errno);
 				goto done;
 			}
 			offset += bytes;
 		} while (offset < ps->data_len);
-		pipe_cons_signal(pp);
+		pipe_cons_signal(pp, 0);
 	}
 
 done:
