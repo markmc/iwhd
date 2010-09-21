@@ -66,19 +66,23 @@ public:
 
 	DBClientConnection	client;
 
-	char *	DidPut		(char * bucket, char * key, char * loc,
-				 size_t size);
-	void	GotCopy		(char * bucket, char * key, char * loc);
-	char *	HasCopy		(char * bucket, char * key, char * loc);
-	int	SetValue	(char * bucket, char * key, char * mkey,
-				 char * mvalue);
-	int	GetValue	(char * bucket, char * key, char * mkey,
-				 char ** mvalue);
-	RepoQuery * NewQuery	(char * bucket, char * key, char * expr);
+	char *	DidPut		(const char *bucket, const char *key,
+				 const char *loc, size_t size);
+	void	GotCopy		(const char *bucket, const char *key,
+				 const char *loc);
+	char *	HasCopy		(const char *bucket, const char *key,
+				 const char *loc);
+	int	SetValue	(const char *bucket, const char *key,
+				 const char *mkey, const char * mvalue);
+	int	GetValue	(const char *bucket, const char *key,
+				 const char *mkey, char ** mvalue);
+	RepoQuery * NewQuery	(const char *bucket, const char *key,
+				 const char * expr);
 	auto_ptr<DBClientCursor> GetCursor (Query &q);
-	void	Delete		(char * bucket, char * key);
-	size_t	GetSize		(char * bucket, char * key);
-	int	Check		(char * bucket, char * key, char * depot);
+	void	Delete		(const char *bucket, const char *key);
+	size_t	GetSize		(const char *bucket, const char *key);
+	int	Check		(const char *bucket, const char *key,
+				 const char *depot);
 };
 
 class RepoQuery {
@@ -86,7 +90,8 @@ class RepoQuery {
 	DBClientCursor *	curs;
 	value_t *		expr;
 public:
-		RepoQuery	(char *, char *, char *, RepoMeta &);
+		RepoQuery	(const char *, const char *, const char *,
+				 RepoMeta &);
 		~RepoQuery	();
 	bool	Next		(void);
 	char	*bucket;
@@ -142,7 +147,8 @@ RepoMeta::GetCursor (Query &q)
 }
 
 char *
-RepoMeta::DidPut (char * bucket, char * key, char * loc, size_t size)
+RepoMeta::DidPut (const char *bucket, const char *key, const char *loc,
+		  size_t size)
 {
 	BSONObjBuilder			bb;
 	struct timeval			now_tv;
@@ -187,7 +193,7 @@ RepoMeta::DidPut (char * bucket, char * key, char * loc, size_t size)
 }
 
 extern "C" char *
-meta_did_put (char * bucket, char * key, char * loc, size_t size)
+meta_did_put (const char *bucket, const char *key, const char *loc, size_t size)
 {
 	char	*rc;
 
@@ -202,7 +208,7 @@ meta_did_put (char * bucket, char * key, char * loc, size_t size)
 }
 
 void
-RepoMeta::GotCopy (char * bucket, char * key, char * loc)
+RepoMeta::GotCopy (const char *bucket, const char *key, const char *loc)
 {
 	BSONObjBuilder			bb;
 	auto_ptr<DBClientCursor>	curs;
@@ -220,7 +226,7 @@ RepoMeta::GotCopy (char * bucket, char * key, char * loc)
 }
 
 extern "C" void
-meta_got_copy (char * bucket, char * key, char * loc)
+meta_got_copy (const char *bucket, const char *key, const char *loc)
 {
 	CLIENT_LOCK;
 	it->GotCopy(bucket,key,loc);
@@ -228,7 +234,7 @@ meta_got_copy (char * bucket, char * key, char * loc)
 }
 
 char *
-RepoMeta::HasCopy (char * bucket, char * key, char * loc)
+RepoMeta::HasCopy (const char *bucket, const char *key, const char *loc)
 {
 	BSONObjBuilder			bb;
 	auto_ptr<DBClientCursor>	curs;
@@ -253,7 +259,7 @@ RepoMeta::HasCopy (char * bucket, char * key, char * loc)
 }
 
 extern "C" char *
-meta_has_copy (char * bucket, char * key, char * loc)
+meta_has_copy (const char *bucket, const char *key, const char *loc)
 {
 	char	*rc;
 
@@ -265,7 +271,8 @@ meta_has_copy (char * bucket, char * key, char * loc)
 }
 
 int
-RepoMeta::SetValue (char * bucket, char * key, char * mkey, char * mvalue)
+RepoMeta::SetValue (const char *bucket, const char *key, const char *mkey,
+		    const char * mvalue)
 {
 	Query	q	= QUERY("bucket"<<bucket<<"key"<<key);
 
@@ -275,7 +282,8 @@ RepoMeta::SetValue (char * bucket, char * key, char * mkey, char * mvalue)
 }
 
 extern "C" int
-meta_set_value (char * bucket, char * key, char * mkey, char * mvalue)
+meta_set_value (const char *bucket, const char *key, const char *mkey,
+		const char * mvalue)
 {
 	int	rc;
 
@@ -287,7 +295,8 @@ meta_set_value (char * bucket, char * key, char * mkey, char * mvalue)
 }
 
 int
-RepoMeta::GetValue (char * bucket, char * key, char * mkey, char ** mvalue)
+RepoMeta::GetValue (const char *bucket, const char *key, const char *mkey,
+		    char ** mvalue)
 {
 	auto_ptr<DBClientCursor>	curs;
 	Query				q;
@@ -312,7 +321,8 @@ RepoMeta::GetValue (char * bucket, char * key, char * mkey, char ** mvalue)
 }
 
 extern "C" int
-meta_get_value (char * bucket, char * key, char * mkey, char ** mvalue)
+meta_get_value (const char *bucket, const char *key, const char *mkey,
+		char ** mvalue)
 {
 	int	rc;
 
@@ -323,7 +333,8 @@ meta_get_value (char * bucket, char * key, char * mkey, char ** mvalue)
 	return rc;
 }
 
-RepoQuery::RepoQuery (char * bucket, char * key, char *qstr, RepoMeta &p)
+RepoQuery::RepoQuery (const char *bucket, const char *key, const char *qstr,
+		      RepoMeta &p)
 	: parent(p)
 {
 	Query				q;
@@ -414,13 +425,13 @@ RepoQuery::Next (void)
 }
 
 RepoQuery *
-RepoMeta::NewQuery (char * bucket, char * key, char *expr)
+RepoMeta::NewQuery (const char *bucket, const char *key, const char *expr)
 {
 	return new RepoQuery(bucket,key,expr,*this);
 }
 
 extern "C" void *
-meta_query_new (char * bucket, char * key, char *expr)
+meta_query_new (const char *bucket, const char *key, const char *expr)
 {
 	void	*rc;
 
@@ -475,7 +486,7 @@ RepoMeta::BucketList (void)
 #endif
 
 void
-RepoMeta::Delete (char * bucket, char * key)
+RepoMeta::Delete (const char *bucket, const char *key)
 {
 	Query	q	= QUERY("bucket"<<bucket<<"key"<<key);
 
@@ -484,7 +495,7 @@ RepoMeta::Delete (char * bucket, char * key)
 
 extern "C"
 void
-meta_delete (char * bucket, char * key)
+meta_delete (const char *bucket, const char *key)
 {
 	CLIENT_LOCK;
 	it->Delete(bucket,key);
@@ -492,7 +503,7 @@ meta_delete (char * bucket, char * key)
 }
 
 size_t
-RepoMeta::GetSize (char * bucket, char * key)
+RepoMeta::GetSize (const char *bucket, const char *key)
 {
 	auto_ptr<DBClientCursor>	curs;
 	Query				q;
@@ -512,7 +523,7 @@ RepoMeta::GetSize (char * bucket, char * key)
 
 extern "C"
 size_t
-meta_get_size (char * bucket, char * key)
+meta_get_size (const char *bucket, const char *key)
 {
 	size_t	rc;
 

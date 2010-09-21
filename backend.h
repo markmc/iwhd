@@ -10,10 +10,12 @@ typedef void	 init_func_t		(void);
 typedef void	*get_child_func_t	(void *);
 typedef void	*put_child_func_t	(void *);
 typedef void	*cache_child_func_t	(void *);
-typedef int	 delete_func_t		(char *bucket, char *key, char *url);
-typedef int	 bcreate_func_t		(char *bucket);
-typedef int	 register_func_t	(my_state *ms, struct _provider *prov,
-					 char *next, GHashTable *args);
+typedef int	 delete_func_t		(const char *bucket, const char *key,
+					 const char *url);
+typedef int	 bcreate_func_t		(const char *bucket);
+typedef int	 register_func_t	(my_state *ms,
+					 const struct _provider *prov,
+					 const char *next, GHashTable *args);
 
 typedef struct {
 	const char		*name;

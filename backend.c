@@ -94,7 +94,7 @@ bad_cache_child (void * ctx)
 }
 
 int
-bad_delete (char *bucket, char *key, char *url)
+bad_delete (const char *bucket, const char *key, const char *url)
 {
 	(void)bucket;
 	(void)key;
@@ -105,7 +105,7 @@ bad_delete (char *bucket, char *key, char *url)
 }
 
 int
-bad_bcreate (char *bucket)
+bad_bcreate (const char *bucket)
 {
 	(void)bucket;
 
@@ -114,7 +114,8 @@ bad_bcreate (char *bucket)
 }
 
 int
-bad_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
+bad_register (my_state *ms, const provider_t *prov, const char *next,
+	      GHashTable *args)
 {
 	(void)ms;
 	(void)prov;
@@ -239,7 +240,7 @@ s3_put_child (void * ctx)
 }
 
 int
-s3_delete (char *bucket, char *key, char *url)
+s3_delete (const char *bucket, const char *key, const char *url)
 {
 	(void)url;
 
@@ -250,7 +251,7 @@ s3_delete (char *bucket, char *key, char *url)
 }
 
 int
-s3_bcreate (char *bucket)
+s3_bcreate (const char *bucket)
 {
 	DPRINTF("creating bucket %s\n",bucket);
 
@@ -304,7 +305,8 @@ s3_init_tmpfile (char *value)
 }
 
 int
-s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
+s3_register (my_state *ms, const provider_t *prov, const char *next,
+	     GHashTable *args)
 {
 	char		*kernel		= g_hash_table_lookup(args,"kernel");
 	char		*ramdisk	= g_hash_table_lookup(args,"ramdisk");
@@ -325,7 +327,7 @@ s3_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
 	char		*ami_bkt;
 	char		 ami_id_buf[64];
 	regmatch_t	 match[2];
-	
+
 	if (!regex_ok) {
 		return MHD_HTTP_BAD_REQUEST;
 	}
@@ -514,7 +516,7 @@ cleanup:
 		free(ami_key);
 	}
 	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
-		
+
 	return rc;
 }
 
@@ -642,7 +644,7 @@ curl_cache_child (void * ctx)
 }
 
 int
-curl_delete (char *bucket, char *key, char *url)
+curl_delete (const char *bucket, const char *key, const char *url)
 {
 	CURL			*curl;
 	char			 fixed[1024];
@@ -665,7 +667,7 @@ curl_delete (char *bucket, char *key, char *url)
 }
 
 int
-curl_bcreate (char *bucket)
+curl_bcreate (const char *bucket)
 {
 	(void)bucket;
 
@@ -682,7 +684,8 @@ curl_bcreate (char *bucket)
  */
 
 int
-curl_register (my_state *ms, provider_t *prov, char *next, GHashTable *args)
+curl_register (my_state *ms, const provider_t *prov, const char *next,
+	       GHashTable *args)
 {
 	char			 fixed[1024];
 	CURL			*curl;
@@ -815,7 +818,7 @@ done:
 }
 
 int
-fs_delete (char *bucket, char *key, char *url)
+fs_delete (const char *bucket, const char *key, const char *url)
 {
 	(void)bucket;
 	(void)key;
@@ -829,7 +832,7 @@ fs_delete (char *bucket, char *key, char *url)
 }
 
 int
-fs_bcreate (char *bucket)
+fs_bcreate (const char *bucket)
 {
 	DPRINTF("creating bucket %s\n",bucket);
 

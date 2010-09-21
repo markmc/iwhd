@@ -161,7 +161,7 @@ tmpl_get_ctx (const char *type)
 }
 
 int
-tmpl_root_header (tmpl_ctx_t *ctx, char *name, char *version)
+tmpl_root_header (tmpl_ctx_t *ctx, const char *name, const char *version)
 {
 	int		 size;
 	tmpl_format_t	*fmt	= ctx->format;
@@ -177,7 +177,7 @@ tmpl_root_header (tmpl_ctx_t *ctx, char *name, char *version)
 }
 
 int
-tmpl_root_entry (tmpl_ctx_t *ctx, char *rel, char *link)
+tmpl_root_entry (tmpl_ctx_t *ctx, const char *rel, const char *link)
 {
 	int		 size;
 	tmpl_format_t	*fmt	= ctx->format;

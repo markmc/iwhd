@@ -28,9 +28,9 @@ typedef struct {
 
 tmpl_ctx_t	*tmpl_get_ctx		(const char *type);
 int		 tmpl_root_header	(tmpl_ctx_t *ctx,
-					 char *name, char *version);
+					 const char *name, const char *version);
 int		 tmpl_root_entry	(tmpl_ctx_t *ctx,
-					 char *rel, char *link);
+					 const char *rel, const char *link);
 int		 tmpl_root_footer	(tmpl_ctx_t *ctx);
 int		 tmpl_prov_header	(tmpl_ctx_t *ctx);
 int		 tmpl_prov_entry	(tmpl_ctx_t *ctx,
