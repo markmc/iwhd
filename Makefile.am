@@ -18,6 +18,7 @@ AM_CFLAGS = -W -Wall -Wextra -Wno-unused -Wformat-security \
 
 AM_CPPFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
 
+SUBDIRS = t
 ACLOCAL_AMFLAGS = -I ax
 
 bin_PROGRAMS = iwhd

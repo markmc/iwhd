@@ -90,5 +90,5 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([gettimeofday memmove memset strcasecmp strdup strndup strtoul])
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile t/Makefile])
 AC_OUTPUT
