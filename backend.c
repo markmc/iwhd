@@ -16,6 +16,7 @@
 #include <sys/wait.h>
 #include <assert.h>
 #include <errno.h>
+#include <error.h>
 
 #include <microhttpd.h>
 #include <curl/curl.h>
@@ -233,7 +234,7 @@ s3_put_child (void * ctx)
 		llen = strtoll(clen,NULL,10);
 	}
 	else {
-		fprintf(stderr,"missing Content-Length\n");
+		error (0, 0, "missing Content-Length\n");
 		llen = (curl_off_t)MHD_SIZE_UNKNOWN;
 	}
 
@@ -289,7 +290,7 @@ s3_init_tmpfile (char *value)
 
 	fd = mkstemp(path);
 	if (fd < 0) {
-		perror("mkstemp");
+		error (0, errno, "%s: failed to create file from template", path);
 		free(path);
 		return NULL;
 	}
@@ -300,11 +301,12 @@ s3_init_tmpfile (char *value)
 		close(fd);
 		if (written != (ssize_t)len) {
 			if (written < 0) {
-				perror("s3_init_tmpfile write");
+				error (0, errno, "failed to write to %s", path);
 			}
 			else {
-				fprintf(stderr,"bad write length %zd in %s\n",
-					written, __func__);
+				error (0, errno,
+				       "invalid write length %zd in %s\n",
+				       written, __func__);
 			}
 			unlink(path);
 			free(path);
@@ -361,7 +363,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!api_key) {
 		api_key = (char *)prov->username;
 		if (!api_key) {
-			printf("missing EC2 API key\n");
+			error (0, 0, "missing EC2 API key\n");
 			goto cleanup;
 		}
 	}
@@ -370,7 +372,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!api_secret) {
 		api_secret = (char *)prov->password;
 		if (!prov->password) {
-			printf("missing EC2 API key\n");
+			error (0, 0, "missing EC2 API key\n");
 			goto cleanup;
 		}
 	}
@@ -385,7 +387,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	else {
 		ami_cert = get_provider_value(prov->index,"ami-cert");
 		if (!ami_cert) {
-			printf("missing EC2 AMI cert\n");
+			error (0, 0, "missing EC2 AMI cert\n");
 			goto cleanup;
 		}
 	}
@@ -400,7 +402,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	else {
 		ami_key = get_provider_value(prov->index,"ami-key");
 		if (!ami_key) {
-			printf("missing EC2 AMI key\n");
+			error (0, 0, "missing EC2 AMI key\n");
 			goto cleanup;
 		}
 	}
@@ -409,7 +411,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!ami_uid) {
 		ami_uid = get_provider_value(prov->index,"ami-uid");
 		if (!ami_uid) {
-			printf("missing EC2 AMI uid\n");
+			error (0, 0, "missing EC2 AMI uid\n");
 			goto cleanup;
 		}
 	}
@@ -452,31 +454,29 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	DPRINTF("ami-bkt = %s\n",ami_bkt);
 
 	if (pipe(organ) < 0) {
-		perror("pipe");
+		error (0, errno, "pipe creation failed");
 		goto cleanup;
 	}
 
 	pid = fork();
 	if (pid < 0) {
-		perror("fork");
+		error (0, errno, "fork failed");
 		close(organ[0]);
 		close(organ[1]);
 		goto cleanup;
 	}
 
 	if (pid == 0) {
+		const char *cmd = "dc-register-image";
 		(void)dup2(organ[1],STDOUT_FILENO);
 		(void)dup2(organ[1],STDERR_FILENO);
-		if (execvp("dc-register-image",(char* const*)argv) < 0) {
-			perror("execvp");
-		}
-		/* Just in case... */
-		exit(!0);
+		execvp(cmd, (char* const*)argv);
+		error (EXIT_FAILURE, errno, "failed run command %s", cmd);
 	}
 
 	DPRINTF("waiting for child...\n");
 	if (waitpid(pid,NULL,0) < 0) {
-		perror("waitpid");
+		error (0, errno, "waitpid failed");
 	}
 	/* TBD: check identity/status from waitpid */
 	DPRINTF("...child exited\n");
@@ -589,7 +589,7 @@ curl_put_child (void * ctx)
 		llen = strtoll(clen,NULL,10);
 	}
 	else {
-		fprintf(stderr,"missing Content-Length\n");
+		error (0, 0, "missing Content-Length\n");
 		llen = (curl_off_t)MHD_SIZE_UNKNOWN;
 	}
 
@@ -766,8 +766,9 @@ fs_get_child (void * ctx)
 	int		 fd;
 	char		 buf[1<<16];
 	ssize_t		 bytes;
+	char		*file = ms->url+1;
 
-	fd = open(ms->url+1,O_RDONLY);
+	fd = open(file, O_RDONLY);
 	if (fd < 0) {
 		return THREAD_FAILED;
 	}
@@ -776,7 +777,7 @@ fs_get_child (void * ctx)
 		bytes = read(fd,buf,sizeof(buf));
 		if (bytes <= 0) {
 			if (bytes < 0) {
-				perror("read");
+				error (0, errno, "%s: read failed", file);
 			}
 			break;
 		}
@@ -800,8 +801,9 @@ fs_put_child (void * ctx)
 	int		 fd;
 	ssize_t		 bytes;
 	size_t		 offset;
+	char		*file = ms->url+1;
 
-	fd = open(ms->url+1,O_WRONLY|O_CREAT,0666);
+	fd = open(file,O_WRONLY|O_CREAT,0666);
 	if (fd < 0) {
 		pipe_cons_siginit(ps, errno);
 		free(pp);
@@ -817,7 +819,8 @@ fs_put_child (void * ctx)
 				ps->data_ptr+offset,ps->data_len-offset);
 			if (bytes <= 0) {
 				if (bytes < 0) {
-					perror("write");
+					error (0, errno, "%s: write failed",
+					       file);
 				}
 				pipe_cons_signal(pp, errno);
 				goto done;
@@ -842,7 +845,7 @@ fs_delete (const char *bucket, const char *key, const char *url)
 	(void)key;
 
 	if (unlink(url+1) < 0) {
-		perror("unlink");
+		error (0, errno, "%s: failed to unlink", url+1);
 		return MHD_NO;
 	}
 
@@ -854,8 +857,8 @@ fs_bcreate (const char *bucket)
 {
 	DPRINTF("creating bucket %s\n",bucket);
 
-	if (mkdir(bucket,0777) < 0) {
-		perror("mkdir");
+	if (mkdir(bucket,0700) < 0) {
+		error (0, errno, "%s: failed to create directory", bucket);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 
