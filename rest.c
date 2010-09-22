@@ -601,6 +601,7 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 			if (!ms->pipe.data_ptr) {
 				return MHD_NO;
 			}
+			((char *)ms->pipe.data_ptr)[0] = '\0';
 			ms->cleanup |= CLEANUP_BUF_PTR;
 		}
 		(void)strncat(ms->pipe.data_ptr,data,*data_size);
@@ -786,6 +787,7 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 			if (!ms->pipe.data_ptr) {
 				return MHD_NO;
 			}
+			((char *)ms->pipe.data_ptr)[0] = '\0';
 			ms->cleanup |= CLEANUP_BUF_PTR;
 		}
 		(void)strncat(ms->pipe.data_ptr,data,*data_size);
@@ -896,7 +898,8 @@ typedef struct {
 } fake_bucket_t;
 
 fake_bucket_t fake_bucket_list[] = {
-	{ "bucket_factory",	"_new" }
+	{ "bucket_factory",	"_new" },
+	{ "provider_list",	"_providers" },
 };
 
 int

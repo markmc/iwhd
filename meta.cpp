@@ -366,6 +366,9 @@ RepoQuery::RepoQuery (const char *bucket, const char *key, const char *qstr,
 		if (expr) {
 			print_value(expr);
 		}
+		else {
+			cout << "could not parse " << qstr << endl;
+		}
 	}
 	else {
 		expr = NULL;
