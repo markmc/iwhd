@@ -62,7 +62,7 @@ xstrdup (char const *string)
 
 /* TBD: use separate function to parse dates differently */
 value_t *
-make_number (char *text)
+make_number (const char *text)
 {
 	value_t *tmp = malloc(sizeof(*tmp));
 
@@ -75,7 +75,7 @@ make_number (char *text)
 }
 
 value_t *
-make_string (char *text, type_t t)
+make_string (const char *text, type_t t)
 {
 	value_t *tmp = malloc(sizeof(*tmp));
 
@@ -134,7 +134,7 @@ struct { char *name; char *value; } hacked_obj_fields[] = {
 };
 
 char *
-unit_oget_func (void * notused, char *text)
+unit_oget_func (void * notused, const char *text)
 {
 	int i;
 
@@ -149,7 +149,7 @@ unit_oget_func (void * notused, char *text)
 getter_t unit_oget = { unit_oget_func };
 
 char *
-unit_sget_func (void * notused, char *text)
+unit_sget_func (void * notused, const char *text)
 {
 	return "never";
 }
@@ -162,9 +162,9 @@ struct { char *obj; char *key; char *value; } hacked_links[] = {
 };
 
 char *
-follow_link (char *object, char *key)
+follow_link (const char *object, const char *key)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; hacked_links[i].obj; ++i) {
 		if (strcmp(object,hacked_links[i].obj)) {
@@ -179,7 +179,7 @@ follow_link (char *object, char *key)
 	return NULL;
 }
 #else
-extern char *follow_link (char *object, char *key);
+extern char *follow_link (const char *object, const char *key);
 #endif
 
 char *
@@ -207,9 +207,9 @@ string_value (value_t *v, getter_t *oget, getter_t *sget)
 }
 
 int
-is_ok_number (char *a_str)
+is_ok_number (const char *a_str)
 {
-	char	*p;
+	const char	*p;
 
 	if (!a_str) {
 		return 0;
@@ -294,7 +294,7 @@ compare (value_t *left, comp_t op, value_t *right,
 }
 
 void
-_print_value (value_t *v, int level)
+_print_value (const value_t *v, int level)
 {
 	if (!v) {
 		printf("%*sNULL\n",level,"");
@@ -354,13 +354,13 @@ _print_value (value_t *v, int level)
 }
 
 void
-print_value (value_t *v)
+print_value (const value_t *v)
 {
 	_print_value(v,0);
 }
 
 void
-free_value (value_t *v)
+free_value (const value_t *v)
 {
 	if (!v) {
 		return;
@@ -371,12 +371,12 @@ free_value (value_t *v)
 	case T_OFIELD:
 	case T_SFIELD:
 		free(v->as_str);
-		free(v);
+		free((void *)v);
 		break;
 	case T_LINK:
 		free_value(v->as_tree.left);
 		free(v->as_tree.right);
-		free(v);
+		free((void *)v);
 		break;
 	case T_COMP:
 	case T_AND:
@@ -387,12 +387,12 @@ free_value (value_t *v)
 		free_value(v->as_tree.left);
 		/* Fall through. */
 	default:
-		free(v);
+		free((void *)v);
 	}
 }
 
 int
-eval (value_t *v, getter_t *oget, getter_t *sget)
+eval (const value_t *v, getter_t *oget, getter_t *sget)
 {
 	int	 res;
 	char	*str;
