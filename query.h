@@ -37,7 +37,7 @@ typedef struct {
 
 value_t	*parse		(const char *text);
 int	 eval		(const value_t *expr, getter_t *oget, getter_t *sget);
-void	 free_value	(const value_t *);
+void	 free_value	(value_t *);
 void	 print_value	(const value_t *);
 
 #if defined(__CPLUSPLUS__) || defined(__cplusplus)

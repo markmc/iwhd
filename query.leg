@@ -360,7 +360,7 @@ print_value (const value_t *v)
 }
 
 void
-free_value (const value_t *v)
+free_value (value_t *v)
 {
 	if (!v) {
 		return;
@@ -371,12 +371,12 @@ free_value (const value_t *v)
 	case T_OFIELD:
 	case T_SFIELD:
 		free(v->as_str);
-		free((void *)v);
+		free(v);
 		break;
 	case T_LINK:
 		free_value(v->as_tree.left);
 		free(v->as_tree.right);
-		free((void *)v);
+		free(v);
 		break;
 	case T_COMP:
 	case T_AND:
@@ -387,7 +387,7 @@ free_value (const value_t *v)
 		free_value(v->as_tree.left);
 		/* Fall through. */
 	default:
-		free((void *)v);
+		free(v);
 	}
 }
 
