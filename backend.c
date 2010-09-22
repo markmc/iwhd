@@ -448,7 +448,8 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
 	rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
-	argv[argc++] = "dc-register-image";
+	const char *cmd = "dc-register-image";
+	argv[argc++] = cmd;
 	argv[argc++] = ms->bucket;
 	argv[argc++] = ms->key;
 	argv[argc++] = api_key;
@@ -482,7 +483,6 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	}
 
 	if (pid == 0) {
-		const char *cmd = "dc-register-image";
 		(void)dup2(organ[1],STDOUT_FILENO);
 		(void)dup2(organ[1],STDERR_FILENO);
 		execvp(cmd, (char* const*)argv);
