@@ -17,7 +17,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 AC_PREREQ([2.65])
-AC_INIT([image-warehouse], [1.0], [FIXME@example.com])
+AC_INIT([iwhd], [1.0], [FIXME@example.com])
 AC_CONFIG_AUX_DIR([build-aux])
 
 AC_CONFIG_HEADERS([config.h:config.hin])
