@@ -33,6 +33,7 @@ char	*parse_config		(void);
 void	 repl_init		(void);
 void	 replicate		(char *url, size_t size, char *policy);
 void	 replicate_delete	(char *url);
+void	 replicate_bcreate	(char *bucket);
 int	 get_provider		(int i, provider_t *out);
 void	 update_provider	(char *provider,
 				 char *username, char *password);

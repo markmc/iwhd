@@ -61,12 +61,17 @@ extern backend_func_tbl	s3_func_tbl;
 extern backend_func_tbl	curl_func_tbl;
 extern backend_func_tbl	fs_func_tbl;
 
-typedef enum { REPL_PUT, REPL_DEL } repl_t;
+typedef enum {
+	REPL_PUT,		/* store an object */
+	REPL_ODELETE,		/* delete an object */
+	REPL_BCREATE,		/* create a bucket */
+	/* TBD: bucket deletion, others? */
+} repl_t;
 
 typedef struct _repl_item {
 	struct _repl_item	*next;
 	repl_t			 type;
-	char			*url;
+	char			*path;
 	unsigned int		 server;
 	size_t			 size;
 	int			 pipes[2];
@@ -257,9 +262,9 @@ proxy_repl_prod_fs (void *ctx)
 	ssize_t		 	 obytes;
 	ssize_t			 offset;
 
-	DPRINTF("replicating from %s (FS)\n",item->url);
+	DPRINTF("replicating from %s (FS)\n",item->path);
 
-	ifd = open(item->url,O_RDONLY);
+	ifd = open(item->path,O_RDONLY);
 	if (ifd < 0) {
 		perror("ifd open");
 		return THREAD_FAILED;
@@ -316,7 +321,7 @@ proxy_repl_prod (void *ctx)
 	char			*stctx;
 	char			*myurl;
 
-	sprintf(addr,"http://%s:%u/%s",proxy_host,proxy_port,item->url);
+	sprintf(addr,"http://%s:%u/%s",proxy_host,proxy_port,item->path);
 	DPRINTF("replicating from %s\n",addr);
 
 	if (s3mode) {
@@ -325,7 +330,7 @@ proxy_repl_prod (void *ctx)
 		hstor = hstor_new(svc_acc,proxy_host,
 				     proxy_key,proxy_secret);
 		/* Blech.  Can't conflict with consumer, though. */
-		myurl = strdup(item->url);
+		myurl = strdup(item->path);
 		assert (myurl);
 		bucket = strtok_r(myurl,"/",&stctx);
 		key = strtok_r(NULL,"/",&stctx);
@@ -450,6 +455,7 @@ proxy_repl_cons (void *ctx)
 	const char		*s_key;
 	const char		*s_secret;
 	const char		*s_type;
+	const char		*s_name;
 	struct curl_slist	*slist;
 	char			*myurl;
 
@@ -459,22 +465,22 @@ proxy_repl_cons (void *ctx)
 	s_key = json_string_value(json_object_get(server,"key"));
 	s_secret = json_string_value(json_object_get(server,"secret"));
 	s_type = json_string_value(json_object_get(server,"type"));
+	s_name = json_string_value(json_object_get(server,"name"));
 
-	myurl = strdup(item->url);
+	myurl = strdup(item->path);
 	assert (myurl);
 	bucket = strtok_r(myurl,"/",&stctx);
 	key = strtok_r(NULL,"/",&stctx);
 
 	if (!strcasecmp(s_type,"s3")) {
 		DPRINTF("replicating %zu to %s/%s (S3)\n",item->size,s_host,
-			item->url);
+			item->path);
 		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",s_host,s_port);
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
 		/* Blech.  Can't conflict with producer, though. */
 		hstor_put(hstor,bucket,key,
 			     junk_reader,item->size,fp,NULL);
 		hstor_free(hstor);
-		free(myurl);
 	}
 	else {
 		const char *token_str = NULL;
@@ -488,12 +494,13 @@ proxy_repl_cons (void *ctx)
 			/* Re-fetch as this might have changed. */
 			s_host = json_string_value(json_object_get(server,
 				"host"));
-			sprintf(addr,"%s/%s",s_host,item->url);
+			sprintf(addr,"%s/%s",s_host,item->path);
 			DPRINTF("replicating %zu to %s (CF)\n",item->size,
 				addr);
 		}
 		else {
-			sprintf(addr,"http://%s:%u/%s",s_host,s_port,item->url);
+			sprintf(addr,"http://%s:%u/%s",
+				s_host,s_port,item->path);
 			DPRINTF("replicating %zu to %s (repod)\n",item->size,
 				addr);
 		}
@@ -526,6 +533,8 @@ proxy_repl_cons (void *ctx)
 
 	DPRINTF("%s returning\n",__func__);
 	close(item->pipes[0]);
+	meta_got_copy(bucket,key,s_name);
+	free(myurl);
 	return NULL;
 }
 
@@ -555,24 +564,71 @@ repl_worker_del (repl_item *item)
 
 	if (!strcasecmp(s_type,"s3")) {
 		DPRINTF("%s replicating delete of %s on %s:%u (S3)\n",__func__,
-			item->url, s_host, s_port);
+			item->path, s_host, s_port);
 		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",s_host,s_port);
 		/* TBD: check return */
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
-		assert (item->url);
-		bucket = strtok_r(item->url,"/",&stctx);
+		assert (item->path);
+		bucket = strtok_r(item->path,"/",&stctx);
 		key = strtok_r(NULL,"/",&stctx);
-		DPRINTF("%s calling hstor_del\n",__func__);
 		(void)hstor_del(hstor,bucket,key);
 		hstor_free(hstor);
 	}
 	else {
-		DPRINTF("%s replicating delete of %s on %s:%u (HTTP)\n",__func__,
-			item->url, s_host, s_port);
+		DPRINTF("%s replicating delete of %s on %s:%u (HTTP)\n",
+			__func__, item->path, s_host, s_port);
+		sprintf(addr,"http://%s:%d%s",s_host,s_port,item->path);
 		curl = curl_easy_init();
 		curl_easy_setopt(curl,CURLOPT_URL,addr);
 		curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"DELETE");
-		DPRINTF("%s calling curl_easy_perform\n",__func__);
+		curl_easy_perform(curl);
+		curl_easy_cleanup(curl);
+	}
+
+	DPRINTF("%s returning\n",__func__);
+}
+
+void
+repl_worker_bcreate (repl_item *item)
+{
+	json_t			*server;
+	const char		*s_host;
+	unsigned int		 s_port;
+	const char		*s_key;
+	const char		*s_secret;
+	const char		*s_type;
+	char			 svc_acc[128];
+	struct hstor_client	*hstor;
+	char			 addr[1024];
+	CURL			*curl;
+
+	server = json_array_get(config,item->server);
+	s_host = json_string_value(json_object_get(server,"host"));
+	s_port = json_integer_value(json_object_get(server,"port"));
+	s_key = json_string_value(json_object_get(server,"key"));
+	s_secret = json_string_value(json_object_get(server,"secret"));
+	s_type = json_string_value(json_object_get(server,"type"));
+
+	if (!strcasecmp(s_type,"s3")) {
+		DPRINTF("%s replicating create of bucket %s on %s:%u (S3)\n",
+			__func__, item->path, s_host, s_port);
+		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",s_host,s_port);
+		/* TBD: check return */
+		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
+		assert (item->path);
+		if (!hstor_add_bucket(hstor,item->path)) {
+			fprintf(stderr,"bucket create failed for %s\n",
+				item->path);
+		}
+		hstor_free(hstor);
+	}
+	else {
+		DPRINTF("%s replicating create of bucket %s on %s:%u (HTTP)\n",
+			__func__, item->path, s_host, s_port);
+		sprintf(addr,"http://%s:%d/%s",s_host,s_port,item->path);
+		curl = curl_easy_init();
+		curl_easy_setopt(curl,CURLOPT_URL,addr);
+		curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"PUT");
 		curl_easy_perform(curl);
 		curl_easy_cleanup(curl);
 	}
@@ -616,14 +672,17 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 				perror("pipe");
 			}
 			break;
-		case REPL_DEL:
+		case REPL_ODELETE:
 			repl_worker_del(item);
+			break;
+		case REPL_BCREATE:
+			repl_worker_bcreate(item);
 			break;
 		default:
 			fprintf(stderr,"bad repl type %d (url=%s) skipped\n",
-				item->type, item->url);
+				item->type, item->path);
 		}
-		free(item->url);
+		free(item->path);
 		free(item);
 	}
 }
@@ -717,7 +776,7 @@ replicate (char *url, size_t size, char *policy)
 			break;
 		}
 		item->type = REPL_PUT;
-		item->url = strdup(url);
+		item->path = strdup(url);
 		item->server = i;
 		item->size = size;
 		pthread_mutex_lock(&queue_lock);
@@ -741,22 +800,22 @@ replicate (char *url, size_t size, char *policy)
 }
 
 void
-replicate_delete (char *url)
+replicate_namespace_action (char *name, repl_t action)
 {
 	unsigned int	 i;
 	repl_item	*item;
 
 	for (i = 1; i < json_array_size(config); ++i) {
-		DPRINTF("replicating delete(%s) on %u\n",url,i);
+		DPRINTF("replicating delete(%s) on %u\n",name,i);
 		item = malloc(sizeof(*item));
 		if (!item) {
 			fprintf(stderr,"could not create repl_item for %s\n",
-				url);
+				name);
 			return;
 		}
-		item->type = REPL_DEL;
-		item->url = strdup(url);
-		if (!item->url) {
+		item->type = action;
+		item->path = strdup(name);
+		if (!item->path) {
 			free(item);
 			return;
 		}
@@ -774,6 +833,18 @@ replicate_delete (char *url)
 		pthread_mutex_unlock(&queue_lock);
 		sem_post(&queue_sema);
 	}
+}
+
+void
+replicate_delete (char * name)
+{
+	replicate_namespace_action(name,REPL_ODELETE);
+}
+
+void
+replicate_bcreate (char * name)
+{
+	replicate_namespace_action(name,REPL_BCREATE);
 }
 
 int

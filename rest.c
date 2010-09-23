@@ -1115,9 +1115,20 @@ create_bucket (char *name)
 			DPRINTF("default-policy " "create failed\n");
 			/* Non-fatal. */
 		}
+		DPRINTF("created bucket %s\n",name);
+		/*
+		 * There's not a whole lot to do about bucket-creation
+		 * failures on replicas, other than to report them, unless
+		 * we adopt an "all or nothing" approach and unwind the
+		 * create on the primary as well.  Then what if that fails?
+		 * It's just one example of the general "fewer replicas
+		 * than desired" distributed-system problem, not worth a
+		 * point solution here/now.  Revisit when we have a more
+		 * general replica-repair policy/system in place.
+		 */
+		replicate_bcreate(name);
 	}
 
-	DPRINTF("created bucket %s\n",name);
 	return rc;
 }
 
