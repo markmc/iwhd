@@ -18,6 +18,8 @@ AM_CFLAGS = -W -Wall -Wextra -Wno-unused \
 
 AM_CPPFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
 
+ACLOCAL_AMFLAGS = -I ax
+
 bin_PROGRAMS = iwhd
 EXTRA_DIST = query.leg
 
@@ -43,10 +45,8 @@ iwhd_SOURCES = \
 iwhd_CPPFLAGS	= $(HAIL_CFLAGS)
 iwhd_LDADD =		\
   -lmongoclient		\
-  $(BOOST_FS_LIB)	\
-  $(BOOST_PO_LIB)	\
-  $(BOOST_SYS_LIB)	\
-  $(BOOST_THR_LIB)	\
+  $(BOOST_SYSTEM_LIB)	\
+  $(BOOST_THREAD_LIB)	\
   $(CRYPTO_LIB)		\
   $(CURL_LIB)		\
   $(JANSSON_LIB)	\

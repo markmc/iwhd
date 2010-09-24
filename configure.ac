@@ -72,27 +72,10 @@ AC_CHECK_LIB([xml2], [xmlInitParser],
 	[AC_MSG_ERROR([Missing required XML2 lib])])
 AC_SUBST([XML2_LIB])
 
-AC_CHECK_LIB([boost_filesystem-mt], [_ZN5boost10filesystem6detail6throwsE],
-	[BOOST_FS_LIB=-lboost_filesystem-mt],
-	[AC_MSG_ERROR([Missing required boost_filesystem lib])])
-AC_SUBST([BOOST_FS_LIB])
-
-AC_CHECK_LIB([boost_program_options-mt],
-             [_ZN5boost15program_options11bool_switchEv],
-	[BOOST_PO_LIB=-lboost_program_options-mt],
-	[AC_MSG_ERROR([Missing required boost_program_options lib])])
-AC_SUBST([BOOST_PO_LIB])
-
-AC_CHECK_LIB([boost_system-mt], [_ZN5boost6system6throwsE],
-	[BOOST_SYS_LIB=-lboost_system-mt],
-	[AC_MSG_ERROR([Missing required boost_system lib])])
-AC_SUBST([BOOST_SYS_LIB])
-
-AC_CHECK_LIB([boost_thread-mt], [_ZN5boost6detail12get_tss_dataEPKv],
-	[BOOST_THR_LIB=-lboost_thread-mt],
-	[AC_MSG_ERROR([Missing required boost_thread lib])])
-AC_SUBST([BOOST_THR_LIB])
-
+# from http://www.gnu.org/software/autoconf-archive/
+AX_BOOST_BASE
+AX_BOOST_SYSTEM
+AX_BOOST_THREAD
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h strings.h sys/time.h unistd.h])
