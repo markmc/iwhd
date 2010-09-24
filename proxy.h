@@ -31,12 +31,13 @@ typedef struct _provider {
 
 char	*parse_config		(void);
 void	 repl_init		(void);
-void	 replicate		(char *url, size_t size, char *policy);
-void	 replicate_delete	(char *url);
-void	 replicate_bcreate	(char *bucket);
+void	 replicate		(const char *url, size_t size,
+				 const char *policy);
+void	 replicate_delete	(const char *url);
+void	 replicate_bcreate	(const char *bucket);
 int	 get_provider		(int i, provider_t *out);
-void	 update_provider	(char *provider,
-				 char *username, char *password);
-char	*get_provider_value	(int i, char *fname);
+void	 update_provider	(const char *provider,
+				 const char *username, const char *password);
+char	*get_provider_value	(int i, const char *fname);
 
 #endif

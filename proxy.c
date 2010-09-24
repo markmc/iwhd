@@ -539,7 +539,7 @@ proxy_repl_cons (void *ctx)
 }
 
 void
-repl_worker_del (repl_item *item)
+repl_worker_del (const repl_item *item)
 {
 	json_t			*server;
 	const char		*s_host;
@@ -718,7 +718,7 @@ repl_sget (void *ctx, const char *id)
 }
 
 void
-replicate (char *url, size_t size, char *policy)
+replicate (const char *url, size_t size, const char *policy)
 {
 	unsigned int	 i;
 	repl_item	*item;
@@ -800,7 +800,7 @@ replicate (char *url, size_t size, char *policy)
 }
 
 void
-replicate_namespace_action (char *name, repl_t action)
+replicate_namespace_action (const char *name, repl_t action)
 {
 	unsigned int	 i;
 	repl_item	*item;
@@ -836,13 +836,13 @@ replicate_namespace_action (char *name, repl_t action)
 }
 
 void
-replicate_delete (char * name)
+replicate_delete (const char *name)
 {
 	replicate_namespace_action(name,REPL_ODELETE);
 }
 
 void
-replicate_bcreate (char * name)
+replicate_bcreate (const char *name)
 {
 	replicate_namespace_action(name,REPL_BCREATE);
 }
@@ -889,7 +889,7 @@ get_provider (int i, provider_t *out)
 }
 
 char *
-get_provider_value (int i, char *fname)
+get_provider_value (int i, const char *fname)
 {
 	json_t	*server;
 	json_t	*field;
@@ -910,7 +910,7 @@ get_provider_value (int i, char *fname)
 }
 
 void
-update_provider (char *provider, char *username, char *password)
+update_provider (const char *provider, const char *username, const char *password)
 {
 	int		 i;
 	json_t		*server;
