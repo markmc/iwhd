@@ -58,6 +58,11 @@
  * they like to both the config and to replication attributes on objects.
  */
 
+/* Sizes for internal string buffers. */
+#define ADDR_SIZE	1024
+#define SVC_ACC_SIZE	128
+#define HEADER_SIZE	64
+
 extern backend_func_tbl	bad_func_tbl;
 extern backend_func_tbl	s3_func_tbl;
 extern backend_func_tbl	curl_func_tbl;
@@ -248,7 +253,7 @@ junk_writer (void *ptr, size_t size, size_t nmemb, void *stream)
 
 	n = fwrite(ptr,size,nmemb,stream);
 	fflush(stream);
-	printf("in %s(%zu,%zu) => %zu\n",__func__,size,nmemb,n);
+	DPRINTF("in %s(%zu,%zu) => %zu\n",__func__,size,nmemb,n);
 
 	return n;
 }
@@ -314,21 +319,31 @@ proxy_repl_prod (void *ctx)
 {
 	repl_item		*item	= ctx;
 	FILE			*fp	= fdopen(item->pipes[1],"w");
-	char			 addr[1024];
+	char			 addr[ADDR_SIZE];
 	CURL			*curl;
-	char			 svc_acc[128];
+	char			 svc_acc[SVC_ACC_SIZE];
 	struct hstor_client	*hstor;
 	char			*bucket;
 	char			*key;
 	char			*stctx;
 	char			*myurl;
+	int			 chars;
 
-	sprintf(addr,"http://%s:%u/%s",proxy_host,proxy_port,item->path);
+	chars = snprintf(addr,ADDR_SIZE,
+		"http://%s:%u/%s",proxy_host,proxy_port,item->path);
+	if (chars >= ADDR_SIZE) {
+		error(0,0,"path too long in %s\n",__func__);
+		goto done;
+	}
 	DPRINTF("replicating from %s\n",addr);
 
 	if (s3mode) {
-		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",
+		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",
 			proxy_host,proxy_port);
+		if (chars >= SVC_ACC_SIZE) {
+			error(0,0,"svc_acc too long in %s\n",__func__);
+			goto done;
+		}
 		hstor = hstor_new(svc_acc,proxy_host,
 				     proxy_key,proxy_secret);
 		/* Blech.  Can't conflict with consumer, though. */
@@ -351,7 +366,9 @@ proxy_repl_prod (void *ctx)
 		curl_easy_cleanup(curl);
 	}
 
+done:
 	DPRINTF("%s returning\n",__func__);
+	/* Closing should signal to the consumer that we're finished. */
 	close(item->pipes[1]);
 	return NULL;
 }
@@ -408,20 +425,35 @@ get_cloudfiles_token (json_t *server, const char *host, unsigned int port,
 	const char * user, const char * key)
 {
 	CURL			*curl;
-	char	 		 addr[1024];
-	char	 		 auth_user[64];
-	char	 		 auth_key[64];
+	char	 		 addr[ADDR_SIZE];
+	char	 		 auth_user[HEADER_SIZE];
+	char	 		 auth_key[HEADER_SIZE];
 	json_t			*token_obj;
 	struct curl_slist	*slist;
+	int			 chars;
 
 	token_obj = json_object_get(server,"token");
 	if (token_obj) {
 		return json_string_value(token_obj);
 	}
 
-	sprintf(addr,"https://%s:%u/v1.0",host,port);
-	sprintf(auth_user,"X-Auth-User: %s",user);
-	sprintf(auth_key,"X-Auth-Key: %s",key);
+	chars = snprintf(addr,ADDR_SIZE,"https://%s:%u/v1.0",host,port);
+	if (chars >= ADDR_SIZE) {
+		error(0,0,"API URL too long in %s\n",__func__);
+		return NULL;
+	}
+
+	chars = snprintf(auth_user,HEADER_SIZE,"X-Auth-User: %s",user);
+	if (chars >= HEADER_SIZE) {
+		error(0,0,"auth_user too long in %s\n",__func__);
+		return NULL;
+	}
+
+	chars = snprintf(auth_key,HEADER_SIZE,"X-Auth-Key: %s",key);
+	if (chars >= HEADER_SIZE) {
+		error(0,0,"auth_key too long in %s\n",__func__);
+		return NULL;
+	}
 
 	curl = curl_easy_init();
 	curl_easy_setopt(curl,CURLOPT_URL,addr);
@@ -444,10 +476,11 @@ proxy_repl_cons (void *ctx)
 {
 	repl_item		*item	= ctx;
 	FILE			*fp	= fdopen(item->pipes[0],"r");
-	char			 addr[1024];
+	char			 addr[ADDR_SIZE];
 	CURL			*curl;
 	json_t			*server;
-	char			 svc_acc[128];
+	char			 svc_acc[SVC_ACC_SIZE];
+	char			 auth_hdr[HEADER_SIZE];
 	struct hstor_client	*hstor;
 	char			*bucket;
 	char			*key;
@@ -460,6 +493,7 @@ proxy_repl_cons (void *ctx)
 	const char		*s_name;
 	struct curl_slist	*slist;
 	char			*myurl;
+	int			 chars;
 
 	server = json_array_get(config,item->server);
 	s_host = json_string_value(json_object_get(server,"host"));
@@ -477,7 +511,11 @@ proxy_repl_cons (void *ctx)
 	if (!strcasecmp(s_type,"s3")) {
 		DPRINTF("replicating %zu to %s/%s (S3)\n",item->size,s_host,
 			item->path);
-		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",s_host,s_port);
+		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",s_host,s_port);
+		if (chars >= SVC_ACC_SIZE) {
+			error(0,0,"svc_acc too long in %s\n",__func__);
+			return THREAD_FAILED;
+		}
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
 		/* Blech.  Can't conflict with producer, though. */
 		hstor_put(hstor,bucket,key,
@@ -491,18 +529,28 @@ proxy_repl_cons (void *ctx)
 				s_key, s_secret);
 			if (!token_str) {
 				DPRINTF("could not get CF token\n");
-				return NULL;
+				return THREAD_FAILED;
 			}
 			/* Re-fetch as this might have changed. */
 			s_host = json_string_value(json_object_get(server,
 				"host"));
-			sprintf(addr,"%s/%s",s_host,item->path);
+			chars = snprintf(addr,ADDR_SIZE,"%s/%s",
+				s_host,item->path);
+			if (chars >= ADDR_SIZE) {
+				error(0,0,"CF path too long in %s\n",__func__);
+				return THREAD_FAILED;
+			}
 			DPRINTF("replicating %zu to %s (CF)\n",item->size,
 				addr);
 		}
 		else {
-			sprintf(addr,"http://%s:%u/%s",
+			chars = snprintf(addr,ADDR_SIZE,"http://%s:%u/%s",
 				s_host,s_port,item->path);
+			if (chars >= ADDR_SIZE) {
+				error(0,0,"HTTP path too long in %s\n",
+					__func__);
+				return THREAD_FAILED;
+			}
 			DPRINTF("replicating %zu to %s (repod)\n",item->size,
 				addr);
 		}
@@ -513,8 +561,14 @@ proxy_repl_cons (void *ctx)
 			(curl_off_t)item->size);
 		curl_easy_setopt(curl,CURLOPT_READFUNCTION,junk_reader);
 		if (!strcasecmp(s_type,"cf")) {
-			sprintf(svc_acc,"X-Auth-Token: %s",token_str);
-			slist = curl_slist_append(NULL,svc_acc);
+			chars = snprintf(auth_hdr,HEADER_SIZE,
+				"X-Auth-Token: %s",token_str);
+			if (chars >= HEADER_SIZE) {
+				error(0,0,"auth_token too long in %s\n",
+					__func__);
+				return THREAD_FAILED;
+			}
+			slist = curl_slist_append(NULL,auth_hdr);
 			/*
 			 * Rackspace doesn't clearly document that you'll get
 			 * 412 (Precondition Failed) if you omit this.
@@ -549,13 +603,14 @@ repl_worker_del (const repl_item *item)
 	const char		*s_key;
 	const char		*s_secret;
 	const char		*s_type;
-	char			 svc_acc[128];
+	char			 svc_acc[SVC_ACC_SIZE];
 	struct hstor_client	*hstor;
-	char			 addr[1024];
+	char			 addr[ADDR_SIZE];
 	CURL			*curl;
 	char			*bucket;
 	char			*key;
 	char			*stctx;
+	int			 chars;
 
 	server = json_array_get(config,item->server);
 	s_host = json_string_value(json_object_get(server,"host"));
@@ -567,7 +622,11 @@ repl_worker_del (const repl_item *item)
 	if (!strcasecmp(s_type,"s3")) {
 		DPRINTF("%s replicating delete of %s on %s:%u (S3)\n",__func__,
 			item->path, s_host, s_port);
-		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",s_host,s_port);
+		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",s_host,s_port);
+		if (chars >= SVC_ACC_SIZE) {
+			error(0,0,"svc_acc too long in %s\n",__func__);
+			return;
+		}
 		/* TBD: check return */
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
 		assert (item->path);
@@ -579,7 +638,12 @@ repl_worker_del (const repl_item *item)
 	else {
 		DPRINTF("%s replicating delete of %s on %s:%u (HTTP)\n",
 			__func__, item->path, s_host, s_port);
-		sprintf(addr,"http://%s:%d%s",s_host,s_port,item->path);
+		chars = snprintf(addr,ADDR_SIZE,"http://%s:%d%s",
+			s_host,s_port,item->path);
+		if (chars >= ADDR_SIZE) {
+			error(0,0,"path too long in %s\n",__func__);
+			return;
+		}
 		curl = curl_easy_init();
 		curl_easy_setopt(curl,CURLOPT_URL,addr);
 		curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"DELETE");
@@ -599,10 +663,11 @@ repl_worker_bcreate (repl_item *item)
 	const char		*s_key;
 	const char		*s_secret;
 	const char		*s_type;
-	char			 svc_acc[128];
+	char			 svc_acc[SVC_ACC_SIZE];
 	struct hstor_client	*hstor;
-	char			 addr[1024];
+	char			 addr[ADDR_SIZE];
 	CURL			*curl;
+	int			 chars;
 
 	server = json_array_get(config,item->server);
 	s_host = json_string_value(json_object_get(server,"host"));
@@ -614,7 +679,11 @@ repl_worker_bcreate (repl_item *item)
 	if (!strcasecmp(s_type,"s3")) {
 		DPRINTF("%s replicating create of bucket %s on %s:%u (S3)\n",
 			__func__, item->path, s_host, s_port);
-		snprintf(svc_acc,sizeof(svc_acc),"%s:%u",s_host,s_port);
+		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",s_host,s_port);
+		if (chars >= SVC_ACC_SIZE) {
+			error(0,0,"svc_acc too long in %s\n",__func__);
+			return;
+		}
 		/* TBD: check return */
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
 		assert (item->path);
@@ -627,7 +696,12 @@ repl_worker_bcreate (repl_item *item)
 	else {
 		DPRINTF("%s replicating create of bucket %s on %s:%u (HTTP)\n",
 			__func__, item->path, s_host, s_port);
-		sprintf(addr,"http://%s:%d/%s",s_host,s_port,item->path);
+		chars = snprintf(addr,ADDR_SIZE,"http://%s:%d/%s",
+			s_host,s_port,item->path);
+		if (chars >= ADDR_SIZE) {
+			error(0,0,"path too long in %s\n",__func__);
+			return;
+		}
 		curl = curl_easy_init();
 		curl_easy_setopt(curl,CURLOPT_URL,addr);
 		curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"PUT");
