@@ -15,6 +15,8 @@
 
 #include <config.h>
 
+#include <errno.h>
+#include <error.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <poll.h>
@@ -100,20 +102,20 @@ validate_server (unsigned int i)
 
 	server = json_array_get(config,i);
 	if (!json_is_object(server)) {
-		fprintf(stderr,"config elem %u: missing object\n",i);
+		error(0,0,"config elem %u: missing object\n",i);
 		return 0;
 	}
 
 	elem = json_object_get(server,"name");
 	if (!json_is_string(elem)) {
-		fprintf(stderr,"config elem %u: missing name\n",i);
+		error(0,0,"config elem %u: missing name\n",i);
 		return 0;
 	}
 	name = json_string_value(elem);
 
 	elem = json_object_get(server,"type");
 	if (!json_is_string(elem)) {
-		fprintf(stderr,"config elem %u (%s): missing type\n",i,name);
+		error(0,0,"config elem %u (%s): missing type\n",i,name);
 		return 0;
 	}
 	type = json_string_value(elem);
@@ -128,20 +130,20 @@ validate_server (unsigned int i)
 		needs = NEED_NONE;
 	}
 	else {
-		fprintf(stderr,"config elem %u (%s): bad type\n",i,name);
+		error(0,0,"config elem %u (%s): bad type\n",i,name);
 		return 0;
 	}
 
 	if (needs != NEED_NONE) {
 		elem = json_object_get(server,"host");
 		if (!json_is_string(elem)) {
-			fprintf(stderr,"config elem %u (%s): missing host\n",
+			error(0,0,"config elem %u (%s): missing host\n",
 				i,name);
 			return 0;
 		}
 		elem = json_object_get(server,"port");
 		if (!json_is_integer(elem)) {
-			fprintf(stderr,"config elem %u (%s): missing port\n",
+			error(0,0,"config elem %u (%s): missing port\n",
 				i,name);
 			return 0;
 		}
@@ -150,13 +152,13 @@ validate_server (unsigned int i)
 	if (needs == NEED_ALL) {
 		elem = json_object_get(server,"key");
 		if (!json_is_string(elem)) {
-			fprintf(stderr,"config elem %u (%s): missing S3 key\n",
+			error(0,0,"config elem %u (%s): missing S3 key\n",
 				i, name);
 			return 0;
 		}
 		elem = json_object_get(server,"secret");
 		if (!json_is_string(elem)) {
-			fprintf(stderr,
+			error(0,0,
 				"config elem %u (%s): missing S3 secret\n",
 				i, name);
 			return 0;
@@ -203,18 +205,18 @@ parse_config (void)
 	unsigned int	 i;
 
 	if (access(cfg_file,R_OK) < 0) {
-		perror(cfg_file);
+		error(0,errno,cfg_file);
 		return NULL;
 	}
 
 	config = json_load_file(cfg_file,&err);
 	if (!config) {
-		fprintf(stderr,"JSON error on line %d: %s\n",err.line,err.text);
+		error(0,0,"JSON error on line %d: %s\n",err.line,err.text);
 		return NULL;
 	}
 
 	if (json_typeof(config) != JSON_ARRAY) {
-		fprintf(stderr,"config should be a JSON array\n");
+		error(0,0,"config should be a JSON array\n");
 		goto err;
 	}
 
@@ -266,7 +268,7 @@ proxy_repl_prod_fs (void *ctx)
 
 	ifd = open(item->path,O_RDONLY);
 	if (ifd < 0) {
-		perror("ifd open");
+		error(0,errno,"ifd open");
 		return THREAD_FAILED;
 	}
 	ofd = item->pipes[1];
@@ -275,7 +277,7 @@ proxy_repl_prod_fs (void *ctx)
 		ibytes = read(ifd,buf,sizeof(buf));
 		if (ibytes <= 0) {
 			if (ibytes < 0) {
-				perror("read");
+				error(0,errno,"read");
 			}
 			else {
 				DPRINTF("EOF on ifd\n");
@@ -287,7 +289,7 @@ proxy_repl_prod_fs (void *ctx)
 			obytes = write(ofd,buf+offset,ibytes);
 			if (obytes <= 0) {
 				if (obytes < 0) {
-					perror("ofd write");
+					error(0,errno,"ofd write");
 				}
 				else {
 					DPRINTF("zero-length write on ofd\n");
@@ -617,7 +619,7 @@ repl_worker_bcreate (repl_item *item)
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
 		assert (item->path);
 		if (!hstor_add_bucket(hstor,item->path)) {
-			fprintf(stderr,"bucket create failed for %s\n",
+			error(0,0,"bucket create failed for %s\n",
 				item->path);
 		}
 		hstor_free(hstor);
@@ -669,7 +671,7 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 				pthread_join(cons,NULL);
 			}
 			else {
-				perror("pipe");
+				error(0,errno,"pipe");
 			}
 			break;
 		case REPL_ODELETE:
@@ -679,7 +681,7 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 			repl_worker_bcreate(item);
 			break;
 		default:
-			fprintf(stderr,"bad repl type %d (url=%s) skipped\n",
+			error(0,0,"bad repl type %d (url=%s) skipped\n",
 				item->type, item->path);
 		}
 		free(item->path);
@@ -732,7 +734,7 @@ replicate (const char *url, size_t size, const char *policy)
 
 	url2 = strdup(url);
 	if (!url2) {
-		fprintf(stderr,"could not parse url %s\n",url);
+		error(0,0,"could not parse url %s\n",url);
 		return;
 	}
 	qctx.cur_bucket = strtok_r(url2,"/",&stctx);
@@ -771,7 +773,7 @@ replicate (const char *url, size_t size, const char *policy)
 		DPRINTF("REPLICATING %s to %u\n",url,i);
 		item = malloc(sizeof(*item));
 		if (!item) {
-			fprintf(stderr,"could not create repl_item for %s\n",
+			error(0,0,"could not create repl_item for %s\n",
 				url);
 			break;
 		}
@@ -809,7 +811,7 @@ replicate_namespace_action (const char *name, repl_t action)
 		DPRINTF("replicating delete(%s) on %u\n",name,i);
 		item = malloc(sizeof(*item));
 		if (!item) {
-			fprintf(stderr,"could not create repl_item for %s\n",
+			error(0,0,"could not create repl_item for %s\n",
 				name);
 			return;
 		}
