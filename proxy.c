@@ -210,7 +210,7 @@ parse_config (void)
 	unsigned int	 i;
 
 	if (access(cfg_file,R_OK) < 0) {
-		error(0,errno,cfg_file);
+		error(0,errno,"failed to open %s for reading", cfg_file);
 		return NULL;
 	}
 
@@ -282,7 +282,7 @@ proxy_repl_prod_fs (void *ctx)
 		ibytes = read(ifd,buf,sizeof(buf));
 		if (ibytes <= 0) {
 			if (ibytes < 0) {
-				error(0,errno,"read");
+				error(0,errno,"%s: read failed", item->path);
 			}
 			else {
 				DPRINTF("EOF on ifd\n");
@@ -847,12 +847,17 @@ replicate (const char *url, size_t size, const char *policy)
 		DPRINTF("REPLICATING %s to %u\n",url,i);
 		item = malloc(sizeof(*item));
 		if (!item) {
-			error(0,0,"could not create repl_item for %s\n",
-				url);
+			error(0,errno,"could not create repl_item for %s\n",
+			      url);
 			break;
 		}
 		item->type = REPL_PUT;
 		item->path = strdup(url);
+		if (!item->path) {
+			error(0,errno,"could not create repl_item for %s\n",
+			      url);
+			break;
+		}
 		item->server = i;
 		item->size = size;
 		pthread_mutex_lock(&queue_lock);
@@ -885,8 +890,8 @@ replicate_namespace_action (const char *name, repl_t action)
 		DPRINTF("replicating delete(%s) on %u\n",name,i);
 		item = malloc(sizeof(*item));
 		if (!item) {
-			error(0,0,"could not create repl_item for %s\n",
-				name);
+			error(0,errno,"could not create repl_item for %s\n",
+			      name);
 			return;
 		}
 		item->type = action;

@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-AM_CFLAGS = -W -Wall -Wextra -Wno-unused \
+AM_CFLAGS = -W -Wall -Wextra -Wno-unused -Wformat-security \
   -Wp,-D_FORTIFY_SOURCE=2 -O2 -fdiagnostics-show-option
 
 AM_CPPFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
