@@ -29,13 +29,13 @@ wait_for .1 30 "curl http://localhost:$port" \
 
 cd FS || fail=1
 
+# Create an empty bucket.
 curl -X PUT http://localhost:$port/b1 || fail=1
 test -d b1 || fail=1
 
+# Create a file in that bucket.
 echo foo | curl -T - http://localhost:$port/b1/f1 || fail=1
 test -f b1/f1 || fail=1
 test "$(cat b1/f1)" = foo || fail=1
-
-kill $mongo_pid $iwhd_pid
 
 Exit $fail
