@@ -349,6 +349,11 @@ proxy_repl_prod (void *ctx)
 	char			*myurl;
 	int			 chars;
 
+	if (fp == NULL) {
+		error(0, errno, "%s: fdopen failed", __func__);
+		return NULL;
+	}
+
 	chars = snprintf(addr,ADDR_SIZE,
 		"http://%s:%u/%s",proxy_host,proxy_port,item->path);
 	if (chars >= ADDR_SIZE) {
@@ -389,7 +394,7 @@ proxy_repl_prod (void *ctx)
 done:
 	DPRINTF("%s returning\n",__func__);
 	/* Closing should signal to the consumer that we're finished. */
-	close(item->pipes[1]);
+	fclose(fp);
 	return NULL;
 }
 
@@ -515,6 +520,11 @@ proxy_repl_cons (void *ctx)
 	char			*myurl;
 	int			 chars;
 
+	if (fp == NULL) {
+		error(0, errno, "%s: fdopen failed", __func__);
+		return THREAD_FAILED;
+	}
+
 	server = json_array_get(config,item->server);
 	s_host = json_string_value(json_object_get(server,"host"));
 	s_port = json_integer_value(json_object_get(server,"port"));
@@ -608,7 +618,7 @@ proxy_repl_cons (void *ctx)
 	}
 
 	DPRINTF("%s returning\n",__func__);
-	close(item->pipes[0]);
+	fclose(fp);
 	meta_got_copy(bucket,key,s_name);
 	free(myurl);
 	return NULL;
