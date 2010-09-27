@@ -15,12 +15,8 @@ cleanup_() { kill $mongo_pid; }
 wait_for .1 30 'mongo < /dev/null' \
   || framework_failure_ mongod failed to start
 
-# FIXME: currently iwhd creates buckets in the working dir.
-# Once that is fixed, we won't need this "cd".
-cd iwhd
-
-# "path": "FS"
-printf '[ { "type": "fs",   "name": "primary" } ]\n' > iwhd.cfg || fail=1
+printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
+  > iwhd.cfg || fail=1
 
 port=9091
 iwhd -v -p $port -c iwhd.cfg &
@@ -30,6 +26,8 @@ cleanup_() { kill $mongo_pid $iwhd_pid; }
 # Wait for up to 3 seconds for iwhd to begin listening on $port.
 wait_for .1 30 "curl http://localhost:$port" \
   || { echo iwhd failed to listen; Exit 1; }
+
+cd FS || fail=1
 
 curl -X PUT http://localhost:$port/b1 || fail=1
 test -d b1 || fail=1
