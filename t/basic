@@ -15,10 +15,39 @@ cleanup_() { kill $mongo_pid; }
 wait_for .1 30 'mongo < /dev/null' \
   || framework_failure_ mongod failed to start
 
+port=9091
+cat <<EOF > root.xml || framework_failure_
+<api service="image_warehouse" version="$VERSION">
+	<link rel="bucket_factory" href="http://localhost:$port/_new"/>
+	<link rel="provider_list" href="http://localhost:$port/_providers"/>
+	<link rel="bucket" href="http://localhost:$port/b1"/>
+</api>
+EOF
+
+cat <<EOF > root.json || framework_failure_
+{
+	"service": "image_warehouse",
+	"version": "$VERSION",
+	[
+		{
+			"rel": "bucket_factory",
+			"link": "http://localhost:$port/_new"
+		},
+		{
+			"rel": "provider_list",
+			"link": "http://localhost:$port/_providers"
+		},
+		{
+			"rel": "bucket",
+			"link": "http://localhost:$port/b1"
+		}
+	]
+}
+EOF
+
 printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
   > iwhd.cfg || fail=1
 
-port=9091
 iwhd -v -p $port -c iwhd.cfg &
 iwhd_pid=$!
 cleanup_() { kill $mongo_pid $iwhd_pid; }
@@ -27,15 +56,23 @@ cleanup_() { kill $mongo_pid $iwhd_pid; }
 wait_for .1 30 "curl http://localhost:$port" \
   || { echo iwhd failed to listen; Exit 1; }
 
-cd FS || fail=1
-
 # Create an empty bucket.
 curl -X PUT http://localhost:$port/b1 || fail=1
-test -d b1 || fail=1
+test -d FS/b1 || fail=1
 
 # Create a file in that bucket.
 echo foo | curl -T - http://localhost:$port/b1/f1 || fail=1
-test -f b1/f1 || fail=1
-test "$(cat b1/f1)" = foo || fail=1
+test -f FS/b1/f1 || fail=1
+test "$(cat FS/b1/f1)" = foo || fail=1
+
+# Get root; default, then Accept: XML & JSON:
+curl http://localhost:$port > root || fail=1
+compare root root.xml || fail=1
+
+curl -H 'Accept: */xml' http://localhost:$port > root || fail=1
+compare root root.xml || fail=1
+
+curl -H 'Accept: */json' http://localhost:$port > root || fail=1
+compare root root.json || fail=1
 
 Exit $fail
