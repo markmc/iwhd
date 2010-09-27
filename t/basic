@@ -53,7 +53,7 @@ iwhd_pid=$!
 cleanup_() { kill $mongo_pid $iwhd_pid; }
 
 # Wait for up to 3 seconds for iwhd to begin listening on $port.
-wait_for .1 30 "curl http://localhost:$port" \
+wait_for .1 30 "curl -s http://localhost:$port" \
   || { echo iwhd failed to listen; Exit 1; }
 
 # Create an empty bucket.
