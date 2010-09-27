@@ -1600,11 +1600,10 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 			data,data_size,rctx);
 	}
 
-	ms = malloc(sizeof(my_state));
+	ms = calloc(sizeof(*ms), 1);
 	if (!ms) {
 		return MHD_NO;
 	}
-	memset(ms,0,sizeof(*ms));
 
 	utype = parse_url(url,ms);
 
