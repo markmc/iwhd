@@ -39,13 +39,14 @@
 
 GLOBAL(int,		verbose,	0);
 GLOBAL(char *,		cfg_file,	NULL);
-GLOBAL(const char *,	proxy_host,	NULL);		/* always */
+GLOBAL(const char *,	proxy_host,	NULL);		/* repod/S3 */
 GLOBAL(unsigned short,	proxy_port,	MY_PORT+1);	/* repod/S3 */
 GLOBAL(const char *,	proxy_key,	"foo");		/* S3 only */
 GLOBAL(const char *,	proxy_secret,	"bar");		/* S3 only */
 GLOBAL(const char *,	master_host,	NULL);
 GLOBAL(unsigned short,	master_port,	MY_PORT);
 GLOBAL(unsigned int,	s3mode,		0);		/* repod/S3 */
+GLOBAL(const char *,	local_path,	"/tmp");	/* FS */
 GLOBAL(const char *,	db_host,	"localhost");
 GLOBAL(unsigned short,	db_port,	27017);
 GLOBAL(char *,          me,             "here");

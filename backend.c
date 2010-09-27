@@ -771,6 +771,15 @@ curl_register (my_state *ms, const provider_t *prov, const char *next,
 void
 fs_init (void)
 {
+	DPRINTF("changing directory to %s\n",local_path);
+	if (chroot(local_path) < 0) {
+		error(0,errno,"chroot failed, unsafe to continue\n");
+		exit(!0); /* Value doesn't matter, as long as it's not zero. */
+	}
+	if (chdir(local_path) < 0) {
+		error(0,errno,"chdir failed, unsafe to continue\n");
+		exit(!0); /* Value doesn't matter, as long as it's not zero. */
+	}
 }
 
 /* Start an FS _producer_. */

@@ -1545,6 +1545,12 @@ parse_url (const char *url, my_state *ms)
 	unsigned short	eindex;
 	char *parts[URL_INVAL];
 
+	if (strstr(url,"../")) {
+		/* Naughty, naughty.  Never a good reason to allow this. */
+		DPRINTF("Rejecting ../ in path.\n");
+		return URL_INVAL;
+	}
+
 	eindex = URL_ROOT;
 	parts[URL_BUCKET] = ms->bucket;
 	parts[URL_OBJECT] = ms->key;

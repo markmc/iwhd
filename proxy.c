@@ -63,6 +63,13 @@
 #define SVC_ACC_SIZE	128
 #define HEADER_SIZE	64
 
+/* Bitfield for things to check in validate_server */
+#define NEED_NONE	0
+#define NEED_SERVER	0x00000001
+#define NEED_CREDS	0x00000002
+#define NEED_PATH	0x00000004
+#define NEED_ALL	~0
+
 extern backend_func_tbl	bad_func_tbl;
 extern backend_func_tbl	s3_func_tbl;
 extern backend_func_tbl	curl_func_tbl;
@@ -103,7 +110,7 @@ validate_server (unsigned int i)
 	json_t		*elem;
 	const char	*name;
 	const char	*type;
-	enum { NEED_NONE, NEED_SERVER, NEED_ALL } needs = NEED_ALL;
+	unsigned int	 needs	= NEED_ALL;
 
 	server = json_array_get(config,i);
 	if (!json_is_object(server)) {
@@ -126,20 +133,20 @@ validate_server (unsigned int i)
 	type = json_string_value(elem);
 
 	if (!strcasecmp(type,"s3") || !strcasecmp(type,"cf")) {
-		needs = NEED_ALL;
+		needs = NEED_SERVER | NEED_CREDS;
 	}
 	else if (!strcasecmp(type,"http")) {
 		needs = NEED_SERVER;
 	}
 	else if (!strcasecmp(type,"fs")) {
-		needs = NEED_NONE;
+		needs = NEED_PATH;
 	}
 	else {
 		error(0,0,"config elem %u (%s): bad type\n",i,name);
 		return 0;
 	}
 
-	if (needs != NEED_NONE) {
+	if (needs & NEED_SERVER) {
 		elem = json_object_get(server,"host");
 		if (!json_is_string(elem)) {
 			error(0,0,"config elem %u (%s): missing host\n",
@@ -154,17 +161,26 @@ validate_server (unsigned int i)
 		}
 	}
 
-	if (needs == NEED_ALL) {
+	if (needs & NEED_CREDS) {
 		elem = json_object_get(server,"key");
 		if (!json_is_string(elem)) {
-			error(0,0,"config elem %u (%s): missing S3 key\n",
+			error(0,0,"config elem %u (%s): missing key\n",
 				i, name);
 			return 0;
 		}
 		elem = json_object_get(server,"secret");
 		if (!json_is_string(elem)) {
 			error(0,0,
-				"config elem %u (%s): missing S3 secret\n",
+				"config elem %u (%s): missing secret\n",
+				i, name);
+			return 0;
+		}
+	}
+
+	if (needs & NEED_PATH) {
+		elem = json_object_get(server,"path");
+		if (!json_is_string(elem)) {
+			error(0,0,"config elem %u (%s): missing path\n",
 				i, name);
 			return 0;
 		}
@@ -197,6 +213,10 @@ set_config (void)
 		else {
 			s3mode = 0;
 		}
+	}
+	else {
+		local_path = json_string_value(
+			json_object_get(server,"path"));
 	}
 
 	return (char *)json_string_value(json_object_get(server,"name"));
@@ -947,6 +967,7 @@ get_provider (int i, provider_t *out)
 	/* TBD: change key/secret field names to username/password */
 	out->username = json_string_value(json_object_get(server,"key"));
 	out->password = json_string_value(json_object_get(server,"secret"));
+	out->path = json_string_value(json_object_get(server,"path"));
 
 	/* Use empty strings instead of NULL. */
 	if (!out->username) out->username = "";

@@ -26,6 +26,7 @@ typedef struct _provider {
 	int			 port;
 	const char		*username;
 	const char		*password;
+	const char		*path;
 	backend_func_tbl	*func_tbl;
 } provider_t;
 
