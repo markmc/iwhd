@@ -304,6 +304,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 				MHD_NO,MHD_NO);
 			MHD_queue_response(conn,MHD_HTTP_NOT_FOUND,resp);
 			MHD_destroy_response(resp);
+			free_ms(ms);
 			return MHD_YES;
 		}
 		DPRINTF("  will fetch from %s:%u\n", master_host,master_port);
@@ -904,6 +905,7 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	MHD_destroy_response(resp);
 
 	replicate_delete((char *)url);
+	free_ms(ms);
 	return MHD_YES;
 }
 
