@@ -45,6 +45,41 @@ cat <<EOF > root.json || framework_failure_
 }
 EOF
 
+emit_provider()
+{
+  local xml_or_json=$1
+  case $# in 7);; *) echo "emit_provider: wrong # args" 1>&2; exit 1;; esac
+  case $xml_or_json in xml|json);;
+    *) echo "invalid xml_or_json $xml_or_json" 1>&2; exit 1;; esac
+
+  if test $xml_or_json = xml; then
+    printf \
+'<providers>
+\t<provider name="%s">
+\t\t<type>%s</type>
+\t\t<host>%s</host>
+\t\t<port>%s</port>
+\t\t<username>%s</username>
+\t\t<password>%s</password>
+\t</provider>
+</providers>
+' $2 $3 $4 $5 $6 $7
+  else
+    printf \
+'[
+\t{
+\t\t"name": "%s",
+\t\t"type": "%s",
+\t\t"host": "%s",
+\t\t"port": %s,
+\t\t"username": "%s",
+\t\t"password": "%s"
+\t}
+]
+' $2 $3 $4 $5 $6 $7
+  fi
+}
+
 printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
   > iwhd.cfg || fail=1
 
@@ -74,5 +109,49 @@ compare root root.xml || fail=1
 
 curl -H 'Accept: */json' http://localhost:$port > root || fail=1
 compare root root.json || fail=1
+
+# ################## Providers
+
+p_name=primary
+host='(null)'
+
+# Verify that default providers information is as expected.
+curl http://localhost:$port/_providers > p || fail=1
+emit_provider xml "$p_name" fs "$host" 0 '' '' > p.exp || fail=1
+compare p.exp p || fail=1
+
+for i in xml json; do
+
+  curl_H() { curl -H "Accept: */$i" "$@"; }
+
+  # Change username and password; ensure that is reflected in providers output.
+  curl_H -d provider="$p_name" -d username=u -d password=p \
+    http://localhost:$port/_providers || fail=1
+  curl_H http://localhost:$port/_providers > p || fail=1
+  emit_provider $i "$p_name" fs "$host" 0 u p > p.xml || fail=1
+  compare p.xml p || fail=1
+
+  # Try to change just one of username and password, not specifying the other.
+  # Ensure that the attempt fails.
+  curl_H -d provider="$p_name" -d username=u \
+    http://localhost:$port/_providers || fail=1
+  curl_H http://localhost:$port/_providers > p || fail=1
+  emit_provider $i "$p_name" fs "$host" 0 u p > p.exp || fail=1
+  compare p.exp p || fail=1
+
+  curl_H -d provider="$p_name" -d password=p \
+    http://localhost:$port/_providers || fail=1
+  curl_H http://localhost:$port/_providers > p || fail=1
+  emit_provider $i "$p_name" fs "$host" 0 u p > p.exp || fail=1
+  compare p.exp p || fail=1
+
+  # Try to change both username and password.  Now, it must succeed.
+  curl_H -d provider="$p_name" -d username=v -d password=q \
+    http://localhost:$port/_providers || fail=1
+  curl_H http://localhost:$port/_providers > p || fail=1
+  emit_provider $i "$p_name" fs "$host" 0 v q > p.exp || fail=1
+  compare p.exp p || fail=1
+
+done
 
 Exit $fail
