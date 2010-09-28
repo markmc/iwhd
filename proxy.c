@@ -1039,8 +1039,9 @@ update_provider (const char *provider, const char *username, const char *passwor
 		s_name = json_string_value(json_object_get(server,"name"));
 		DPRINTF("  checking %s\n",s_name);
 		if (s_name && !strcmp(s_name,provider)) {
-			json_object_set(server,"key",json_string(username));
-			json_object_set(server,"secret",json_string(password));
+			json_object_set_new(server,"key",json_string(username));
+			json_object_set_new(server,"secret",
+					    json_string(password));
 			break;
 		}
 	}
