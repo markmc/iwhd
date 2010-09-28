@@ -110,6 +110,13 @@ compare root root.xml || fail=1
 curl -H 'Accept: */json' http://localhost:$port > root || fail=1
 compare root root.json || fail=1
 
+# Delete an object and ensure that it's gone from the file system.
+curl -X DELETE http://localhost:$port/b1/f1
+test -f FS/b1/f1 && fail=1
+
+# Try to delete a nonexistent object.
+curl -X DELETE http://localhost:$port/b1/no-such-obj
+
 # ################## Providers
 
 p_name=primary
