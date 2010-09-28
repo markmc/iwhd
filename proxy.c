@@ -114,20 +114,20 @@ validate_server (unsigned int i)
 
 	server = json_array_get(config,i);
 	if (!json_is_object(server)) {
-		error(0,0,"config elem %u: missing object\n",i);
+		error(0,0,"config elem %u: missing object",i);
 		return 0;
 	}
 
 	elem = json_object_get(server,"name");
 	if (!json_is_string(elem)) {
-		error(0,0,"config elem %u: missing name\n",i);
+		error(0,0,"config elem %u: missing name",i);
 		return 0;
 	}
 	name = json_string_value(elem);
 
 	elem = json_object_get(server,"type");
 	if (!json_is_string(elem)) {
-		error(0,0,"config elem %u (%s): missing type\n",i,name);
+		error(0,0,"config elem %u (%s): missing type",i,name);
 		return 0;
 	}
 	type = json_string_value(elem);
@@ -142,20 +142,20 @@ validate_server (unsigned int i)
 		needs = NEED_PATH;
 	}
 	else {
-		error(0,0,"config elem %u (%s): bad type\n",i,name);
+		error(0,0,"config elem %u (%s): bad type",i,name);
 		return 0;
 	}
 
 	if (needs & NEED_SERVER) {
 		elem = json_object_get(server,"host");
 		if (!json_is_string(elem)) {
-			error(0,0,"config elem %u (%s): missing host\n",
+			error(0,0,"config elem %u (%s): missing host",
 				i,name);
 			return 0;
 		}
 		elem = json_object_get(server,"port");
 		if (!json_is_integer(elem)) {
-			error(0,0,"config elem %u (%s): missing port\n",
+			error(0,0,"config elem %u (%s): missing port",
 				i,name);
 			return 0;
 		}
@@ -164,15 +164,14 @@ validate_server (unsigned int i)
 	if (needs & NEED_CREDS) {
 		elem = json_object_get(server,"key");
 		if (!json_is_string(elem)) {
-			error(0,0,"config elem %u (%s): missing key\n",
-				i, name);
+			error(0,0,"config elem %u (%s): missing key",
+			      i, name);
 			return 0;
 		}
 		elem = json_object_get(server,"secret");
 		if (!json_is_string(elem)) {
-			error(0,0,
-				"config elem %u (%s): missing secret\n",
-				i, name);
+			error(0,0, "config elem %u (%s): missing secret",
+			      i, name);
 			return 0;
 		}
 	}
@@ -180,8 +179,8 @@ validate_server (unsigned int i)
 	if (needs & NEED_PATH) {
 		elem = json_object_get(server,"path");
 		if (!json_is_string(elem)) {
-			error(0,0,"config elem %u (%s): missing path\n",
-				i, name);
+			error(0,0,"config elem %u (%s): missing path",
+			      i, name);
 			return 0;
 		}
 	}
@@ -236,12 +235,12 @@ parse_config (void)
 
 	config = json_load_file(cfg_file,&err);
 	if (!config) {
-		error(0,0,"JSON error on line %d: %s\n",err.line,err.text);
+		error(0,0,"JSON error on line %d: %s",err.line,err.text);
 		return NULL;
 	}
 
 	if (json_typeof(config) != JSON_ARRAY) {
-		error(0,0,"config should be a JSON array\n");
+		error(0,0,"config should be a JSON array");
 		goto err;
 	}
 
@@ -357,7 +356,7 @@ proxy_repl_prod (void *ctx)
 	chars = snprintf(addr,ADDR_SIZE,
 		"http://%s:%u/%s",proxy_host,proxy_port,item->path);
 	if (chars >= ADDR_SIZE) {
-		error(0,0,"path too long in %s\n",__func__);
+		error(0,0,"path too long in %s",__func__);
 		goto done;
 	}
 	DPRINTF("replicating from %s\n",addr);
@@ -366,7 +365,7 @@ proxy_repl_prod (void *ctx)
 		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",
 			proxy_host,proxy_port);
 		if (chars >= SVC_ACC_SIZE) {
-			error(0,0,"svc_acc too long in %s\n",__func__);
+			error(0,0,"svc_acc too long in %s",__func__);
 			goto done;
 		}
 		hstor = hstor_new(svc_acc,proxy_host,
@@ -464,19 +463,19 @@ get_cloudfiles_token (json_t *server, const char *host, unsigned int port,
 
 	chars = snprintf(addr,ADDR_SIZE,"https://%s:%u/v1.0",host,port);
 	if (chars >= ADDR_SIZE) {
-		error(0,0,"API URL too long in %s\n",__func__);
+		error(0,0,"API URL too long in %s",__func__);
 		return NULL;
 	}
 
 	chars = snprintf(auth_user,HEADER_SIZE,"X-Auth-User: %s",user);
 	if (chars >= HEADER_SIZE) {
-		error(0,0,"auth_user too long in %s\n",__func__);
+		error(0,0,"auth_user too long in %s",__func__);
 		return NULL;
 	}
 
 	chars = snprintf(auth_key,HEADER_SIZE,"X-Auth-Key: %s",key);
 	if (chars >= HEADER_SIZE) {
-		error(0,0,"auth_key too long in %s\n",__func__);
+		error(0,0,"auth_key too long in %s",__func__);
 		return NULL;
 	}
 
@@ -543,7 +542,7 @@ proxy_repl_cons (void *ctx)
 			item->path);
 		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",s_host,s_port);
 		if (chars >= SVC_ACC_SIZE) {
-			error(0,0,"svc_acc too long in %s\n",__func__);
+			error(0,0,"svc_acc too long in %s",__func__);
 			return THREAD_FAILED;
 		}
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
@@ -567,7 +566,7 @@ proxy_repl_cons (void *ctx)
 			chars = snprintf(addr,ADDR_SIZE,"%s/%s",
 				s_host,item->path);
 			if (chars >= ADDR_SIZE) {
-				error(0,0,"CF path too long in %s\n",__func__);
+				error(0,0,"CF path too long in %s",__func__);
 				return THREAD_FAILED;
 			}
 			DPRINTF("replicating %zu to %s (CF)\n",item->size,
@@ -577,7 +576,7 @@ proxy_repl_cons (void *ctx)
 			chars = snprintf(addr,ADDR_SIZE,"http://%s:%u/%s",
 				s_host,s_port,item->path);
 			if (chars >= ADDR_SIZE) {
-				error(0,0,"HTTP path too long in %s\n",
+				error(0,0,"HTTP path too long in %s",
 					__func__);
 				return THREAD_FAILED;
 			}
@@ -594,7 +593,7 @@ proxy_repl_cons (void *ctx)
 			chars = snprintf(auth_hdr,HEADER_SIZE,
 				"X-Auth-Token: %s",token_str);
 			if (chars >= HEADER_SIZE) {
-				error(0,0,"auth_token too long in %s\n",
+				error(0,0,"auth_token too long in %s",
 					__func__);
 				return THREAD_FAILED;
 			}
@@ -654,7 +653,7 @@ repl_worker_del (const repl_item *item)
 			item->path, s_host, s_port);
 		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",s_host,s_port);
 		if (chars >= SVC_ACC_SIZE) {
-			error(0,0,"svc_acc too long in %s\n",__func__);
+			error(0,0,"svc_acc too long in %s",__func__);
 			return;
 		}
 		/* TBD: check return */
@@ -671,7 +670,7 @@ repl_worker_del (const repl_item *item)
 		chars = snprintf(addr,ADDR_SIZE,"http://%s:%d%s",
 			s_host,s_port,item->path);
 		if (chars >= ADDR_SIZE) {
-			error(0,0,"path too long in %s\n",__func__);
+			error(0,0,"path too long in %s",__func__);
 			return;
 		}
 		curl = curl_easy_init();
@@ -711,14 +710,14 @@ repl_worker_bcreate (repl_item *item)
 			__func__, item->path, s_host, s_port);
 		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",s_host,s_port);
 		if (chars >= SVC_ACC_SIZE) {
-			error(0,0,"svc_acc too long in %s\n",__func__);
+			error(0,0,"svc_acc too long in %s",__func__);
 			return;
 		}
 		/* TBD: check return */
 		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
 		assert (item->path);
 		if (!hstor_add_bucket(hstor,item->path)) {
-			error(0,0,"bucket create failed for %s\n",
+			error(0,0,"bucket create failed for %s",
 				item->path);
 		}
 		hstor_free(hstor);
@@ -729,7 +728,7 @@ repl_worker_bcreate (repl_item *item)
 		chars = snprintf(addr,ADDR_SIZE,"http://%s:%d/%s",
 			s_host,s_port,item->path);
 		if (chars >= ADDR_SIZE) {
-			error(0,0,"path too long in %s\n",__func__);
+			error(0,0,"path too long in %s",__func__);
 			return;
 		}
 		curl = curl_easy_init();
@@ -785,7 +784,7 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 			repl_worker_bcreate(item);
 			break;
 		default:
-			error(0,0,"bad repl type %d (url=%s) skipped\n",
+			error(0,0,"bad repl type %d (url=%s) skipped",
 				item->type, item->path);
 		}
 		free(item->path);
@@ -838,7 +837,7 @@ replicate (const char *url, size_t size, const char *policy)
 
 	url2 = strdup(url);
 	if (!url2) {
-		error(0,0,"could not parse url %s\n",url);
+		error(0,0,"could not parse url %s",url);
 		return;
 	}
 	qctx.cur_bucket = strtok_r(url2,"/",&stctx);
@@ -877,14 +876,14 @@ replicate (const char *url, size_t size, const char *policy)
 		DPRINTF("REPLICATING %s to %u\n",url,i);
 		item = malloc(sizeof(*item));
 		if (!item) {
-			error(0,errno,"could not create repl_item for %s\n",
+			error(0,errno,"could not create repl_item for %s",
 			      url);
 			break;
 		}
 		item->type = REPL_PUT;
 		item->path = strdup(url);
 		if (!item->path) {
-			error(0,errno,"could not create repl_item for %s\n",
+			error(0,errno,"could not create repl_item for %s",
 			      url);
 			break;
 		}
@@ -920,7 +919,7 @@ replicate_namespace_action (const char *name, repl_t action)
 		DPRINTF("replicating delete(%s) on %u\n",name,i);
 		item = malloc(sizeof(*item));
 		if (!item) {
-			error(0,errno,"could not create repl_item for %s\n",
+			error(0,errno,"could not create repl_item for %s",
 			      name);
 			return;
 		}

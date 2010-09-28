@@ -249,7 +249,7 @@ s3_put_child (void * ctx)
 		llen = strtoll(clen,NULL,10);
 	}
 	else {
-		error (0, 0, "missing Content-Length\n");
+		error (0, 0, "missing Content-Length");
 		llen = (curl_off_t)MHD_SIZE_UNKNOWN;
 	}
 
@@ -320,7 +320,7 @@ s3_init_tmpfile (char *value)
 			}
 			else {
 				error (0, errno,
-				       "invalid write length %zd in %s\n",
+				       "invalid write length %zd in %s",
 				       written, __func__);
 			}
 			unlink(path);
@@ -378,7 +378,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!api_key) {
 		api_key = (char *)prov->username;
 		if (!api_key) {
-			error (0, 0, "missing EC2 API key\n");
+			error (0, 0, "missing EC2 API key");
 			goto cleanup;
 		}
 	}
@@ -387,7 +387,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!api_secret) {
 		api_secret = (char *)prov->password;
 		if (!prov->password) {
-			error (0, 0, "missing EC2 API key\n");
+			error (0, 0, "missing EC2 API key");
 			goto cleanup;
 		}
 	}
@@ -402,7 +402,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	else {
 		ami_cert = get_provider_value(prov->index,"ami-cert");
 		if (!ami_cert) {
-			error (0, 0, "missing EC2 AMI cert\n");
+			error (0, 0, "missing EC2 AMI cert");
 			goto cleanup;
 		}
 	}
@@ -417,7 +417,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	else {
 		ami_key = get_provider_value(prov->index,"ami-key");
 		if (!ami_key) {
-			error (0, 0, "missing EC2 AMI key\n");
+			error (0, 0, "missing EC2 AMI key");
 			goto cleanup;
 		}
 	}
@@ -426,7 +426,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!ami_uid) {
 		ami_uid = get_provider_value(prov->index,"ami-uid");
 		if (!ami_uid) {
-			error (0, 0, "missing EC2 AMI uid\n");
+			error (0, 0, "missing EC2 AMI uid");
 			goto cleanup;
 		}
 	}
@@ -604,7 +604,7 @@ curl_put_child (void * ctx)
 		llen = strtoll(clen,NULL,10);
 	}
 	else {
-		error (0, 0, "missing Content-Length\n");
+		error (0, 0, "missing Content-Length");
 		llen = (curl_off_t)MHD_SIZE_UNKNOWN;
 	}
 
@@ -773,7 +773,7 @@ fs_init (void)
 {
 	DPRINTF("changing directory to %s\n",local_path);
 	if (chdir(local_path) < 0) {
-		error(0,errno,"chdir failed, unsafe to continue\n");
+		error(0,errno,"chdir failed, unsafe to continue");
 		exit(!0); /* Value doesn't matter, as long as it's not zero. */
 	}
 }
