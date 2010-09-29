@@ -80,6 +80,44 @@ emit_provider()
   fi
 }
 
+emit_bucket_list()
+{
+  local xml_or_json=$1
+  case $xml_or_json in xml|json);;
+    *) echo "invalid xml_or_json $xml_or_json" 1>&2; exit 1;; esac
+  shift
+
+  local i b k
+  if test $xml_or_json = xml; then
+    printf '<objects>\n'
+    for i in "$@"; do
+      b=$(echo "$i"|sed 's/:.*//')
+      k=$(echo "$i"|sed 's/.*://')
+      printf \
+'\t<object>
+\t\t<bucket>%s</bucket>
+\t\t<key>%s</key>
+\t</object>
+' $b $k
+    done
+    printf '</objects>\n'
+  else
+    printf '[\n'
+    for i in "$@"; do
+      b=$(echo "$i"|sed 's/:.*//')
+      k=$(echo "$i"|sed 's/.*://')
+      printf \
+'\t{
+\t\t"bucket": "%s",
+\t\t"key": "%s"
+\t}
+' $b $k
+    done
+    printf ']\n'
+  fi
+
+}
+
 printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
   > iwhd.cfg || fail=1
 
@@ -94,6 +132,9 @@ wait_for .1 30 "curl -s http://localhost:$port" \
 # Create an empty bucket.
 curl -X PUT http://localhost:$port/b1 || fail=1
 test -d FS/b1 || fail=1
+
+# Post to root; should fail (but FIXME: how to detect failure?)
+curl -X PUT http://localhost:$port || fail=1
 
 # Create a file in that bucket.
 echo foo | curl -T - http://localhost:$port/b1/f1 || fail=1
@@ -111,11 +152,11 @@ curl -H 'Accept: */json' http://localhost:$port > root || fail=1
 compare root root.json || fail=1
 
 # Delete an object and ensure that it's gone from the file system.
-curl -X DELETE http://localhost:$port/b1/f1
+curl -X DELETE http://localhost:$port/b1/f1 || fail=1
 test -f FS/b1/f1 && fail=1
 
 # Try to delete a nonexistent object.
-curl -X DELETE http://localhost:$port/b1/no-such-obj
+curl -X DELETE http://localhost:$port/b1/no-such-obj || fail=1
 
 # ################## Providers
 
@@ -138,6 +179,14 @@ for i in xml json; do
   emit_provider $i "$p_name" fs "$host" 0 u p > p.xml || fail=1
   compare p.xml p || fail=1
 
+  # Attempt to modify some other attribute; should fail (but curl won't)
+  curl_H -d provider="$p_name" -d other_attr=foo \
+    http://localhost:$port/_providers || fail=1
+
+  # Attempt to modify nonexistent provider; should fail
+  curl_H -d provider=no_such -d username=v -d password=q \
+    http://localhost:$port/_providers || fail=1
+
   # Try to change just one of username and password, not specifying the other.
   # Ensure that the attempt fails.
   curl_H -d provider="$p_name" -d username=u \
@@ -158,6 +207,22 @@ for i in xml json; do
   curl_H http://localhost:$port/_providers > p || fail=1
   emit_provider $i "$p_name" fs "$host" 0 v q > p.exp || fail=1
   compare p.exp p || fail=1
+
+  # List an empty bucket.
+  curl_H http://localhost:$port/b1 > b || fail=1
+  emit_bucket_list $i > b.exp || fail=1
+  compare b.exp b || fail=1
+
+  # Add an object, list non-empty bucket.
+  echo bar | curl -T - http://localhost:$port/b1/f2 || fail=1
+
+  # Ensure that new name appears in the listing.
+  curl_H http://localhost:$port/b1 > b || fail=1
+  emit_bucket_list $i b1:f2 > b.exp || fail=1
+  compare b.exp b || fail=1
+
+  # Remove b1/f2, to restore state for next iteration of this loop.
+  curl -X DELETE http://localhost:$port/b1/f2 || fail=1
 
 done
 
