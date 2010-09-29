@@ -883,7 +883,7 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	DPRINTF("PROXY DELETE %s\n",url);
 
-	rc = main_func_tbl->delete_func(ms->bucket,ms->key,(char *)url);
+	rc = main_func_tbl->delete_func(ms->bucket,ms->key,url);
 	if (rc == MHD_HTTP_OK) {
 		copied_url = strdup(url);
 		assert (copied_url);
@@ -891,7 +891,7 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 		key = strtok_r(NULL,"/",&stctx);
 		meta_delete(bucket,key);
 		free(copied_url);
-		replicate_delete((char *)url);
+		replicate_delete(url);
 	}
 
 	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
