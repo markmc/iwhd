@@ -823,7 +823,6 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 			simple_closer(ms);
 			return MHD_NO;
 		}
-		MHD_add_response_header(resp,"Content-Type","text/xml");
 		MHD_queue_response(conn,MHD_HTTP_OK,resp);
 		MHD_destroy_response(resp);
 		free_ms(ms);
@@ -885,26 +884,23 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	DPRINTF("PROXY DELETE %s\n",url);
 
 	rc = main_func_tbl->delete_func(ms->bucket,ms->key,(char *)url);
-	if (rc != MHD_YES) {
-		return rc;
+	if (rc == MHD_HTTP_OK) {
+		copied_url = strdup(url);
+		assert (copied_url);
+		bucket = strtok_r(copied_url,"/",&stctx);
+		key = strtok_r(NULL,"/",&stctx);
+		meta_delete(bucket,key);
+		free(copied_url);
+		replicate_delete((char *)url);
 	}
-
-	copied_url = strdup(url);
-	assert (copied_url);
-	bucket = strtok_r(copied_url,"/",&stctx);
-	key = strtok_r(NULL,"/",&stctx);
-	meta_delete(bucket,key);
-	free(copied_url);
 
 	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 	if (!resp) {
 		return MHD_NO;
 	}
-	MHD_add_response_header(resp,"Content-Type","text/xml");
-	MHD_queue_response(conn,MHD_HTTP_OK,resp);
+	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
 
-	replicate_delete((char *)url);
 	free_ms(ms);
 	return MHD_YES;
 }
@@ -1026,7 +1022,6 @@ proxy_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (!resp) {
 		return MHD_NO;
 	}
-	MHD_add_response_header(resp,"Content-Type","text/xml");
 	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
 

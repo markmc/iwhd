@@ -121,7 +121,7 @@ bad_delete (const char *bucket, const char *key, const char *url)
 	(void)url;
 
 	DPRINTF("*** bad call to %s\n",__func__);
-	return MHD_NO;
+	return MHD_HTTP_BAD_REQUEST;
 }
 
 int
@@ -274,7 +274,7 @@ s3_delete (const char *bucket, const char *key, const char *url)
 	hstor_del(hstor,bucket,key);
 	/* TBD: check return value */
 
-	return MHD_YES;
+	return MHD_HTTP_OK;
 }
 
 int
@@ -682,7 +682,7 @@ curl_delete (const char *bucket, const char *key, const char *url)
 
 	curl = curl_easy_init();
 	if (!curl) {
-		return MHD_NO;
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 
 	sprintf(fixed,"http://%s:%u%s",proxy_host,proxy_port,url);
@@ -691,7 +691,7 @@ curl_delete (const char *bucket, const char *key, const char *url)
 	curl_easy_perform(curl);
 	curl_easy_cleanup(curl);
 
-	return MHD_YES;
+	return MHD_HTTP_OK;
 }
 
 int
@@ -866,10 +866,10 @@ fs_delete (const char *bucket, const char *key, const char *url)
 
 	if (unlink(url+1) < 0) {
 		error (0, errno, "%s: failed to unlink", url+1);
-		return MHD_NO;
+		return MHD_HTTP_NOT_FOUND;
 	}
 
-	return MHD_YES;
+	return MHD_HTTP_OK;
 }
 
 int
