@@ -25,3 +25,5 @@ ChangeLog
 Makefile
 Makefile.in
 \#*\#
+/GNUmakefile
+/gnulib-tests

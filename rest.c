@@ -975,7 +975,7 @@ root_blob_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		}
 		ms->cleanup |= CLEANUP_TMPL;
 		ms->gen_ctx->base = host;
-		len = tmpl_root_header(ms->gen_ctx,"image_warehouse","1.0");
+		len = tmpl_root_header(ms->gen_ctx,"image_warehouse",VERSION);
 		if (!len) {
 			return -1;
 		}

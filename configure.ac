@@ -17,7 +17,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 AC_PREREQ([2.65])
-AC_INIT([iwhd], [1.0], [iwhd-devel@fedorahosted.org])
+AC_INIT([iwhd],
+        m4_esyscmd([build-aux/git-version-gen .tarball-version]),
+        [iwhd-devel@fedorahosted.org])
 AC_CONFIG_AUX_DIR([build-aux])
 
 AC_CONFIG_HEADERS([config.h:config.hin])
@@ -28,6 +30,12 @@ AM_SILENT_RULES([yes]) # make --enable-silent-rules the default.
 AC_PROG_CXX
 AC_PROG_CC
 AM_PROG_CC_C_O
+gl_EARLY
+AC_PROG_RANLIB
+AC_TYPE_UINT64_T
+
+gl_INIT
+
 AC_PROG_YACC
 AC_PROG_LEX
 AM_MISSING_PROG([HELP2MAN], [help2man])
@@ -71,22 +79,11 @@ AX_BOOST_BASE
 AX_BOOST_SYSTEM
 AX_BOOST_THREAD
 
-# Checks for header files.
-AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h strings.h sys/time.h unistd.h])
-
-# Checks for typedefs, structures, and compiler characteristics.
-AC_HEADER_STDBOOL
-AC_TYPE_SIZE_T
-AC_TYPE_UINT64_T
-
-# Checks for library functions.
-AC_FUNC_MALLOC
-AC_FUNC_REALLOC
-AC_CHECK_FUNCS([gettimeofday memmove memset strcasecmp strdup strndup strtoul])
-
 AC_CONFIG_FILES([
 Makefile
-t/Makefile
+gnulib-tests/Makefile
+lib/Makefile
 man/Makefile
+t/Makefile
 ])
 AC_OUTPUT
