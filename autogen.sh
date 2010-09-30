@@ -1,3 +1,4 @@
 #!/bin/bash
 
-autoreconf -i
+test -f ChangeLog || touch ChangeLog
+autoreconf -iv
