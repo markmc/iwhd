@@ -20,25 +20,25 @@
 #include <string.h>
 #include "template.h"
 
-char xml_root_header[] = "\
+static const char xml_root_header[] = "\
 <api service=\"%s\" version=\"%s\">\
 ";
 
-char xml_root_entry[] = "\
+static const char xml_root_entry[] = "\
 \n\
 	<link rel=\"%s\" href=\"http://%s/\%s\"/>\
 ";
 
-char xml_root_footer[] = "\
+static const char xml_root_footer[] = "\
 \n\
 </api>\n\
 ";
 
-char xml_prov_header[] = "\
+static const char xml_prov_header[] = "\
 <providers>\
 ";
 
-char xml_prov_entry[] = "\
+static const char xml_prov_entry[] = "\
 \n\
 	<provider name=\"%s\">\n\
 		<type>%s</type>\n\
@@ -49,16 +49,16 @@ char xml_prov_entry[] = "\
 	</provider>\
 ";
 
-char xml_prov_footer[] = "\
+static const char xml_prov_footer[] = "\
 \n\
 </providers>\n\
 ";
 
-char xml_obj_header[] = "\
+static const char xml_obj_header[] = "\
 <objects>\
 ";
 
-char xml_obj_entry[] = "\
+static const char xml_obj_entry[] = "\
 \n\
 	<object>\n\
 		<bucket>%s</bucket>\n\
@@ -66,7 +66,7 @@ char xml_obj_entry[] = "\
 	</object>\
 ";
 
-char xml_obj_footer[] = "\
+static const char xml_obj_footer[] = "\
 \n\
 </objects>\n\
 ";
@@ -85,14 +85,14 @@ tmpl_format_t xml_format = {
 	.z_offset	= 0
 };
 
-char json_root_header[] = "\
+static const char json_root_header[] = "\
 {\n\
 	\"service\": \"%s\",\n\
 	\"version\": \"%s\",\n\
 	[\
 ";
 
-char json_root_entry[] = "\
+static const char json_root_entry[] = "\
 ,\n\
 		{\n\
 			\"rel\": \"%s\",\n\
@@ -100,17 +100,17 @@ char json_root_entry[] = "\
 		}\
 ";
 
-char json_root_footer[] = "\
+static const char json_root_footer[] = "\
 \n\
 	]\n\
 }\n\
 ";
 
-char json_prov_header[] = "\
+static const char json_prov_header[] = "\
 [\
 ";
 
-char json_prov_entry[] = "\
+static const char json_prov_entry[] = "\
 ,\n\
 	{\n\
 		\"name\": \"%s\",\n\
@@ -122,16 +122,16 @@ char json_prov_entry[] = "\
 	}\
 ";
 
-char json_prov_footer[] = "\
+static const char json_prov_footer[] = "\
 \n\
 ]\n\
 ";
 
-char json_obj_header[] = "\
+static const char json_obj_header[] = "\
 [\
 ";
 
-char json_obj_entry[] = "\
+static const char json_obj_entry[] = "\
 ,\n\
 	{\n\
 		\"bucket\": \"%s\",\n\
@@ -139,7 +139,7 @@ char json_obj_entry[] = "\
 	}\
 ";
 
-char json_obj_footer[] = "\
+static const char json_obj_footer[] = "\
 \n\
 ]\n\
 ";

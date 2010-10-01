@@ -69,16 +69,16 @@ typedef struct {
 	MHD_AccessHandlerCallback	 handler;
 } rule;
 
-int			 fs_mode	= 0;
-unsigned short		 my_port	= MY_PORT;
+static int			 fs_mode	= 0;
+static unsigned short		 my_port	= MY_PORT;
 const char *program_name;
 
-char *(reserved_name[]) = { "_default", "_query", "_new", NULL };
-char *(reserved_attr[]) = { "bucket", "key", "date", "etag", "loc", NULL };
+static char *(reserved_name[]) = { "_default", "_query", "_new", NULL };
+static char *(reserved_attr[]) = { "bucket", "key", "date", "etag", "loc", NULL };
 
-backend_func_tbl *main_func_tbl = &bad_func_tbl;
+static backend_func_tbl *main_func_tbl = &bad_func_tbl;
 
-void
+static void
 free_ms (my_state *ms)
 {
 	if (ms->cleanup & CLEANUP_CURL) {
@@ -112,7 +112,7 @@ free_ms (my_state *ms)
 	free(ms);
 }
 
-int
+static int
 validate_put (struct MHD_Connection *conn)
 {
 	const char	*mhdr;
@@ -127,7 +127,7 @@ validate_put (struct MHD_Connection *conn)
 	return (mhdr && !strcmp(mhdr,"master"));
 }
 
-int
+static int
 is_reserved (char *cand, char **resv_list)
 {
 	int	i;
@@ -141,7 +141,7 @@ is_reserved (char *cand, char **resv_list)
 	return FALSE;
 }
 
-int
+static int
 validate_url (const char *url)
 {
 	char	*slash	= rindex(url,'/');
@@ -185,7 +185,7 @@ validate_url (const char *url)
  * introduces some of its own complexity so see below for that.
  **********/
 
-void
+static void
 simple_closer (void *ctx)
 {
 	my_state	*ms	= ctx;
@@ -194,7 +194,7 @@ simple_closer (void *ctx)
 	free_ms(ms);
 }
 
-void
+static void
 child_closer (void * ctx)
 {
 	pipe_private	*pp	= ctx;
@@ -205,7 +205,7 @@ child_closer (void * ctx)
 }
 
 /* Invoked from MHD. */
-int
+static int
 proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
 {
 	pipe_private	*pp	= ctx;
@@ -254,7 +254,7 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
 	return done;
 }
 
-int
+static int
 proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		const char *method, const char *version, const char *data,
 		size_t *data_size, void **rctx)
@@ -357,7 +357,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
-void
+static void
 recheck_replication (my_state * ms, char *policy)
 {
 	int	rc;
@@ -404,7 +404,7 @@ recheck_replication (my_state * ms, char *policy)
 	}
 }
 
-int
+static int
 proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		const char *method, const char *version, const char *data,
 		size_t *data_size, void **rctx)
@@ -536,7 +536,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
-int
+static int
 proxy_get_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 		const char *method, const char *version, const char *data,
 		size_t *data_size, void **rctx)
@@ -572,7 +572,7 @@ proxy_get_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
-int
+static int
 proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 		const char *method, const char *version, const char *data,
 		size_t *data_size, void **rctx)
@@ -680,7 +680,7 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
  * module to fetch one object name at a time.
  **********/
 
-int
+static int
 query_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 		const char *filename, const char *content_type,
 		const char *transfer_encoding, const char *data,
@@ -701,7 +701,7 @@ query_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 }
 
 /* MHD reader function during queries.  Return -1 for EOF. */
-int
+static int
 proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
 {
 	my_state	*ms	= ctx;
@@ -768,7 +768,7 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
 	return len;
 }
 
-int
+static int
 proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 	     const char *method, const char *version, const char *data,
 	     size_t *data_size, void **rctx)
@@ -832,7 +832,7 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
-int
+static int
 proxy_list_objs (void *cctx, struct MHD_Connection *conn, const char *url,
 		 const char *method, const char *version, const char *data,
 		 size_t *data_size, void **rctx)
@@ -863,7 +863,7 @@ proxy_list_objs (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
-int
+static int
 proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	      const char *method, const char *version, const char *data,
 	      size_t *data_size, void **rctx)
@@ -912,16 +912,16 @@ typedef struct {
 	char *link;
 } fake_bucket_t;
 
-fake_bucket_t fake_bucket_list[] = {
+static const fake_bucket_t fake_bucket_list[] = {
 	{ "bucket_factory",	"_new" },
 	{ "provider_list",	"_providers" },
 };
 
-int
+static int
 root_blob_generator (void *ctx, uint64_t pos, char *buf, int max)
 {
 	my_state	*ms	= ctx;
-	fake_bucket_t *	 fb;
+	const fake_bucket_t *fb;
 	int		 len;
 	const char	*accept_hdr;
 	const char	*host;
@@ -995,7 +995,7 @@ root_blob_generator (void *ctx, uint64_t pos, char *buf, int max)
 	return len;
 }
 
-int
+static int
 proxy_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 		const char *method, const char *version, const char *data,
 		size_t *data_size, void **rctx)
@@ -1030,7 +1030,7 @@ proxy_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 
 }
 
-int
+static int
 post_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 	       const char *filename, const char *content_type,
 	       const char *transfer_encoding, const char *data,
@@ -1075,7 +1075,7 @@ post_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 }
 
 /* Returns TRUE if we found an *invalid* key. */
-gboolean
+static gboolean
 post_find (gpointer key, gpointer value, gpointer ctx)
 {
 	(void)value;
@@ -1089,7 +1089,7 @@ post_find (gpointer key, gpointer value, gpointer ctx)
 	return TRUE;
 }
 
-void
+static void
 post_foreach (gpointer key, gpointer value, gpointer ctx)
 {
 	my_state	*ms	= ctx;
@@ -1099,7 +1099,7 @@ post_foreach (gpointer key, gpointer value, gpointer ctx)
 	meta_set_value(ms->bucket,ms->key,key,value);
 }
 
-int
+static int
 create_bucket (char *name)
 {
 	int	rc;
@@ -1131,7 +1131,7 @@ create_bucket (char *name)
 	return rc;
 }
 
-int
+static int
 proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		   const char *method, const char *version, const char *data,
 		   size_t *data_size, void **rctx)
@@ -1196,7 +1196,7 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
-int
+static int
 check_location (my_state *ms)
 {
 	char	*loc	= g_hash_table_lookup(ms->dict,"depot");
@@ -1216,7 +1216,7 @@ check_location (my_state *ms)
 	return MHD_HTTP_OK;
 }
 
-int
+static int
 register_image (my_state *ms)
 {
 	char		*site;
@@ -1246,7 +1246,7 @@ register_image (my_state *ms)
 	return MHD_HTTP_BAD_REQUEST;
 }
 
-int
+static int
 proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		   const char *method, const char *version, const char *data,
 		   size_t *data_size, void **rctx)
@@ -1316,7 +1316,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 }
 
 
-int
+static int
 prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
 {
 	my_state	*ms	= ctx;
@@ -1377,7 +1377,7 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
 	return len;
 }
 
-int
+static int
 proxy_list_provs (void *cctx, struct MHD_Connection *conn, const char *url,
 		  const char *method, const char *version, const char *data,
 		  size_t *data_size, void **rctx)
@@ -1405,7 +1405,7 @@ proxy_list_provs (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
-int
+static int
 prov_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 	       const char *filename, const char *content_type,
 	       const char *transfer_encoding, const char *data,
@@ -1423,7 +1423,7 @@ prov_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 }
 
 
-int
+static int
 proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		   const char *method, const char *version, const char *data,
 		   size_t *data_size, void **rctx)
@@ -1478,7 +1478,7 @@ proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
-int
+static int
 proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 		     const char *method, const char *version, const char *data,
 		     size_t *data_size, void **rctx)
@@ -1509,7 +1509,7 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
-rule my_rules[] = {
+static const rule my_rules[] = {
 	{ /* get bucket list */
 	  "GET",	URL_ROOT,	proxy_api_root  	},
 	{ /* get object list */
@@ -1541,7 +1541,7 @@ rule my_rules[] = {
 	{ NULL, 0, NULL }
 };
 
-url_type
+static url_type
 parse_url (const char *url, my_state *ms)
 {
 	unsigned short	esize;
@@ -1594,7 +1594,7 @@ parse_url (const char *url, my_state *ms)
 	return eindex;
 }
 
-int
+static int
 access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 		const char *method, const char *version, const char *data,
 		size_t *data_size, void **rctx)
@@ -1663,7 +1663,7 @@ enum
   GETOPT_VERSION_CHAR = (CHAR_MIN - 3)
 };
 
-struct option my_options[] = {
+static const struct option my_options[] = {
 	{ "config",  required_argument, NULL, 'c' },
 	{ "db",      required_argument, NULL, 'd' },
 	{ "master",  required_argument, NULL, 'm' },
@@ -1674,7 +1674,7 @@ struct option my_options[] = {
 	{ NULL, 0, NULL, '\0' }
 };
 
-void
+static void
 usage (int status)
 {
   if (status != EXIT_SUCCESS)

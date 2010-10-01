@@ -67,7 +67,4 @@ typedef struct {
 #define CLEANUP_TMPL	0x20
 #define CLEANUP_URL	0x40
 
-
-void free_ms (my_state *ms);
-
 #endif

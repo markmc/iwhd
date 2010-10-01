@@ -19,16 +19,16 @@
 #define TMPL_BUF_SIZE	1024
 
 typedef struct {
-	char	*root_header;
-	char	*root_entry;
-	char	*root_footer;
-	char	*prov_header;
-	char	*prov_entry;
-	char	*prov_footer;
-	char	*obj_header;
-	char	*obj_entry;
-	char	*obj_footer;
-	int	 z_offset;	/* offset to use when index is zero */
+	const char	*root_header;
+	const char	*root_entry;
+	const char	*root_footer;
+	const char	*prov_header;
+	const char	*prov_entry;
+	const char	*prov_footer;
+	const char	*obj_header;
+	const char	*obj_entry;
+	const char	*obj_footer;
+	int		 z_offset;	/* offset to use when index is zero */
 } tmpl_format_t;
 
 typedef struct {
@@ -36,7 +36,7 @@ typedef struct {
 	const char	*base;
 	unsigned int	 index;
 	char		 raw_buf[TMPL_BUF_SIZE];
-	char		*buf;
+	const char		*buf;
 } tmpl_ctx_t;
 
 #define TMPL_CTX_DONE	((tmpl_ctx_t *)(-1))
