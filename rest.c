@@ -1793,7 +1793,8 @@ args_done:
 		printf("db is at %s:%u\n",db_host,db_port);
 		printf("will listen on port %u\n",my_port);
 		printf("my location is \"%s\"\n",me);
-		fflush(stdout);
+		if (fflush(stdout) || ferror(stdout))
+			error(EXIT_FAILURE, 0, "write failed");
 	}
 
 	backend_init();

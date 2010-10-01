@@ -271,7 +271,10 @@ junk_writer (void *ptr, size_t size, size_t nmemb, void *stream)
 	size_t	n;
 
 	n = fwrite(ptr,size,nmemb,stream);
-	fflush(stream);
+	if (n != nmemb)
+		error(0, 0, "warning: write failed");
+	if (fflush(stream))
+		error(0, 0, "warning: write failed");
 	DPRINTF("in %s(%zu,%zu) => %zu\n",__func__,size,nmemb,n);
 
 	return n;
