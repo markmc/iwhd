@@ -471,12 +471,12 @@ BoolExpr = l:CompExpr (
 )* -
 
 CompExpr = l:Unary
-         ( ( LESS - r:Unary { $$ = make_comp(C_LESSTHAN,l,r); } )
-         | ( LESS EQUAL - r:Unary { $$ = make_comp(C_LESSOREQ,l,r); } )
-         | ( EQUAL EQUAL - r:Unary { $$ = make_comp(C_EQUAL,l,r); } )
-         | ( NOT EQUAL - r:Unary { $$ = make_comp(C_DIFFERENT,l,r); } )
-         | ( GREATER EQUAL - r:Unary { $$ = make_comp(C_GREATEROREQ,l,r); } )
-         | ( GREATER - r:Unary { $$ = make_comp(C_GREATERTHAN,l,r); } ) )? -
+         ( ( - LESS - r:Unary { $$ = make_comp(C_LESSTHAN,l,r); } )
+         | ( - LESS EQUAL - r:Unary { $$ = make_comp(C_LESSOREQ,l,r); } )
+         | ( - EQUAL EQUAL - r:Unary { $$ = make_comp(C_EQUAL,l,r); } )
+         | ( - NOT EQUAL - r:Unary { $$ = make_comp(C_DIFFERENT,l,r); } )
+         | ( - GREATER EQUAL - r:Unary { $$ = make_comp(C_GREATEROREQ,l,r); } )
+         | ( - GREATER - r:Unary { $$ = make_comp(C_GREATERTHAN,l,r); } ) )? -
 
 Unary = Atom -
       | NOT - e:Unary - { $$ = make_tree(T_NOT,e,NULL); }
@@ -490,7 +490,7 @@ LinkField = f:Field ( DOT i:ID { $$ = f = make_link(f,i); } )* -
 Field = DOLLAR i:ID - { $$ = make_string((char *)i,T_OFIELD); }
       | WAFFLE i:ID - { $$ = make_string((char *)i,T_SFIELD); }
 
-ParenExpr = OPEN v:BoolExpr CLOSE - { $$ = v; }
+ParenExpr = OPEN - v:BoolExpr - CLOSE - { $$ = v; }
 
 NUMBER	= < [0-9]+ >		{ $$ = make_number(yytext); }
 STRING	= '"' < [^"]* > '"'	{ $$ = make_string(yytext,T_STRING); }

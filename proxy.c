@@ -806,7 +806,7 @@ char *
 repl_oget (void *ctx, const char *id)
 {
 	query_ctx_t	*qctx = ctx;
-	char		*cur_value;
+	char		*cur_value = NULL;
 
 	(void)meta_get_value(qctx->cur_bucket,qctx->cur_key,id,&cur_value);
 
