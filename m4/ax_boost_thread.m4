@@ -14,7 +14,7 @@
 #
 #   This macro calls:
 #
-#     AC_SUBST(BOOST_THREAD_LIB)
+#     AC_SUBST([BOOST_THREAD_LIB])
 #
 #   And sets:
 #
@@ -91,9 +91,9 @@ AC_DEFUN([AX_BOOST_THREAD],
 			  BOOST_CPPFLAGS="-pthread $BOOST_CPPFLAGS"
 		   fi
 
-			AC_SUBST(BOOST_CPPFLAGS)
+			AC_SUBST([BOOST_CPPFLAGS])
 
-			AC_DEFINE(HAVE_BOOST_THREAD,,[define if the Boost::Thread library is available])
+			AC_DEFINE([HAVE_BOOST_THREAD],,[define if the Boost::Thread library is available])
             BOOSTLIBDIR=`echo $BOOST_LDFLAGS | sed -e 's/@<:@^\/@:>@*//'`
 
 			LDFLAGS_SAVE=$LDFLAGS
@@ -107,14 +107,14 @@ AC_DEFUN([AX_BOOST_THREAD],
                 for libextension in `ls $BOOSTLIBDIR/libboost_thread*.so* 2>/dev/null | sed 's,.*/,,' | sed -e 's;^lib\(boost_thread.*\)\.so.*$;\1;'` `ls $BOOSTLIBDIR/libboost_thread*.a* 2>/dev/null | sed 's,.*/,,' | sed -e 's;^lib\(boost_thread.*\)\.a*$;\1;'`; do
                      ax_lib=${libextension}
 				    AC_CHECK_LIB($ax_lib, exit,
-                                 [BOOST_THREAD_LIB="-l$ax_lib"; AC_SUBST(BOOST_THREAD_LIB) link_thread="yes"; break],
+                                 [BOOST_THREAD_LIB="-l$ax_lib"; AC_SUBST([BOOST_THREAD_LIB]) link_thread="yes"; break],
                                  [link_thread="no"])
 				done
                 if test "x$link_thread" != "xyes"; then
                 for libextension in `ls $BOOSTLIBDIR/boost_thread*.dll* 2>/dev/null | sed 's,.*/,,' | sed -e 's;^\(boost_thread.*\)\.dll.*$;\1;'` `ls $BOOSTLIBDIR/boost_thread*.a* 2>/dev/null | sed 's,.*/,,' | sed -e 's;^\(boost_thread.*\)\.a*$;\1;'` ; do
                      ax_lib=${libextension}
 				    AC_CHECK_LIB($ax_lib, exit,
-                                 [BOOST_THREAD_LIB="-l$ax_lib"; AC_SUBST(BOOST_THREAD_LIB) link_thread="yes"; break],
+                                 [BOOST_THREAD_LIB="-l$ax_lib"; AC_SUBST([BOOST_THREAD_LIB]) link_thread="yes"; break],
                                  [link_thread="no"])
 				done
                 fi
@@ -122,7 +122,7 @@ AC_DEFUN([AX_BOOST_THREAD],
             else
                for ax_lib in $ax_boost_user_thread_lib boost_thread-$ax_boost_user_thread_lib; do
 				      AC_CHECK_LIB($ax_lib, exit,
-                                   [BOOST_THREAD_LIB="-l$ax_lib"; AC_SUBST(BOOST_THREAD_LIB) link_thread="yes"; break],
+                                   [BOOST_THREAD_LIB="-l$ax_lib"; AC_SUBST([BOOST_THREAD_LIB]) link_thread="yes"; break],
                                    [link_thread="no"])
                   done
 

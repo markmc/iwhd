@@ -17,7 +17,7 @@
 #
 #   This macro calls:
 #
-#     AC_SUBST(BOOST_CPPFLAGS) / AC_SUBST(BOOST_LDFLAGS)
+#     AC_SUBST([BOOST_CPPFLAGS]) / AC_SUBST([BOOST_LDFLAGS])
 #
 #   And sets:
 #
@@ -238,9 +238,9 @@ if test "x$want_boost" = "xyes"; then
         # execute ACTION-IF-NOT-FOUND (if present):
         ifelse([$3], , :, [$3])
     else
-        AC_SUBST(BOOST_CPPFLAGS)
-        AC_SUBST(BOOST_LDFLAGS)
-        AC_DEFINE(HAVE_BOOST,,[define if the Boost library is available])
+        AC_SUBST([BOOST_CPPFLAGS])
+        AC_SUBST([BOOST_LDFLAGS])
+        AC_DEFINE([HAVE_BOOST],,[define if the Boost library is available])
         # execute ACTION-IF-FOUND (if present):
         ifelse([$2], , :, [$2])
     fi

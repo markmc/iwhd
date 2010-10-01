@@ -30,7 +30,6 @@ skip_low_priority =			\
 
 # Tests not to run as part of "make distcheck".
 local-checks-to-skip =			\
-  sc_m4_quote_check			\
   sc_program_name			\
   sc_prohibit_echo_minus_en		\
   sc_prohibit_empty_lines_at_EOF	\

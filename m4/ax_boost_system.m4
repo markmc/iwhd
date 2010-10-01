@@ -14,7 +14,7 @@
 #
 #   This macro calls:
 #
-#     AC_SUBST(BOOST_SYSTEM_LIB)
+#     AC_SUBST([BOOST_SYSTEM_LIB])
 #
 #   And sets:
 #
@@ -76,9 +76,9 @@ AC_DEFUN([AX_BOOST_SYSTEM],
              AC_LANG_POP([C++])
 		])
 		if test "x$ax_cv_boost_system" = "xyes"; then
-			AC_SUBST(BOOST_CPPFLAGS)
+			AC_SUBST([BOOST_CPPFLAGS])
 
-			AC_DEFINE(HAVE_BOOST_SYSTEM,,[define if the Boost::System library is available])
+			AC_DEFINE([HAVE_BOOST_SYSTEM],,[define if the Boost::System library is available])
             BOOSTLIBDIR=`echo $BOOST_LDFLAGS | sed -e 's/@<:@^\/@:>@*//'`
 
 			LDFLAGS_SAVE=$LDFLAGS
@@ -86,14 +86,14 @@ AC_DEFUN([AX_BOOST_SYSTEM],
                 for libextension in `ls $BOOSTLIBDIR/libboost_system*.so* $BOOSTLIBDIR/libboost_system*.a* 2>/dev/null | sed 's,.*/,,' | sed -e 's;^lib\(boost_system.*\)\.so.*$;\1;' -e 's;^lib\(boost_system.*\)\.a*$;\1;'` ; do
                      ax_lib=${libextension}
 				    AC_CHECK_LIB($ax_lib, exit,
-                                 [BOOST_SYSTEM_LIB="-l$ax_lib"; AC_SUBST(BOOST_SYSTEM_LIB) link_system="yes"; break],
+                                 [BOOST_SYSTEM_LIB="-l$ax_lib"; AC_SUBST([BOOST_SYSTEM_LIB]) link_system="yes"; break],
                                  [link_system="no"])
 				done
                 if test "x$link_system" != "xyes"; then
                 for libextension in `ls $BOOSTLIBDIR/boost_system*.{dll,a}* 2>/dev/null | sed 's,.*/,,' | sed -e 's;^\(boost_system.*\)\.dll.*$;\1;' -e 's;^\(boost_system.*\)\.a*$;\1;'` ; do
                      ax_lib=${libextension}
 				    AC_CHECK_LIB($ax_lib, exit,
-                                 [BOOST_SYSTEM_LIB="-l$ax_lib"; AC_SUBST(BOOST_SYSTEM_LIB) link_system="yes"; break],
+                                 [BOOST_SYSTEM_LIB="-l$ax_lib"; AC_SUBST([BOOST_SYSTEM_LIB]) link_system="yes"; break],
                                  [link_system="no"])
 				done
                 fi
@@ -101,7 +101,7 @@ AC_DEFUN([AX_BOOST_SYSTEM],
             else
                for ax_lib in $ax_boost_user_system_lib boost_system-$ax_boost_user_system_lib; do
 				      AC_CHECK_LIB($ax_lib, exit,
-                                   [BOOST_SYSTEM_LIB="-l$ax_lib"; AC_SUBST(BOOST_SYSTEM_LIB) link_system="yes"; break],
+                                   [BOOST_SYSTEM_LIB="-l$ax_lib"; AC_SUBST([BOOST_SYSTEM_LIB]) link_system="yes"; break],
                                    [link_system="no"])
                   done
 
