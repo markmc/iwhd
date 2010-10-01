@@ -361,7 +361,8 @@ _print_value (const value_t *v, int level)
 	case T_LINK:
 		printf("%*sLINK\n",level,"");
 		_print_value(v->as_tree.left,level+2);
-		printf("%*sDEST FIELD%s\n",level+2,"",(char *)v->as_tree.right);
+		printf("%*sDEST FIELD %s\n",level+2,"",
+			(char *)v->as_tree.right);
 		break;
 	default:
 		printf("%*sUNKNOWN %d\n",level,"",v->type);
@@ -463,32 +464,31 @@ eval (const value_t *v, getter_t *oget, getter_t *sget)
 Stmt = - BoolExpr - EOL { *cur_expr = $$; }
      | ( !EOL . )* EOL
 
-BoolExpr = l:CompExpr (
-	( - AND - r:CompExpr )
+BoolExpr = l:NotExpr
+	( ( - AND - r:NotExpr )
 		{ $$ = l = make_tree(T_AND,l,r); }
-	( - OR - r:CompExpr )
-		{ $$ = l = make_tree(T_OR,l,r); }
-)* -
+	| ( - OR - r:NotExpr )
+		{ $$ = l = make_tree(T_OR,l,r); } )*
 
-CompExpr = l:Unary
-         ( ( - LESS - r:Unary { $$ = make_comp(C_LESSTHAN,l,r); } )
-         | ( - LESS EQUAL - r:Unary { $$ = make_comp(C_LESSOREQ,l,r); } )
-         | ( - EQUAL EQUAL - r:Unary { $$ = make_comp(C_EQUAL,l,r); } )
-         | ( - NOT EQUAL - r:Unary { $$ = make_comp(C_DIFFERENT,l,r); } )
-         | ( - GREATER EQUAL - r:Unary { $$ = make_comp(C_GREATEROREQ,l,r); } )
-         | ( - GREATER - r:Unary { $$ = make_comp(C_GREATERTHAN,l,r); } ) )? -
+NotExpr = CompExpr -
+	| NOT - e:CompExpr - { $$ = make_tree(T_NOT,e,NULL); }
 
-Unary = Atom -
-      | NOT - e:Unary - { $$ = make_tree(T_NOT,e,NULL); }
+CompExpr = l:Atom
+         ( ( - LESS - r:Atom { $$ = make_comp(C_LESSTHAN,l,r); } )
+         | ( - LESS EQUAL - r:Atom { $$ = make_comp(C_LESSOREQ,l,r); } )
+         | ( - EQUAL EQUAL - r:Atom { $$ = make_comp(C_EQUAL,l,r); } )
+         | ( - NOT EQUAL - r:Atom { $$ = make_comp(C_DIFFERENT,l,r); } )
+         | ( - GREATER EQUAL - r:Atom { $$ = make_comp(C_GREATEROREQ,l,r); } )
+         | ( - GREATER - r:Atom { $$ = make_comp(C_GREATERTHAN,l,r); } ) )?
 
-Atom = ( Literal | LinkField | ParenExpr ) -
+Atom = ( Literal | LinkField | ParenExpr )
 
 Literal = NUMBER | STRING | TIME
 
-LinkField = f:Field ( DOT i:ID { $$ = f = make_link(f,i); } )* -
+LinkField = f:Field ( DOT i:ID { $$ = f = make_link(f,i); } )*
 
-Field = DOLLAR i:ID - { $$ = make_string((char *)i,T_OFIELD); }
-      | WAFFLE i:ID - { $$ = make_string((char *)i,T_SFIELD); }
+Field = DOLLAR i:ID { $$ = make_string((char *)i,T_OFIELD); }
+      | WAFFLE i:ID { $$ = make_string((char *)i,T_SFIELD); }
 
 ParenExpr = OPEN - v:BoolExpr - CLOSE - { $$ = v; }
 

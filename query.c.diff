@@ -1,6 +1,6 @@
---- query-orig.c	2010-09-23 16:19:31.543661275 +0200
-+++ query.c	2010-09-23 16:19:31.547897591 +0200
-@@ -537,7 +537,7 @@ YY_LOCAL(int) yyrefill(void)
+--- query-orig.c	2010-10-01 12:56:20.000000000 -0400
++++ query.c	2010-10-01 12:56:20.000000000 -0400
+@@ -538,7 +538,7 @@ YY_LOCAL(int) yyrefill(void)
    while (yybuflen - yypos < 512)
      {
        yybuflen *= 2;
@@ -9,7 +9,7 @@
      }
    YY_INPUT((yybuf + yypos), yyn, (yybuflen - yypos));
    if (!yyn) return 0;
-@@ -602,7 +602,7 @@ YY_LOCAL(void) yyDo(yyaction action, int
+@@ -603,7 +603,7 @@ YY_LOCAL(void) yyDo(yyaction action, int
    while (yythunkpos >= yythunkslen)
      {
        yythunkslen *= 2;
@@ -18,7 +18,7 @@
      }
    yythunks[yythunkpos].begin=  begin;
    yythunks[yythunkpos].end=    end;
-@@ -620,7 +620,7 @@ YY_LOCAL(int) yyText(int begin, int end)
+@@ -621,7 +621,7 @@ YY_LOCAL(int) yyText(int begin, int end)
        while (yytextlen < (yyleng - 1))
  	{
  	  yytextlen *= 2;
@@ -27,7 +27,7 @@
  	}
        memcpy(yytext, yybuf + begin, yyleng);
      }
-@@ -1154,13 +1154,13 @@ YY_PARSE(int) YYPARSEFROM(yyrule yystart
+@@ -1159,13 +1159,13 @@ YY_PARSE(int) YYPARSEFROM(yyrule yystart
    if (!yybuflen)
      {
        yybuflen= 1024;
