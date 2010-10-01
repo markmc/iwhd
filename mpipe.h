@@ -17,7 +17,6 @@
 #define _MPIPE_H
 
 #include <fcntl.h>
-#include <getopt.h>
 #include <poll.h>
 #include <pthread.h>
 #include <semaphore.h>

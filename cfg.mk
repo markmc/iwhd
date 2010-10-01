@@ -32,12 +32,9 @@ skip_low_priority =			\
 local-checks-to-skip =			\
   sc_m4_quote_check			\
   sc_program_name			\
-  sc_prohibit_assert_without_use	\
   sc_prohibit_echo_minus_en		\
   sc_prohibit_empty_lines_at_EOF	\
-  sc_prohibit_getopt_without_use	\
   sc_prohibit_test_minus_ao		\
-  sc_prohibit_strings_without_use	\
   sc_space_tab				\
   sc_useless_cpp_parens			\
   $(skip_low_priority)

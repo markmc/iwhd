@@ -18,7 +18,6 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
-#include <getopt.h>
 #include <poll.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -26,9 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <unistd.h>
-#include <assert.h>
 
 #include <hstor.h>
 #include <microhttpd.h>	/* for HTTP status values */
