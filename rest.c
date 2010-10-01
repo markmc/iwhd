@@ -35,6 +35,7 @@
 #include <glib.h>
 
 #include "iwh.h"
+#include "progname.h"
 #include "meta.h"
 #include "backend.h"
 #include "setup.h"
@@ -65,7 +66,6 @@ typedef struct {
 } rule;
 
 static unsigned short		 my_port	= MY_PORT;
-const char			*program_name;
 char				*cfg_file	= NULL;
 
 static const char *const (reserved_name[]) = {"_default", "_new", "_policy", "_query", NULL};
@@ -1936,7 +1936,7 @@ main (int argc, char **argv)
 	char			*port_tmp;
 	int			 autostart = 0;
 
-	program_name = argv[0];
+	set_program_name (argv[0]);
 
 	for (;;) switch (getopt_long(argc,argv,"ac:d:m:p:v",my_options,NULL)) {
 	case 'a':

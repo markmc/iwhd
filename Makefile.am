@@ -16,6 +16,7 @@
 AM_CFLAGS = -W -Wall -Wextra -Wno-unused -Wformat-security \
   -Wp,-D_FORTIFY_SOURCE=2 -O2 -fdiagnostics-show-option
 
+# FIXME: don't hard-code 2.0
 AM_CPPFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
 
 iwhd_YFLAGS = -d
@@ -71,8 +72,9 @@ rpm: dist iwhd.spec
 	chmod 644 $(distdir).tar.gz
 	rpmbuild -ta $(distdir).tar.gz
 
-iwhd_CPPFLAGS	= $(HAIL_CFLAGS)
+iwhd_CPPFLAGS	= $(HAIL_CFLAGS) -I$(top_srcdir)/lib
 iwhd_LDADD =		\
+  lib/libiwhd.a		\
   -lmongoclient		\
   $(BOOST_SYSTEM_LIB)	\
   $(BOOST_THREAD_LIB)	\
