@@ -74,7 +74,7 @@ test -f fs_upstream/rbucket/dflt_test || fail=1
 test -f fs_downstream/rbucket/dflt_test && fail=1
 
 # Set the replication policy to always replicate.
-echo -n 1 | curl -T - $bkt/_default/_policy || fail=1
+printf 1 | curl -T - $bkt/_default/_policy || fail=1
 
 # Add a file, make sure it *is* replicated.
 echo foo | curl -T - $bkt/pos_test || fail=1
@@ -83,18 +83,18 @@ test -f fs_upstream/rbucket/pos_test || fail=1
 test -f fs_downstream/rbucket/pos_test || fail=1
 
 # Make sure we can do selective replication based on object/site attributes.
-echo -n '$color==#color' | curl -T - $bkt/_default/_policy || fail=1
+printf '$color==#color' | curl -T - $bkt/_default/_policy || fail=1
 
 # Positive test.
 # NB this file is also used by the delete test below
-echo -n blue | curl -T - $bkt/sel_pos/color || fail=1
-echo -n foo | curl -T - $bkt/sel_pos || fail=1
+printf blue | curl -T - $bkt/sel_pos/color || fail=1
+printf foo | curl -T - $bkt/sel_pos || fail=1
 wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
 test -f fs_downstream/rbucket/sel_pos || fail=1
 
 # Negative test.
-echo -n red | curl -T - $bkt/sel_neg/color || fail=1
-echo -n foo | curl -T - $bkt/sel_neg || fail=1
+printf red | curl -T - $bkt/sel_neg/color || fail=1
+printf foo | curl -T - $bkt/sel_neg || fail=1
 wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
 test -f fs_downstream/rbucket/sel_neg && fail=1
 
@@ -106,10 +106,10 @@ test -f fs_downstream/rbucket/sel_pos && fail=1
 
 # Test re-replication when we change an attribute.
 echo hello | curl -T - $bkt/attr_chg
-echo -n 'red' | curl -T - $bkt/attr_chg/color
-echo -n '$color=="blue"' | curl -T - $bkt/attr_chg/_policy
+printf red | curl -T - $bkt/attr_chg/color
+printf '$color=="blue"' | curl -T - $bkt/attr_chg/_policy
 test -f fs_downstream/rbucket/attr_chg && fail=1
-echo -n 'blue' | curl -T - $bkt/attr_chg/color
+printf blue | curl -T - $bkt/attr_chg/color
 wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
 test -f fs_downstream/rbucket/attr_chg || fail=1
 

@@ -167,7 +167,7 @@ single attribute:
 
 The attribute can also be set with a PUT to the same URL.
 
-		$ echo -n green | curl -T - http://fserver-1:9090/my_bucket/file1/color
+		$ printf green | curl -T - http://fserver-1:9090/my_bucket/file1/color
 
 Lastly, objects and attributes can be deleted (object deletes
 are propagated to secondary warehouses).
@@ -213,7 +213,7 @@ Replication Policies
 Replication policies are stored as "_policy" attributes on
 objects. To set a policy, use the same mechanism as for other attributes.
 
-		$ echo -n '$color == "green"' | curl -T - http://fserver-1:9090/my_bucket/file1/_policy
+		$ printf '$color == "green"' | curl -T - http://fserver-1:9090/my_bucket/file1/_policy
 
 This will cause the warehouse daemon to replicate to all secondary
 warehouses whenever the object is changed (including attribute
@@ -235,12 +235,12 @@ what you want for two other reasons:
 To specify selective replication, matching object atttributes
 with secondary-warehouse attributes, you would do this instead.
 
-		$ echo -n '$color == #color' | curl -T - http://fserver-1:9090/my_bucket/file1/_policy
+		$ printf '$color == #color' | curl -T - http://fserver-1:9090/my_bucket/file1/_policy
 
 To set a default replication policy for all objects within a bucket,
 use the "_default" pseudo-object.
 
-		$ echo -n '$color == #color' | curl -T - http://fserver-1:9090/my_bucket/_default/_policy
+		$ printf '$color == #color' | curl -T - http://fserver-1:9090/my_bucket/_default/_policy
 
 This will cause any modification to a green object to be replicated
 to green remote warehouses any time they are changed, but will
