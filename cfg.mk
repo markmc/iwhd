@@ -39,7 +39,6 @@ local-checks-to-skip =			\
   sc_prohibit_test_minus_ao		\
   sc_prohibit_strings_without_use	\
   sc_space_tab				\
-  sc_trailing_blank			\
   sc_useless_cpp_parens			\
   $(skip_low_priority)
 
