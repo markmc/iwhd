@@ -32,7 +32,6 @@ skip_low_priority =			\
 local-checks-to-skip =			\
   sc_program_name			\
   sc_prohibit_empty_lines_at_EOF	\
-  sc_prohibit_test_minus_ao		\
   sc_space_tab				\
   sc_useless_cpp_parens			\
   $(skip_low_priority)
