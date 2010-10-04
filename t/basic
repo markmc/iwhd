@@ -129,12 +129,14 @@ cleanup_() { kill $mongo_pid $iwhd_pid; }
 wait_for .1 30 "curl -s http://localhost:$port" \
   || { echo iwhd failed to listen; Exit 1; }
 
+
 # Create an empty bucket.
 curl -X PUT http://localhost:$port/b1 || fail=1
 test -d FS/b1 || fail=1
 
-# Post to root; should fail (but FIXME: how to detect failure?)
-curl -X PUT http://localhost:$port || fail=1
+# PUT to root; should fail
+curl -f -X PUT http://localhost:$port 2> root_put.err
+grep ' 404' root_put.err || fail=1
 
 # Create a file in that bucket.
 echo foo | curl -T - http://localhost:$port/b1/f1 || fail=1

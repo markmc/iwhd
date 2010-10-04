@@ -120,6 +120,11 @@ RepoMeta::RepoMeta ()
 {
 	char	addr[128];
 
+	if (!verbose) {
+		cout.rdbuf(0);
+		cout << "bite me" << endl;
+	}
+
 	sprintf(addr,"%s:%u",db_host,db_port);
 	client.connect(addr);
 }
