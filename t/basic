@@ -134,14 +134,23 @@ wait_for .1 30 "curl -s http://localhost:$port" \
 curl -X PUT http://localhost:$port/b1 || fail=1
 test -d FS/b1 || fail=1
 
+# Try to create a duplicate bucket.
+curl -f -X PUT http://localhost:$port/b1 2> dup_bucket.err
+grep ' 500$' dup_bucket.err || fail=1
+
 # PUT to root; should fail
 curl -f -X PUT http://localhost:$port 2> root_put.err
-grep ' 404' root_put.err || fail=1
+grep ' 404$' root_put.err || fail=1
 
 # Create a file in that bucket.
 echo foo | curl -T - http://localhost:$port/b1/f1 || fail=1
+# Test presence in the FS.
 test -f FS/b1/f1 || fail=1
 test "$(cat FS/b1/f1)" = foo || fail=1
+# Test through the API as well.
+curl http://localhost:$port/b1/f1 > f1copy
+test "$(cat f1copy)" = foo || fail=1
+
 
 # Get root; default, then Accept: XML & JSON:
 curl http://localhost:$port > root || fail=1
@@ -153,12 +162,18 @@ compare root root.xml || fail=1
 curl -H 'Accept: */json' http://localhost:$port > root || fail=1
 compare root root.json || fail=1
 
-# Delete an object and ensure that it's gone from the file system.
+# Delete an object.
 curl -X DELETE http://localhost:$port/b1/f1 || fail=1
+# Ensure that it's gone from the file system.
 test -f FS/b1/f1 && fail=1
+# Ensure that it's gone in the API as well.
+curl -f http://localhost:$port/b1/f1 > /dev/null 2> del_object.err
+grep ' 404$' del_object.err || fail=1
 
 # Try to delete a nonexistent object.
-curl -X DELETE http://localhost:$port/b1/no-such-obj || fail=1
+curl -f -X DELETE http://localhost:$port/b1/no-such-obj 2> del_nosuch.err
+grep ' 404$' del_nosuch.err || fail=1
+
 
 # ################## Providers
 
