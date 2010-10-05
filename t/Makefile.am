@@ -16,6 +16,7 @@
 
 TESTS =						\
   basic						\
+  replication					\
   parser-test
 
 EXTRA_DIST =					\

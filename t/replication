@@ -1,0 +1,100 @@
+#!/bin/sh
+# Test replication functionality.
+
+. "${srcdir=.}/init.sh"; path_prepend_ ..
+
+mkdir mongod fs_upstream fs_downstream || framework_failure_ mkdir failed
+
+# FIXME: start this only if there's not a working one already running, or
+# probably better, start this one unconditionally and make iwhd use it.
+mongod --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1 &
+mongo_pid=$!
+cleanup_() { kill $mongo_pid; sleep 3; }
+
+# Wait for up to 3 seconds for mongod to begin listening.
+wait_for .1 30 'mongo < /dev/null' \
+  || framework_failure_ mongod failed to start
+
+cat > iwhd_u.cfg << EOF
+[
+	{ "name":"upstream",   "type":"fs",   "path":"fs_upstream" },
+	{ "name":"downstream", "type":"http", "host":"localhost", "port": 9093,
+	  "color": "blue" }
+]
+EOF
+
+port=9092
+iwhd -v -p $port -c iwhd_u.cfg &
+iwhd_pid=$!
+wait_for .1 30 "curl http://localhost:$port" \
+	|| framework_failure_ "iwhd upstream"
+cleanup_() { kill $mongo_pid $iwhd_pid; sleep 3; }
+
+cat > iwhd_d.cfg << EOF
+[
+	{"name": "downstream", "type": "fs", "path": "fs_downstream" }
+]
+EOF
+
+d_port=9093
+iwhd -v -p $d_port -c iwhd_d.cfg &
+iwhd_d_pid=$!
+wait_for .1 30 "curl http://localhost:$d_port" \
+	|| framework_failure_ "iwhd downstream"
+cleanup_() { kill $mongo_pid $iwhd_pid $iwhd_d_pid; sleep 3; }
+
+api=http://localhost:$port
+wait_for_repl() {
+	curl -d op=rep_status $api > repl.out || return 1
+	test "$(cat repl.out)" = "0 requests" || return 1
+	return 0
+}
+bkt=$api/rbucket
+
+# Create a bucket to work in.
+curl -X PUT $bkt || fail=1
+# Make sure it exists at both ends (i.e. create was replicated).
+wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
+test -d fs_upstream/rbucket || fail=1
+test -d fs_downstream/rbucket || fail=1
+
+# Add a file, make sure it's *not* replicated (default policy).
+echo foo | curl -T - $bkt/file2 || fail=1
+wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
+test -f fs_upstream/rbucket/file2 || fail=1
+test -f fs_downstream/rbucket/file2 && fail=1
+
+# Set the replication policy to always replicate.
+echo -n 1 | curl -T - $bkt/_default/_policy || fail=1
+
+# Add a file, make sure it *is* replicated.
+echo foo | curl -T - $bkt/file3 || fail=1
+wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
+test -f fs_upstream/rbucket/file3 || fail=1
+test -f fs_downstream/rbucket/file3 || fail=1
+
+# Make sure we can do selective replication based on object/site attributes.
+echo -n '$color==#color' | curl -T - $bkt/_default/_policy || fail=1
+
+# Positive test.
+# NB this file is also used by the delete test below
+echo -n blue | curl -T - $bkt/file4/color || fail=1
+echo -n foo | curl -T - $bkt/file4 || fail=1
+wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
+test -f fs_downstream/rbucket/file4 || fail=1
+
+# Negative test.
+echo -n red | curl -T - $bkt/file5/color || fail=1
+echo -n foo | curl -T - $bkt/file5 || fail=1
+wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
+test -f fs_downstream/rbucket/file5 && fail=1
+
+# Test replication of deletes.
+curl -X DELETE $bkt/file4 || fail=2
+wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
+test -f fs_upstream/rbucket/file4 && fail=1
+test -f fs_downstream/rbucket/file4 && fail=1
+
+# TBD: add op=check result checks
+
+Exit $fail
