@@ -1132,6 +1132,76 @@ create_bucket (char *name)
 }
 
 static int
+control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
+		  const char *method, const char *version, const char *data,
+		  size_t *data_size, void **rctx)
+{
+	struct MHD_Response	*resp;
+	my_state		*ms	= *rctx;
+	int			 rc;
+	char			*op;
+	char			 buf[80];
+	int			 len;
+
+	(void)cctx;
+	(void)method;
+	(void)version;
+
+	DPRINTF("ROOT POST (%s, %zu)\n",url,*data_size);
+
+	if (ms->state == MS_NEW) {
+		ms->state = MS_NORMAL;
+		ms->url = (char *)url;
+		ms->dict = g_hash_table_new_full(
+			g_str_hash,g_str_equal,free,free);
+		ms->cleanup |= CLEANUP_DICT;
+		ms->post = MHD_create_post_processor(conn,4096,
+			post_iterator,ms->dict);
+		ms->cleanup |= CLEANUP_POST;
+		return MHD_YES;
+	}
+
+	if (*data_size) {
+		MHD_post_process(ms->post,data,*data_size);
+		*data_size = 0;
+		return MHD_YES;
+	}
+
+	rc = MHD_HTTP_BAD_REQUEST;
+
+	op = g_hash_table_lookup(ms->dict,"op");
+	if (op) {
+		if (!strcmp(op,"rep_status")) {
+			len = snprintf(buf,sizeof(buf),"%d requests\n",
+				get_rep_count());
+			rc = MHD_HTTP_OK;
+		}
+		else {
+			len = snprintf(buf,sizeof(buf),"unknown op");
+		}
+	}
+	else {
+		len = snprintf(buf,sizeof(buf),"missing op");
+	}
+
+	if (len >= (int)sizeof(buf)) {
+		len = 0;
+		rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	/* NB The last arg tells MHD to copy the arg and free it later. */
+	resp = MHD_create_response_from_data(len,buf,MHD_NO,MHD_YES);
+	if (!resp) {
+		return MHD_NO;
+	}
+	MHD_queue_response(conn,rc,resp);
+	MHD_destroy_response(resp);
+
+	free_ms(ms);
+	return MHD_YES;
+}
+
+static int
 proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		   const char *method, const char *version, const char *data,
 		   size_t *data_size, void **rctx)
@@ -1512,6 +1582,8 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 static const rule my_rules[] = {
 	{ /* get bucket list */
 	  "GET",	URL_ROOT,	proxy_api_root  	},
+	{ /* perform a control operation on the API root */
+	  "POST",	URL_ROOT,	control_api_root	},
 	{ /* get object list */
 	  "GET",	URL_BUCKET,	proxy_list_objs		},
 	{ /* create bucket */

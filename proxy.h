@@ -40,5 +40,6 @@ int	 get_provider		(int i, provider_t *out);
 void	 update_provider	(const char *provider,
 				 const char *username, const char *password);
 char	*get_provider_value	(int i, const char *fname);
+int	 get_rep_count		(void);
 
 #endif

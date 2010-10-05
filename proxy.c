@@ -102,6 +102,7 @@ static repl_item	*queue_tail	= NULL;
 static pthread_mutex_t	 queue_lock;
 static sem_t		 queue_sema;
 static json_t		*config		= NULL;
+static int		 rep_count	= 0;
 
 static int
 validate_server (unsigned int i)
@@ -800,6 +801,8 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 		}
 		free(item->path);
 		free(item);
+		/* No atomic dec without test?  Lame. */
+		(void)g_atomic_int_dec_and_test(&rep_count);
 	}
 }
 
@@ -911,6 +914,7 @@ replicate (const char *url, size_t size, const char *policy)
 		}
 		queue_tail = item;
 		pthread_mutex_unlock(&queue_lock);
+		g_atomic_int_inc(&rep_count);
 		sem_post(&queue_sema);
 	}
 
@@ -952,6 +956,7 @@ replicate_namespace_action (const char *name, repl_t action)
 		}
 		queue_tail = item;
 		pthread_mutex_unlock(&queue_lock);
+		g_atomic_int_inc(&rep_count);
 		sem_post(&queue_sema);
 	}
 }
@@ -1066,4 +1071,10 @@ follow_link (char *object, char *key)
 	(void)key;
 
 	return "no_such_object";
+}
+
+int
+get_rep_count (void)
+{
+	return g_atomic_int_get(&rep_count);
 }
