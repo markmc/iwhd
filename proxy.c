@@ -97,13 +97,13 @@ typedef struct {
 	json_t		*cur_server;
 } query_ctx_t;
 
-repl_item	*queue_head	= NULL;
-repl_item	*queue_tail	= NULL;
-pthread_mutex_t	 queue_lock;
-sem_t		 queue_sema;
-json_t		*config		= NULL;
+static repl_item	*queue_head	= NULL;
+static repl_item	*queue_tail	= NULL;
+static pthread_mutex_t	 queue_lock;
+static sem_t		 queue_sema;
+static json_t		*config		= NULL;
 
-int
+static int
 validate_server (unsigned int i)
 {
 	json_t		*server;
@@ -265,8 +265,8 @@ err:
 	return 0;
 }
 
-size_t
-junk_writer (void *ptr, size_t size, size_t nmemb, void *stream)
+static size_t
+junk_writer (/* const */ void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	size_t	n;
 
@@ -280,7 +280,7 @@ junk_writer (void *ptr, size_t size, size_t nmemb, void *stream)
 	return n;
 }
 
-void *
+static void *
 proxy_repl_prod_fs (void *ctx)
 {
 	repl_item		*item	= ctx;
@@ -336,7 +336,7 @@ proxy_repl_prod_fs (void *ctx)
 	return NULL;
 }
 
-void *
+static void *
 proxy_repl_prod (void *ctx)
 {
 	repl_item		*item	= ctx;
@@ -400,7 +400,7 @@ done:
 	return NULL;
 }
 
-size_t
+static size_t
 junk_reader (void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	size_t	n;
@@ -410,14 +410,14 @@ junk_reader (void *ptr, size_t size, size_t nmemb, void *stream)
 	return n;
 }
 
-size_t
+static size_t
 cf_writer (void *ptr ATTRIBUTE_UNUSED, size_t size, size_t nmemb,
 	   void *stream ATTRIBUTE_UNUSED)
 {
 	return size * nmemb;
 }
 
-size_t
+static size_t
 cf_header (void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	char	*next;
@@ -447,7 +447,7 @@ cf_header (void *ptr, size_t size, size_t nmemb, void *stream)
 	return size * nmemb;
 }
 
-const char *
+static const char *
 get_cloudfiles_token (json_t *server, const char *host, unsigned int port,
 	const char * user, const char * key)
 {
@@ -498,7 +498,7 @@ get_cloudfiles_token (json_t *server, const char *host, unsigned int port,
 	return token_obj ? json_string_value(token_obj) : NULL;
 }
 
-void *
+static void *
 proxy_repl_cons (void *ctx)
 {
 	repl_item		*item	= ctx;
@@ -626,7 +626,7 @@ proxy_repl_cons (void *ctx)
 	return NULL;
 }
 
-void
+static void
 repl_worker_del (const repl_item *item)
 {
 	json_t			*server;
@@ -686,7 +686,7 @@ repl_worker_del (const repl_item *item)
 	DPRINTF("%s returning\n",__func__);
 }
 
-void
+static void
 repl_worker_bcreate (repl_item *item)
 {
 	json_t			*server;
@@ -744,7 +744,7 @@ repl_worker_bcreate (repl_item *item)
 	DPRINTF("%s returning\n",__func__);
 }
 
-void *
+static void *
 repl_worker (void *notused ATTRIBUTE_UNUSED)
 {
 	repl_item	*item;
@@ -805,7 +805,7 @@ repl_init (void)
 	pthread_create(&tid,NULL,repl_worker,NULL);
 }
 
-char *
+static char *
 repl_oget (void *ctx, const char *id)
 {
 	query_ctx_t	*qctx = ctx;
@@ -816,7 +816,7 @@ repl_oget (void *ctx, const char *id)
 	return cur_value;
 }
 
-char *
+static char *
 repl_sget (void *ctx, const char *id)
 {
 	query_ctx_t	*qctx = ctx;
@@ -912,7 +912,7 @@ replicate (const char *url, size_t size, const char *policy)
 	free(url2);
 }
 
-void
+static void
 replicate_namespace_action (const char *name, repl_t action)
 {
 	unsigned int	 i;
