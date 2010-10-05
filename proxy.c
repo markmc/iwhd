@@ -744,6 +744,16 @@ repl_worker_bcreate (repl_item *item)
 	DPRINTF("%s returning\n",__func__);
 }
 
+/* Use this to diagnose failed thread creation.  */
+#define xpthread_create(thread, start_routine, msg)			\
+  do {									\
+    int err = pthread_create (thread, NULL, start_routine, NULL);	\
+    if (err) {								\
+      error (0, err, msg);						\
+      return NULL;							\
+    }									\
+  } while (0)
+
 static void *
 repl_worker (void *notused ATTRIBUTE_UNUSED)
 {
@@ -764,15 +774,12 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 		switch (item->type) {
 		case REPL_PUT:
 			if (pipe(item->pipes) >= 0) {
-				if (proxy_host) {
-					pthread_create(&prod,NULL,
-						proxy_repl_prod,item);
-				}
-				else {
-					pthread_create(&prod,NULL,
-						proxy_repl_prod_fs,item);
-				}
-				pthread_create(&cons,NULL,proxy_repl_cons,item);
+				xpthread_create(&prod, (proxy_host
+							? proxy_repl_prod
+							: proxy_repl_prod_fs),
+					      "failed to start producer thread");
+				xpthread_create(&cons,proxy_repl_cons,
+					      "failed to start consumer thread");
 				pthread_join(prod,NULL);
 				pthread_join(cons,NULL);
 			}
