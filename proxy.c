@@ -745,9 +745,9 @@ repl_worker_bcreate (repl_item *item)
 }
 
 /* Use this to diagnose failed thread creation.  */
-#define xpthread_create(thread, start_routine, msg)			\
+#define xpthread_create(thread, start_routine, item, msg)		\
   do {									\
-    int err = pthread_create (thread, NULL, start_routine, NULL);	\
+    int err = pthread_create (thread, NULL, start_routine, item);	\
     if (err) {								\
       error (0, err, msg);						\
       return NULL;							\
@@ -777,9 +777,10 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 				xpthread_create(&prod, (proxy_host
 							? proxy_repl_prod
 							: proxy_repl_prod_fs),
-					      "failed to start producer thread");
-				xpthread_create(&cons,proxy_repl_cons,
-					      "failed to start consumer thread");
+						item,
+					    "failed to start producer thread");
+				xpthread_create(&cons,proxy_repl_cons,item,
+					    "failed to start consumer thread");
 				pthread_join(prod,NULL);
 				pthread_join(cons,NULL);
 			}
