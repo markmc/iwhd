@@ -243,4 +243,29 @@ for i in xml json; do
 
 done
 
+
+# Add a single attribute to an object using the PUT method.
+bucket=http://localhost:$port/b1
+printf nothing | curl -T - $bucket/f3 || fail=1
+printf blue | curl -T - $bucket/f3/color || fail=1
+test "$(curl $bucket/f3/color)" = blue || fail=1
+
+# Add multiple attributes to an object using the POST method.
+# NB use a file which doesn't yet exist (yes, this should work too)
+curl -d key=f4 -d shape=round -d size=big $bucket || fail=1
+test "$(curl $bucket/f4/shape)" = round || fail=1
+test "$(curl $bucket/f4/size)" = big || fail=1
+
+# Ensure that an attempt to add each reserved attribute fails.
+# FIXME: keep this list in sync with the one in rest.c:
+# grep '^static.*reserved_attr' rest.c
+for attr in bucket key date etag loc; do
+  printf whatever | curl -f -T - $bucket/f5/$attr 2> bad_attr.err
+  grep ' 400$' bad_attr.err || fail=1
+done
+
+# TBD: add attribute-delete tests when that functionality is implemented
+
+# TBD: add white-box tests for attributes in mongo
+
 Exit $fail
