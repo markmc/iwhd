@@ -1,0 +1,36 @@
+#!/bin/sh
+# exercise the parser
+
+. "${srcdir=.}/init.sh"; path_prepend_ .
+
+cat <<\EOF > f.exp || framework_failure_
+AND
+  COMPARISON
+    SERVER FIELD a (never)
+    STRING fubar
+  NOT
+    COMPARISON
+      LINK
+        LINK
+          OBJECT FIELD b (7)
+          DEST FIELD c
+        DEST FIELD d
+      NUMBER 3
+d= 0
+EOF
+
+parser '#a=="fubar"&&!($b.c.d<3)' > features 2> err || fail=1
+compare features f.exp
+compare /dev/null err
+
+parser '#a == "fubar" && ! ( $b.c.d < 3)' > white-space 2> err || fail=1
+compare white-space f.exp
+compare /dev/null err
+
+parser '$ a' > e1.out 2>&1; test $? = 1 || fail=1
+printf "could not parse '$ a'\n" > e1.exp
+compare e1.exp e1.out
+
+parser '1 = = 1' > e2.out 2>&1; test $? = 1 || fail=1
+printf "could not parse '1 = = 1'\n" > e2.exp
+compare e2.exp e2.out

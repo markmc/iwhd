@@ -15,12 +15,27 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 TESTS =						\
-  basic
+  basic						\
+  parser-test
 
 EXTRA_DIST =					\
   $(TESTS)					\
   init.cfg					\
   init.sh
+
+check_PROGRAMS = parser
+
+BUILT_SOURCES =
+BUILT_SOURCES += parser.c
+MAINTAINERCLEANFILES = $(BUILT_SOURCES)
+parser_CPPFLAGS	= -I $(top_srcdir)
+
+parser.c: Makefile.am
+	rm -f $@-t $@
+	printf '#define UNIT_TEST 1\n' > $@-t
+	printf '#include "query.c"\n' >> $@-t
+	chmod a=r $@-t
+	mv $@-t $@
 
 TESTS_ENVIRONMENT =				\
   tmp__=$$TMPDIR; test -d "$$tmp__" || tmp__=.; \
