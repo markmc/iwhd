@@ -9,7 +9,7 @@ m_port=$(expr $mongo_base_port + 0)
 
 mongod --port $m_port --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1 &
 mongo_pid=$!
-cleanup_() { kill $mongo_pid; }
+cleanup_() { kill -9 $mongo_pid; }
 
 # Wait for up to 3 seconds for mongod to begin listening.
 wait_for .1 30 'mongo < /dev/null' \
@@ -123,7 +123,7 @@ printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
 
 iwhd -v -p $port -c iwhd.cfg -d localhost:$m_port &
 iwhd_pid=$!
-cleanup_() { kill $mongo_pid $iwhd_pid; }
+cleanup_() { kill -9 $mongo_pid $iwhd_pid; }
 
 # Wait for up to 3 seconds for iwhd to begin listening on $port.
 wait_for .1 30 "curl -s http://localhost:$port" \

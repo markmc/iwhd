@@ -9,7 +9,7 @@ m_port=$(expr $mongo_base_port + 1)
 
 mongod --port $m_port --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1 &
 mongo_pid=$!
-cleanup_() { kill $mongo_pid; sleep 3; }
+cleanup_() { kill -9 $mongo_pid; }
 
 # Wait for up to 3 seconds for mongod to begin listening.
 wait_for .1 30 'mongo localhost:$m_port < /dev/null' \
@@ -28,7 +28,7 @@ iwhd -v -p $port -c iwhd_u.cfg -d localhost:$m_port &
 iwhd_pid=$!
 wait_for .1 30 "curl http://localhost:$port" \
 	|| framework_failure_ "iwhd upstream"
-cleanup_() { kill $mongo_pid $iwhd_pid; sleep 3; }
+cleanup_() { kill -9 $mongo_pid $iwhd_pid; }
 
 cat > iwhd_d.cfg << EOF
 [
@@ -41,7 +41,7 @@ iwhd -v -p $d_port -c iwhd_d.cfg -d localhost:$m_port &
 iwhd_d_pid=$!
 wait_for .1 30 "curl http://localhost:$d_port" \
 	|| framework_failure_ "iwhd downstream"
-cleanup_() { kill $mongo_pid $iwhd_pid $iwhd_d_pid; sleep 3; }
+cleanup_() { kill -9 $mongo_pid $iwhd_pid $iwhd_d_pid; }
 
 api=http://localhost:$port
 wait_for_repl() {
