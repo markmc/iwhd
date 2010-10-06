@@ -5,9 +5,11 @@
 
 mkdir mongod fs_upstream fs_downstream || framework_failure_ mkdir failed
 
+m_port=27018
+
 # FIXME: start this only if there's not a working one already running, or
 # probably better, start this one unconditionally and make iwhd use it.
-mongod --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1 &
+mongod --port $m_port --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1 &
 mongo_pid=$!
 cleanup_() { kill $mongo_pid; sleep 3; }
 
@@ -24,7 +26,7 @@ cat > iwhd_u.cfg << EOF
 EOF
 
 port=9092
-iwhd -v -p $port -c iwhd_u.cfg &
+iwhd -v -p $port -c iwhd_u.cfg -d localhost:$m_port &
 iwhd_pid=$!
 wait_for .1 30 "curl http://localhost:$port" \
 	|| framework_failure_ "iwhd upstream"
@@ -37,7 +39,7 @@ cat > iwhd_d.cfg << EOF
 EOF
 
 d_port=9093
-iwhd -v -p $d_port -c iwhd_d.cfg &
+iwhd -v -p $d_port -c iwhd_d.cfg -d localhost:$m_port &
 iwhd_d_pid=$!
 wait_for .1 30 "curl http://localhost:$d_port" \
 	|| framework_failure_ "iwhd downstream"
