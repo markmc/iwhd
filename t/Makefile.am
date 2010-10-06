@@ -74,5 +74,3 @@ TESTS_ENVIRONMENT =				\
   SHELL='$(SHELL)'				\
   PATH='$(abs_top_builddir)$(PATH_SEPARATOR)'"$$PATH" \
   ; shell_or_perl_
-
-VERBOSE = yes
