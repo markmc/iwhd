@@ -5,10 +5,8 @@
 
 mkdir mongod fs_upstream fs_downstream || framework_failure_ mkdir failed
 
-m_port=27018
+m_port=$(expr $mongo_base_port + 1)
 
-# FIXME: start this only if there's not a working one already running, or
-# probably better, start this one unconditionally and make iwhd use it.
 mongod --port $m_port --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1 &
 mongo_pid=$!
 cleanup_() { kill $mongo_pid; sleep 3; }
