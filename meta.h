@@ -38,6 +38,9 @@ int meta_query_next (void *qobj, char **bucket, char **key);
 void meta_query_stop (void *qobj);
 void meta_delete (const char *bucket, const char *key);
 size_t meta_get_size (const char *bucket, const char *key);
+void *meta_get_attrs (const char *bucket, const char *key);
+int meta_attr_next (void *aobj, const char **, const char **);
+void meta_attr_stop (void *aobj);
 
 #if defined(__cplusplus)
 }

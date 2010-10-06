@@ -98,6 +98,7 @@ public:
 	size_t	GetSize		(const char *bucket, const char *key);
 	int	Check		(const char *bucket, const char *key,
 				 const char *depot);
+	void *	GetAttrList	(const char *bucket, const char *key);
 };
 
 class RepoQuery {
@@ -555,4 +556,86 @@ meta_get_size (const char *bucket, const char *key)
 	CLIENT_UNLOCK;
 
 	return rc;
+}
+
+class AttrList {
+public:
+				AttrList	(BSONObj &);
+	int			Next		(const char **, const char **);
+	vector<BSONElement>	vec;
+	int			idx;
+};
+
+AttrList::AttrList (BSONObj &bo)
+{
+	bo.elems(vec);
+	idx = 0;
+}
+
+int
+AttrList::Next (const char **name, const char **value)
+{
+	BSONElement	elem;
+
+	while (idx < vec.size()) {
+		elem = vec[idx++];
+		if (elem.type() == String) {
+			*name = elem.fieldName();
+			*value = elem.String().c_str();
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+void *
+RepoMeta::GetAttrList (const char *bucket, const char *key)
+{
+	auto_ptr<DBClientCursor>	curs;
+	Query				q;
+	AttrList *			poc;
+	BSONObj				bo;
+	const char *			name;
+	const char *			value;
+
+	q = QUERY("bucket"<<bucket<<"key"<<key);
+	curs = GetCursor(q);
+
+	if (!curs->more()) {
+		return NULL;
+	}
+	bo = curs->next();
+
+	return new AttrList(bo);
+}
+extern "C"
+void *
+meta_get_attrs (const char *bucket, const char *key)
+{
+	void *poc;
+
+	CLIENT_LOCK;
+	poc = it->GetAttrList(bucket,key);
+	CLIENT_UNLOCK;
+
+	return poc;
+}
+
+extern "C"
+int
+meta_attr_next (void *ctx, const char **name, const char **value)
+{
+	AttrList *poc = (AttrList *)ctx;
+
+	return poc->Next(name,value);
+}
+
+extern "C"
+void
+meta_attr_stop (void *ctx)
+{
+	AttrList *poc = (AttrList *)ctx;
+
+	delete poc;
 }

@@ -109,6 +109,10 @@ free_ms (my_state *ms)
 		free(ms->url);
 	}
 
+	if (ms->cleanup & CLEANUP_AQUERY) {
+		meta_attr_stop(ms->aquery);
+	}
+
 	free(ms);
 }
 
@@ -128,7 +132,7 @@ validate_put (struct MHD_Connection *conn)
 }
 
 static int
-is_reserved (char *cand, char **resv_list)
+is_reserved (const char *cand, char **resv_list)
 {
 	int	i;
 
@@ -721,7 +725,7 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
 			return -1;
 		}
 		ms->cleanup |= CLEANUP_TMPL;
-		len = tmpl_obj_header(ms->gen_ctx);
+		len = tmpl_list_header(ms->gen_ctx);
 		if (!len) {
 			return -1;
 		}
@@ -743,7 +747,7 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
 		if (is_reserved(key,reserved_name)) {
 			continue;
 		}
-		len = tmpl_obj_entry(ms->gen_ctx,bucket,key);
+		len = tmpl_list_entry(ms->gen_ctx,bucket,key);
 		if (!len) {
 			return -1;
 		}
@@ -754,7 +758,7 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
 		return len;
 	}
 
-	len = tmpl_obj_footer(ms->gen_ctx);
+	len = tmpl_list_footer(ms->gen_ctx);
 	if (!len) {
 		return -1;
 	}
@@ -1317,6 +1321,104 @@ register_image (my_state *ms)
 }
 
 static int
+parts_callback (void *ctx, uint64_t pos, char *buf, int max)
+{
+	my_state	*ms	= ctx;
+	int		 len;
+	const char	*accept_hdr;
+	const char	*name;
+	const char	*value;
+	const char	*host;
+
+	(void)pos;
+
+	accept_hdr = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,
+		"Accept");
+	host = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Host");
+
+	if (!ms->gen_ctx) {
+		ms->gen_ctx = tmpl_get_ctx(accept_hdr);
+		if (!ms->gen_ctx) {
+			return -1;
+		}
+		ms->cleanup |= CLEANUP_TMPL;
+		ms->gen_ctx->base = host;
+		len = tmpl_obj_header(ms->gen_ctx,ms->bucket,ms->key);
+		if (!len) {
+			return -1;
+		}
+		if (len > max) {
+			len = max;
+		}
+		memcpy(buf,ms->gen_ctx->buf,len);
+		return len;
+	}
+
+	if (ms->gen_ctx == TMPL_CTX_DONE) {
+		return -1;
+	}
+
+
+	// Set up and use query for what attributes exist.
+	for(;;) {
+		if (!meta_attr_next(ms->aquery,&name,&value)) {
+			break;
+		}
+		if (is_reserved(name,reserved_attr)) {
+			continue;
+		}
+		len = tmpl_obj_entry(ms->gen_ctx,ms->bucket,ms->key,name);
+		if (!len) {
+			return -1;
+		}
+		if (len > max) {
+			len = max;
+		}
+		memcpy(buf,ms->gen_ctx->buf,len);
+		return len;
+	}
+
+	len = tmpl_obj_footer(ms->gen_ctx);
+	if (!len) {
+		return -1;
+	}
+	if (len > max) {
+		len = max;
+	}
+	memcpy(buf,ms->gen_ctx->buf,len);
+	free(ms->gen_ctx);
+	ms->cleanup &= ~CLEANUP_TMPL;
+	ms->gen_ctx = TMPL_CTX_DONE;
+	return len;
+}
+
+static int
+show_parts (struct MHD_Connection *conn, my_state *ms)
+{
+	struct MHD_Response	*resp;
+	void			*ctx;
+	const char		*name;
+	const char		*value;
+
+	ms->aquery = meta_get_attrs(ms->bucket,ms->key);
+	if (!ms->aquery) {
+		return MHD_HTTP_NOT_FOUND;
+	}
+	ms->cleanup |= CLEANUP_AQUERY;
+
+	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
+		65536, parts_callback, ms, simple_closer);
+	if (!resp) {
+		fprintf(stderr,"MHD_crfc failed\n");
+		simple_closer(ms);
+		return MHD_NO;
+	}
+	MHD_queue_response(conn,MHD_HTTP_OK,resp);
+	MHD_destroy_response(resp);
+	return MHD_HTTP_PROCESSING;
+}
+
+static int
 proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		   const char *method, const char *version, const char *data,
 		   size_t *data_size, void **rctx)
@@ -1362,6 +1464,9 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 				else if (!strcmp(op,"register")) {
 					rc = register_image(ms);
 				}
+				else if (!strcmp(op,"parts")) {
+					rc = show_parts(conn,ms);
+				}
 				else {
 					DPRINTF("unknown op %s for %s/%s\n",
 						op, ms->bucket, ms->key);
@@ -1371,14 +1476,22 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 				DPRINTF("op is MISSING (fail)\n");
 			}
 		}
-		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
-		if (!resp) {
-			fprintf(stderr,"MHD_crfd failed\n");
-			return MHD_NO;
+		if (rc != MHD_HTTP_PROCESSING) {
+			/*
+			 * MHD_HTTP_PROCESSING is a special response that
+			 * means a request-specific routine (e.g. show_parts)
+			 * created its own response.  Therefore we shouldn't.
+			 */
+			resp = MHD_create_response_from_data(0,NULL,
+				MHD_NO,MHD_NO);
+			if (!resp) {
+				fprintf(stderr,"MHD_crfd failed\n");
+				return MHD_NO;
+			}
+			MHD_queue_response(conn,rc,resp);
+			MHD_destroy_response(resp);
+			free_ms(ms);
 		}
-		MHD_queue_response(conn,rc,resp);
-		MHD_destroy_response(resp);
-		free_ms(ms);
 	}
 
 	return MHD_YES;
@@ -1779,6 +1892,7 @@ Report %s bugs to %s.\n\
     }
   exit (status);
 }
+
 
 int
 main (int argc, char **argv)

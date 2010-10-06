@@ -25,6 +25,9 @@ typedef struct {
 	const char	*prov_header;
 	const char	*prov_entry;
 	const char	*prov_footer;
+	const char	*list_header;
+	const char	*list_entry;
+	const char	*list_footer;
 	const char	*obj_header;
 	const char	*obj_entry;
 	const char	*obj_footer;
@@ -52,11 +55,16 @@ int		 tmpl_prov_entry	(tmpl_ctx_t *ctx,
 					 const char *name, const char *type,
 					 const char *host, int port,
 					 const char *user, const char *pass);
-int		 tmpl_root_footer	(tmpl_ctx_t *ctx);
-int		 tmpl_obj_header	(tmpl_ctx_t *ctx);
-int		 tmpl_obj_entry		(tmpl_ctx_t *ctx,
-					 const char *bucket, const char *key);
-int		 tmpl_obj_footer	(tmpl_ctx_t *ctx);
 int		 tmpl_prov_footer	(tmpl_ctx_t *ctx);
+int		 tmpl_list_header	(tmpl_ctx_t *ctx);
+int		 tmpl_list_entry	(tmpl_ctx_t *ctx,
+					 const char *bucket, const char *key);
+int		 tmpl_list_footer	(tmpl_ctx_t *ctx);
+int		 tmpl_obj_header	(tmpl_ctx_t *ctx,
+					 const char *bucket, const char *key);
+int		 tmpl_obj_entry		(tmpl_ctx_t *ctx, const char *bucket,
+					 const char *key, const char *attr);
+int		 tmpl_obj_footer	(tmpl_ctx_t *ctx);
+
 
 #endif

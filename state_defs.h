@@ -47,7 +47,8 @@ typedef struct {
 	struct MHD_Connection		*conn;
 	/* for proxy queries */
 	struct MHD_PostProcessor	*post;
-	void				*query;
+	void				*query;		/* object query */
+	void				*aquery;	/* attribute query */
 	/* for bucket-level puts */
 	GHashTable			*dict;
 	/* for new producer/consumer model */
@@ -66,5 +67,6 @@ typedef struct {
 #define CLEANUP_QUERY	0x10
 #define CLEANUP_TMPL	0x20
 #define CLEANUP_URL	0x40
+#define CLEANUP_AQUERY	0x80
 
 #endif

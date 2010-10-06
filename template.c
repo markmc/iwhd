@@ -54,11 +54,11 @@ static const char xml_prov_footer[] = "\
 </providers>\n\
 ";
 
-static const char xml_obj_header[] = "\
+static const char xml_list_header[] = "\
 <objects>\
 ";
 
-static const char xml_obj_entry[] = "\
+static const char xml_list_entry[] = "\
 \n\
 	<object>\n\
 		<bucket>%s</bucket>\n\
@@ -66,11 +66,26 @@ static const char xml_obj_entry[] = "\
 	</object>\
 ";
 
-static const char xml_obj_footer[] = "\
+static const char xml_list_footer[] = "\
 \n\
 </objects>\n\
 ";
 
+static char xml_obj_header[] = "\
+<object>\n\
+	<object_body path=\"http://%s/%s/%s/body\"/>\n\
+	<object_attr_list path=\"http://%s/%s/%s/attrs\"/>\
+";
+
+static char xml_obj_entry[] = "\
+\n\
+	<object_attr name=\"%s\" path=\"http:/%s/%s/%s/attr_%s\"\
+";
+
+static char xml_obj_footer[] = "\
+\n\
+</object>\n\
+";
 
 tmpl_format_t xml_format = {
 	.root_header	= xml_root_header,
@@ -79,6 +94,9 @@ tmpl_format_t xml_format = {
 	.prov_header	= xml_prov_header,
 	.prov_entry	= xml_prov_entry,
 	.prov_footer	= xml_prov_footer,
+	.list_header	= xml_list_header,
+	.list_entry	= xml_list_entry,
+	.list_footer	= xml_list_footer,
 	.obj_header	= xml_obj_header,
 	.obj_entry	= xml_obj_entry,
 	.obj_footer	= xml_obj_footer,
@@ -127,11 +145,11 @@ static const char json_prov_footer[] = "\
 ]\n\
 ";
 
-static const char json_obj_header[] = "\
+static const char json_list_header[] = "\
 [\
 ";
 
-static const char json_obj_entry[] = "\
+static const char json_list_entry[] = "\
 ,\n\
 	{\n\
 		\"bucket\": \"%s\",\n\
@@ -139,9 +157,25 @@ static const char json_obj_entry[] = "\
 	}\
 ";
 
-static const char json_obj_footer[] = "\
+static const char json_list_footer[] = "\
 \n\
 ]\n\
+";
+
+static char json_obj_header[] = "\
+{\n\
+	\"object_body\": \"http://%s/%s/%s/body\"\n\
+	\"object_attr_list\": \"http://%s/%s/%s/attrs\"\
+";
+
+static char json_obj_entry[] = "\
+,\n\
+	\"attr_%s\": \"http://%s/%s/%s/attr_%s\"\
+";
+
+static char json_obj_footer[] = "\
+\n\
+}\n\
 ";
 
 tmpl_format_t json_format = {
@@ -151,6 +185,9 @@ tmpl_format_t json_format = {
 	.prov_header	= json_prov_header,
 	.prov_entry	= json_prov_entry,
 	.prov_footer	= json_prov_footer,
+	.list_header	= json_list_header,
+	.list_entry	= json_list_entry,
+	.list_footer	= json_list_footer,
 	.obj_header	= json_obj_header,
 	.obj_entry	= json_obj_entry,
 	.obj_footer	= json_obj_footer,
@@ -260,19 +297,67 @@ tmpl_prov_footer (tmpl_ctx_t *ctx)
 }
 
 int
-tmpl_obj_header (tmpl_ctx_t *ctx)
+tmpl_list_header (tmpl_ctx_t *ctx)
 {
-	ctx->buf = ctx->format->obj_header;
+	ctx->buf = ctx->format->list_header;
 	return strlen(ctx->buf);
 }
 
 int
-tmpl_obj_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key)
+tmpl_list_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key)
 {
 	int		 size;
 	tmpl_format_t	*fmt	= ctx->format;
 
-	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->obj_entry,bucket,key);
+	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->list_entry,bucket,key);
+	if (size >= TMPL_BUF_SIZE) {
+		return 0;
+	}
+	ctx->buf = ctx->raw_buf;
+
+	if (size && (ctx->index == 0)) {
+		ctx->buf += fmt->z_offset;
+		size -= fmt->z_offset;
+	}
+
+	++(ctx->index);
+	return size;
+}
+
+int
+tmpl_list_footer (tmpl_ctx_t *ctx)
+{
+	ctx->buf = ctx->format->list_footer;
+	return strlen(ctx->buf);
+}
+
+int
+tmpl_obj_header (tmpl_ctx_t *ctx, const char *bucket, const char *key)
+{
+	int		 size;
+	tmpl_format_t	*fmt	= ctx->format;
+
+	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->obj_header,
+		ctx->base, bucket, key,		/* once for the body... */
+		ctx->base, bucket, key);	/* ...and once for the attrs */
+	if (size >= TMPL_BUF_SIZE) {
+		return 0;
+	}
+	ctx->buf = ctx->raw_buf;
+
+	++(ctx->index);
+	return size;
+}
+
+int
+tmpl_obj_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key,
+		const char *attr)
+{
+	int		 size;
+	tmpl_format_t	*fmt	= ctx->format;
+
+	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->obj_entry,
+		attr, ctx->base, bucket, key, attr);
 	if (size >= TMPL_BUF_SIZE) {
 		return 0;
 	}
