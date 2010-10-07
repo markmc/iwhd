@@ -18,6 +18,7 @@ iwhd
 iwhd-*.tar.gz
 iwhd-qparser.c
 iwhd-qparser.h
+iwhd.spec
 qlexer.c
 stamp-h1
 t/*.log

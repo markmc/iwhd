@@ -23,11 +23,18 @@ iwhd_YFLAGS = -d
 SUBDIRS = t
 ACLOCAL_AMFLAGS = -I ax
 
+# iwhd is short for Image WareHouse Daemon.
 bin_PROGRAMS = iwhd
-EXTRA_DIST = iwhd-qparser.h
+
+EXTRA_DIST =		\
+  iwhd-qparser.h	\
+  iwhd.spec		\
+  iwhd.spec.in
+
 BUILT_SOURCES = iwhd-qparser.h qlexer.c
 
-# iwhd is short for Image WareHouse Daemon.
+MOSTLYCLEANFILES =
+MAINTAINERCLEANFILES =
 
 iwhd_SOURCES = \
   auto.c	\
@@ -51,6 +58,19 @@ iwhd_SOURCES = \
 
 EXTRA_iwhd_SOURCES = qlexer.l
 
+MOSTLYCLEANFILES += iwhd.spec
+MAINTAINERCLEANFILES += iwhd.spec
+iwhd.spec: iwhd.spec.in Makefile.am
+	rm -f $@-t $@
+	sed 's/@''VERSION@/$(VERSION)/' $< > $@-t
+	chmod a=r $@-t
+	mv $@-t $@
+
+.PHONY: rpm
+rpm: dist iwhd.spec
+	chmod 644 $(distdir).tar.gz
+	rpmbuild -ta $(distdir).tar.gz
+
 iwhd_CPPFLAGS	= $(HAIL_CFLAGS)
 iwhd_LDADD =		\
   -lmongoclient		\
@@ -65,6 +85,6 @@ iwhd_LDADD =		\
   $(GLIB2_LIB)		\
   $(HAIL_LIBS)
 
-MOSTLYCLEANFILES = qlexer.c
-MAINTAINERCLEANFILES = qlexer.c
+MOSTLYCLEANFILES += qlexer.c
+MAINTAINERCLEANFILES += qlexer.c
 EXTRA_DIST += qlexer.c

@@ -1,0 +1,63 @@
+Name:		iwhd
+Version:	@VERSION@
+Release:	1%{?dist}
+Summary:	Image WareHouse Daemon
+
+Group:		System Environment/Libraries
+License:	GPLv3
+
+# FIXME: this is just the gitweb URL.  Do we need more?
+URL:		http://repo.or.cz/w/iwhd.git
+
+# pulled from upstream git,
+# to recreate tarball, check out commit, then run "make dist"
+Source0:	iwhd-%{version}.tar.gz
+
+BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+
+BuildRequires: boost-devel
+BuildRequires: boost-filesystem
+BuildRequires: glib2-devel
+BuildRequires: hail-devel
+BuildRequires: jansson-devel
+BuildRequires: libcurl-devel
+BuildRequires: libmicrohttpd-devel
+BuildRequires: libxml2-devel
+BuildRequires: mongodb-devel
+BuildRequires: bison
+BuildRequires: flex
+BuildRequires: autoconf
+BuildRequires: automake
+BuildRequires: mongodb-server
+BuildRequires: help2man
+
+%description
+Deltacloud image-warehouse daemon
+
+%prep
+%setup -q
+
+%build
+%configure
+make %{?_smp_mflags}
+
+%install
+rm -rf %{buildroot}
+make install DESTDIR=%{buildroot}
+
+%check
+make -s check
+
+%clean
+rm -rf %{buildroot}
+
+%post
+
+%files
+%defattr(-,root,root,-)
+%doc AUTHORS COPYING README NEWS
+%{_bindir}/iwhd
+
+%changelog
+* Wed Oct  7 2010 Jim Meyering <meyering@redhat.com> - 0.90-1
+- Initial release.
