@@ -62,7 +62,7 @@ pthread_mutex_t		client_lock	= PTHREAD_MUTEX_INITIALIZER;
 void
 dbl_to_str (double *foo, char *optr)
 {
-	int i;
+	unsigned int i;
 	unsigned char *iptr = (unsigned char *)foo;
 
 	for (i = 0; i < sizeof(*foo); ++i) {
