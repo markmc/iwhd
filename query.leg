@@ -143,11 +143,14 @@ make_link (value_t *left, value_t *right)
 
 #if defined(UNIT_TEST)
 struct { char *name; char *value; } hacked_obj_fields[] = {
+        /* Fake object fields for generic unit testing. */
 	{ "a", "2" }, { "b", "7" }, { "c", "11" },
+        /* This one's here to test links (e.g. $template.owner.name). */
 	{ "template", "templates/the_tmpl" },
 	{ NULL }
 };
 
+/* Fake out the eval code for unit testing. */
 char *
 unit_oget_func (void * notused, const char *text)
 {
@@ -163,6 +166,10 @@ unit_oget_func (void * notused, const char *text)
 }
 getter_t unit_oget = { unit_oget_func };
 
+/*
+ * Same as above, but the site-field stuff is so similar to the object-field
+ * stuff that it's not worth exercising too much separately.
+ */
 char *
 unit_sget_func (void * notused, const char *text)
 {
@@ -170,6 +177,7 @@ unit_sget_func (void * notused, const char *text)
 }
 getter_t unit_sget = { unit_sget_func };
 
+/* Fake links from an object/key tuple to an object/key string. */
 struct { char *obj; char *key; char *value; } hacked_links[] = {
 	{ "templates/the_tmpl", "owner", "users/the_user" },
 	{ "users/the_user", "name", "Jeff Darcy" },
@@ -197,6 +205,11 @@ follow_link (const char *object, const char *key)
 extern char *follow_link (const char *object, const char *key);
 #endif
 
+/*
+ * Return the string value of an expression for comparison or display, iff
+ * all component parts are string-valued themselves.  That excludes numbers
+ * and booleans.
+ */
 char *
 string_value (value_t *v, getter_t *oget, getter_t *sget)
 {
@@ -221,6 +234,10 @@ string_value (value_t *v, getter_t *oget, getter_t *sget)
 	}
 }
 
+/*
+ * Check whether a string looks like a simple decimal number.  There's
+ * probably a library function for this somewhere.
+ */
 int
 is_ok_number (const char *a_str)
 {
@@ -239,6 +256,14 @@ is_ok_number (const char *a_str)
 	return 1;
 }
 
+/*
+ * Comparisons are a bit messy.  If both sides are numbers, strings that look
+ * like numbers, or expressions that evaluate to numbers (booleans evaluate
+ * to 0/1), then we do a numeric comparison.  Otherwise, if both sides
+ * evaluate to strings, we attempt a string comparison.   That's the logic,
+ * but the code is actually structured a different way to allow re-use of
+ * common operator-specific code at the end for both cases.
+ */
 int
 compare (value_t *left, comp_t op, value_t *right,
 	 getter_t *oget, getter_t *sget)
@@ -288,6 +313,13 @@ compare (value_t *left, comp_t op, value_t *right,
 		}
 	}
 
+        /*
+         * Strcmp returns -1/0/1, but -1 for us would mean an error and
+         * which of 0/1 we return depends on which comparison operatoer
+         * we're dealing with.  Therefore, we stick the strcmp result on
+         * the left side and let the switch below do an operator-appropriate
+         * compare against zero on the right.
+         */
 	if (!num_ok) {
 		if (!lstr || !rstr) {
 			return -1;
@@ -406,6 +438,18 @@ free_value (value_t *v)
 		free(v);
 	}
 }
+
+/*
+ * Evaluate an AST in the current context to one of:
+ *      true=1
+ *      false=0
+ *      error=-1
+ * It's up to the caller whether error is functionally the same as false.
+ * Note that even T_NUMBER gets squeezed down to these three values.  The
+ * only thing numbers are used for is comparing against other numbers to
+ * yield a boolean for the query or replication-policy code.  If you want
+ * something that returns a number, this is the wrong language for it.
+ */
 
 int
 eval (const value_t *v, getter_t *oget, getter_t *sget)
