@@ -246,7 +246,8 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
 		child_res = NULL;
 		pthread_join(ms->backend_th,&child_res);
 		if (child_res == THREAD_FAILED) {
-			ms->rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+                        DPRINTF("GET producer failed\n");
+                        /* Nothing we can do; already sent status. */
 		}
 		if (ms->from_master) {
 			pthread_join(ms->cache_th,NULL);
@@ -269,6 +270,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	pipe_private		*pp2;
 	char			*my_etag;
 	const char		*user_etag;
+        int                      rc;
 
 	(void)cctx;
 	(void)method;
@@ -286,7 +288,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	my_etag = meta_has_copy(ms->bucket,ms->key,me);
         if (!my_etag) {
-                DPRINTF("should check locally for %s/%s\n",ms->bucket,ms->key);
+                DPRINTF("falling back to local for %s/%s\n",ms->bucket,ms->key);
                 ms->from_master = 0;
         }
 	else if (*my_etag) {
@@ -347,6 +349,9 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	else {
 		pp2 = NULL;
 	}
+
+        rc = pipe_cons_wait_init(&ms->pipe);
+        ms->rc = (rc == 0) ? MHD_HTTP_OK : MHD_HTTP_INTERNAL_SERVER_ERROR;
 
 	resp = MHD_create_response_from_callback(
 		MHD_SIZE_UNKNOWN, 65536, proxy_get_cons, pp, child_closer);

@@ -79,10 +79,12 @@ typedef struct {
 	void		*data_ptr;
 	size_t		 data_len;
 	unsigned long	 sequence;
-	int		 in_init;
 	unsigned short	 cons_total;
+        unsigned short   cons_init_done;
+        unsigned short   cons_init_error;
 	unsigned short	 cons_done;
 	unsigned short   cons_error;
+        enum { PROD_INIT, PROD_RUNNING, PROD_ERROR } prod_state;
 } pipe_shared;
 
 typedef struct {
@@ -99,6 +101,8 @@ int		 pipe_cons_wait		(pipe_private *pp);
 void		 pipe_cons_signal	(pipe_private *pp, int error);
 void		 pipe_cons_siginit	(pipe_shared *ps, int error);
 int		 pipe_prod_wait_init	(pipe_shared *ps);
+void             pipe_prod_siginit      (pipe_shared *ps, int error);
+int              pipe_cons_wait_init    (pipe_shared *ps);
 void		 pipe_prod_signal	(pipe_shared *ps,
 					 void *ptr, size_t total);
 void		 pipe_prod_finish	(pipe_shared *ps);

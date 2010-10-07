@@ -14,6 +14,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include <config.h>
+#include <assert.h>
 
 #include "iwh.h"
 #include "mpipe.h"
@@ -28,10 +29,12 @@ pipe_init_shared (pipe_shared *ps, void *owner, unsigned short ncons)
 	ps->data_ptr = NULL;
 	ps->data_len = 0;
 	ps->sequence = 0;	/* TBD: randomize? */
-	ps->in_init = 1;
 	ps->cons_total = ncons;
 	ps->cons_done = 0;
 	ps->cons_error = 0;
+        ps->cons_init_done = 0;
+        ps->cons_init_error = 0;
+        ps->prod_state = PROD_INIT;
 }
 
 pipe_private *
@@ -84,13 +87,15 @@ pipe_cons_signal (pipe_private *pp, int error)
 	++pp->sequence;
 	pp->offset = 0;
 
-	if (error)
+	if (error) {
 		++ps->cons_error;
-	else
+        }
+	else {
 		++ps->cons_done;
+        }
 	if (ps->cons_done + ps->cons_error >= ps->cons_total) {
-		DPRINTF("consumer signal, done %u total %u\n",
-			ps->cons_done,ps->cons_total);
+		DPRINTF("consumer signal, total %u done %u error %u\n",
+			ps->cons_total, ps->cons_done, ps->cons_error);
 		pthread_cond_signal(&ps->prod_cond);
 	}
 	pthread_mutex_unlock(&ps->lock);
@@ -100,18 +105,16 @@ void
 pipe_cons_siginit (pipe_shared *ps, int error)
 {
 	pthread_mutex_lock(&ps->lock);
-	if (!ps->in_init) {
-		pthread_mutex_unlock(&ps->lock);
-		return;
-	}
-	if (error)
-		++ps->cons_error;
-	else
-		++ps->cons_done;
+	assert ((ps->cons_init_done + ps->cons_init_error) < ps->cons_total);
+	if (error) {
+		++ps->cons_init_error;
+        }
+	else {
+		++ps->cons_init_done;
+        }
 	pthread_cond_broadcast(&ps->prod_cond);
 	DPRINTF("consumer init signal (total %u done %u error %u)\n",
 		ps->cons_total,ps->cons_done,ps->cons_error);
-	ps->in_init = 0;
 	pthread_mutex_unlock(&ps->lock);
 }
 
@@ -122,14 +125,13 @@ int
 pipe_prod_wait_init (pipe_shared *ps)
 {
 	pthread_mutex_lock(&ps->lock);
-	DPRINTF("producer initializing (total %u error %u)\n",
-		ps->cons_total,ps->cons_error);
-	while (ps->cons_done + ps->cons_error < ps->cons_total) {
+	DPRINTF("producer initializing (total %u done %u error %u)\n",
+		ps->cons_total, ps->cons_init_done, ps->cons_init_error);
+	while (ps->cons_init_done + ps->cons_init_error < ps->cons_total) {
 		pthread_cond_broadcast(&ps->cons_cond);
 		pthread_cond_wait(&ps->prod_cond,&ps->lock);
-		DPRINTF("%u children yet to poll (total %u done %u error %u)\n",
-			ps->cons_total - (ps->cons_done + ps->cons_error),
-			ps->cons_total,ps->cons_done,ps->cons_error);
+		DPRINTF("  after sleep (total %u done %u error %u)\n",
+			ps->cons_total,ps->cons_init_done,ps->cons_init_error);
 	}
 	pthread_mutex_unlock(&ps->lock);
 	return ps->cons_error;
@@ -160,6 +162,30 @@ pipe_prod_signal (pipe_shared *ps, void *ptr, size_t total)
 			ps->cons_total,ps->cons_done,ps->cons_error);
 	}
 	pthread_mutex_unlock(&ps->lock);
+}
+
+void
+pipe_prod_siginit (pipe_shared *ps, int err)
+{
+        pthread_mutex_lock(&ps->lock);
+        assert (ps->prod_state == PROD_INIT);
+        ps->prod_state = (err >= 0) ? PROD_RUNNING : PROD_ERROR;
+	pthread_cond_broadcast(&ps->cons_cond);
+        pthread_mutex_unlock(&ps->lock);
+}
+
+int
+pipe_cons_wait_init (pipe_shared *ps)
+{
+	pthread_mutex_lock(&ps->lock);
+        DPRINTF("consumer initing\n");
+	while (ps->prod_state == PROD_INIT) {
+		pthread_cond_broadcast(&ps->prod_cond);
+		pthread_cond_wait(&ps->cons_cond,&ps->lock);
+                DPRINTF("  after sleep (state = %u)\n",ps->prod_state);
+	}
+	pthread_mutex_unlock(&ps->lock);
+	return (ps->prod_state == PROD_ERROR);
 }
 
 void

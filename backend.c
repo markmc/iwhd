@@ -86,9 +86,10 @@ bad_init (void)
 void *
 bad_get_child (void * ctx)
 {
-	(void)ctx;
+        my_state        *ms     = (my_state *)ctx;
 
 	DPRINTF("*** bad call to %s\n",__func__);
+        pipe_prod_siginit(&ms->pipe,-1);
 	return NULL;
 }
 
@@ -222,6 +223,9 @@ void *
 s3_get_child (void * ctx)
 {
 	my_state	*ms	= ctx;
+
+        /* TBD: check existence before calling siginit */
+        pipe_prod_siginit(&ms->pipe,0);
 
 	hstor_get(hstor,ms->bucket,ms->key,http_get_prod,&ms->pipe,0);
 	/* TBD: check return value */
@@ -562,6 +566,7 @@ curl_get_child (void * ctx)
 
 	ms->curl = curl_easy_init();
 	if (!ms->curl) {
+                pipe_prod_siginit(&ms->pipe,-1);
 		return NULL;	/* TBD: flag error somehow */
 	}
 	ms->cleanup |= CLEANUP_CURL;
@@ -577,6 +582,7 @@ curl_get_child (void * ctx)
 	curl_easy_setopt(ms->curl,CURLOPT_WRITEFUNCTION,
 			 http_get_prod);
 	curl_easy_setopt(ms->curl,CURLOPT_WRITEDATA,&ms->pipe);
+        pipe_prod_siginit(&ms->pipe,0);
 	curl_easy_perform(ms->curl);
 	curl_easy_getinfo(ms->curl,CURLINFO_RESPONSE_CODE,&ms->rc);
 
@@ -790,8 +796,12 @@ fs_get_child (void * ctx)
 
 	fd = open(file, O_RDONLY);
 	if (fd < 0) {
+                pipe_prod_siginit(&ms->pipe,-1);
+                pipe_prod_finish(&ms->pipe);
 		return THREAD_FAILED;
 	}
+
+        pipe_prod_siginit(&ms->pipe,0);
 
 	for (;;) {
 		bytes = read(fd,buf,sizeof(buf));
@@ -884,7 +894,6 @@ fs_bcreate (const char *bucket)
 
 	return MHD_HTTP_OK;
 }
-
 
 /***** Function tables. ****/
 
