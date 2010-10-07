@@ -80,6 +80,7 @@ public:
 		~RepoMeta	();
 
 	DBClientConnection	client;
+	char	            addr[128];
 
 	char *	DidPut		(const char *bucket, const char *key,
 				 const char *loc, size_t size);
@@ -119,15 +120,19 @@ RepoMeta *it;
 
 RepoMeta::RepoMeta ()
 {
-	char	addr[128];
-
 	if (!verbose) {
 		cout.rdbuf(0);
 		cout << "bite me" << endl;
 	}
 
+	// TBD: assemble this string properly
 	sprintf(addr,"%s:%u",db_host,db_port);
-	client.connect(addr);
+	try {
+		client.connect(addr);
+	}
+	catch (ConnectException &ce) {
+		cerr << "server down, no metadata access" << endl;
+	}
 }
 
 extern "C" void
@@ -150,18 +155,26 @@ auto_ptr<DBClientCursor>
 RepoMeta::GetCursor (Query &q)
 {
 	auto_ptr<DBClientCursor> curs;
+	bool looping = false;
 
-	curs = client.query(MAIN_TBL,q);
-	if (!curs.get()) {
-		cout << "reconnecting" << endl;
+	for (;;) {
+		if (!client.isFailed()) {
+		        curs = client.query(MAIN_TBL,q);
+		        if (curs.get()) {
+		                break;
+		        }
+		}
+		if (looping) {
+		        break;
+		}
 		try {
-			client.connect("localhost");
+		        client.connect(addr);
 		}
 		catch (ConnectException &ce) {
-			cout << "server down" << endl;
-			throw;
+		        cerr << "reconnection to " << addr << " failed"
+		             << endl;
 		}
-		curs = client.query(MAIN_TBL,q);
+		looping = true;
 	}
 
 	return curs;
@@ -185,6 +198,10 @@ RepoMeta::DidPut (const char *bucket, const char *key, const char *loc,
 
 	q = QUERY("bucket"<<bucket<<"key"<<key);
 	curs = GetCursor(q);
+	if (!curs.get()) {
+		cerr << "DidPut failed for " << bucket << "/" << key << endl;
+		return NULL;
+	}
 	if (curs->more()) {
 		/* Nice functionality, but what an ugly syntax! */
 		client.update(MAIN_TBL,q,BSON(
@@ -237,12 +254,16 @@ RepoMeta::GotCopy (const char *bucket, const char *key, const char *loc)
 
 	q = QUERY("bucket"<<bucket<<"key"<<key);
 	curs = GetCursor(q);
+	if (!curs.get()) {
+		cerr << "GotCopy failed for " << bucket << "/" << key << endl;
+		return;
+	}
 	if (curs->more()) {
 		/* Nice functionality, but what an ugly syntax! */
 		client.update(MAIN_TBL,q,BSON("$addToSet"<<BSON("loc"<<loc)));
 	}
 	else {
-		cerr << bucket << ":" << key << " not found in GotCopy!" << endl;
+		cerr << bucket << "/" << key << " not found in GotCopy!" << endl;
 	}
 }
 
@@ -264,15 +285,19 @@ RepoMeta::HasCopy (const char *bucket, const char *key, const char *loc)
 
 	q = QUERY("bucket"<<bucket<<"key"<<key<<"loc"<<loc);
 	curs = GetCursor(q);
+	if (!curs.get()) {
+		cerr << "HasCopy failed for " << bucket << "/" << key << endl;
+		return NULL;
+	}
 	if (!curs->more()) {
 		cout << bucket << "/" << key << " not found at " << loc << endl;
-		return NULL;
+		return (char *)"";
 	}
 
 	value = curs->next().getStringField("etag");
 	if (!value || !*value) {
 		cout << bucket << "/" << key << " no etag at " << loc << endl;
-		return NULL;
+		return (char *)"";
 	}
 
 	cout << bucket << "/" << key << " etag = " << value << endl;
@@ -297,7 +322,15 @@ RepoMeta::SetValue (const char *bucket, const char *key, const char *mkey,
 {
 	Query	q	= QUERY("bucket"<<bucket<<"key"<<key);
 
-	client.update(MAIN_TBL,q,BSON("$set"<<BSON(mkey<<mvalue)),1);
+	try {
+		client.update(MAIN_TBL,q,BSON("$set"<<BSON(mkey<<mvalue)),1);
+	}
+	catch (ConnectException &ce) {
+		cerr << "SetValue failed for " << bucket << "/" << key << ":"
+		     << mkey << endl;
+		return ENOTCONN;
+	}
+
 	// TBD: check for and propagate errors.
 	return 0;
 }
@@ -326,7 +359,11 @@ RepoMeta::GetValue (const char *bucket, const char *key, const char *mkey,
 
 	q = QUERY("bucket"<<bucket<<"key"<<key);
 	curs = GetCursor(q);
-
+	if (!curs.get()) {
+		cerr << "GetValue failed for " << bucket << "/" << key << ":"
+		     << mkey << endl;
+		return ENOTCONN;
+	}
 	if (!curs->more()) {
 		return ENXIO;
 	}
@@ -431,6 +468,10 @@ RepoQuery::Next (void)
 {
 	BSONObj		bo;
 
+        if (!curs) {
+                return false;
+        }
+
 	while (curs->more()) {
 		bo = curs->next();
 		if (expr) {
@@ -514,7 +555,12 @@ RepoMeta::Delete (const char *bucket, const char *key)
 {
 	Query	q	= QUERY("bucket"<<bucket<<"key"<<key);
 
-	client.remove(MAIN_TBL,q);
+	try {
+		client.remove(MAIN_TBL,q);
+	}
+	catch (ConnectException &ce) {
+		cerr << "Delete failed for " << bucket << "/" << key << endl;
+	}
 }
 
 extern "C"

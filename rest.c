@@ -285,7 +285,11 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	ms->cleanup |= CLEANUP_URL;
 
 	my_etag = meta_has_copy(ms->bucket,ms->key,me);
-	if (my_etag) {
+        if (!my_etag) {
+                DPRINTF("should check locally for %s/%s\n",ms->bucket,ms->key);
+                ms->from_master = 0;
+        }
+	else if (*my_etag) {
 		user_etag = MHD_lookup_connection_value(
 			conn, MHD_HEADER_KIND, "If-None-Match");
 		if (user_etag && !strcmp(user_etag,my_etag)) {
