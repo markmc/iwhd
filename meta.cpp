@@ -580,6 +580,8 @@ RepoMeta::GetSize (const char *bucket, const char *key)
 	BSONObj				bo;
 	const char *			data;
 
+	(void)data;
+
 	q = QUERY("bucket"<<bucket<<"key"<<key);
 	curs = GetCursor(q);
 
