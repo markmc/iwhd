@@ -562,13 +562,15 @@ class AttrList {
 public:
 				AttrList	(BSONObj &);
 	int			Next		(const char **, const char **);
+        BSONObj                 obj;
 	vector<BSONElement>	vec;
 	int			idx;
 };
 
 AttrList::AttrList (BSONObj &bo)
 {
-	bo.elems(vec);
+        obj = bo.copy();
+	obj.elems(vec);
 	idx = 0;
 }
 
