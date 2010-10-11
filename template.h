@@ -35,7 +35,7 @@ typedef struct {
 } tmpl_format_t;
 
 typedef struct {
-	tmpl_format_t	*format;
+	const tmpl_format_t *format;
 	const char	*base;
 	unsigned int	 index;
 	char		 raw_buf[TMPL_BUF_SIZE];

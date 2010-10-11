@@ -71,23 +71,23 @@ static const char xml_list_footer[] = "\
 </objects>\n\
 ";
 
-static char xml_obj_header[] = "\
+static const char xml_obj_header[] = "\
 <object>\n\
 	<object_body path=\"http://%s/%s/%s/body\"/>\n\
 	<object_attr_list path=\"http://%s/%s/%s/attrs\"/>\
 ";
 
-static char xml_obj_entry[] = "\
+static const char xml_obj_entry[] = "\
 \n\
 	<object_attr name=\"%s\" path=\"http:/%s/%s/%s/attr_%s\"\
 ";
 
-static char xml_obj_footer[] = "\
+static const char xml_obj_footer[] = "\
 \n\
 </object>\n\
 ";
 
-tmpl_format_t xml_format = {
+static const tmpl_format_t xml_format = {
 	.root_header	= xml_root_header,
 	.root_entry	= xml_root_entry,
 	.root_footer	= xml_root_footer,
@@ -178,7 +178,7 @@ static char json_obj_footer[] = "\
 }\n\
 ";
 
-tmpl_format_t json_format = {
+static const tmpl_format_t json_format = {
 	.root_header	= json_root_header,
 	.root_entry	= json_root_entry,
 	.root_footer	= json_root_footer,
@@ -215,8 +215,8 @@ tmpl_get_ctx (const char *type)
 int
 tmpl_root_header (tmpl_ctx_t *ctx, const char *name, const char *version)
 {
-	int		 size;
-	tmpl_format_t	*fmt	= ctx->format;
+	int size;
+	const tmpl_format_t *fmt = ctx->format;
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->root_header,
 		name,version);
@@ -231,8 +231,8 @@ tmpl_root_header (tmpl_ctx_t *ctx, const char *name, const char *version)
 int
 tmpl_root_entry (tmpl_ctx_t *ctx, const char *rel, const char *link)
 {
-	int		 size;
-	tmpl_format_t	*fmt	= ctx->format;
+	int size;
+	const tmpl_format_t *fmt = ctx->format;
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->root_entry,
 		rel, ctx->base, link);
@@ -270,8 +270,8 @@ tmpl_prov_entry (tmpl_ctx_t *ctx,
 		 const char *host, int port,
 		 const char *user, const char *pass)
 {
-	int		 size;
-	tmpl_format_t	*fmt	= ctx->format;
+	int size;
+	const tmpl_format_t *fmt = ctx->format;
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->prov_entry,
 		name, type, host, port, user, pass);
@@ -306,8 +306,8 @@ tmpl_list_header (tmpl_ctx_t *ctx)
 int
 tmpl_list_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key)
 {
-	int		 size;
-	tmpl_format_t	*fmt	= ctx->format;
+	int size;
+	const tmpl_format_t *fmt = ctx->format;
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->list_entry,bucket,key);
 	if (size >= TMPL_BUF_SIZE) {
@@ -334,8 +334,8 @@ tmpl_list_footer (tmpl_ctx_t *ctx)
 int
 tmpl_obj_header (tmpl_ctx_t *ctx, const char *bucket, const char *key)
 {
-	int		 size;
-	tmpl_format_t	*fmt	= ctx->format;
+	int size;
+	const tmpl_format_t *fmt = ctx->format;
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->obj_header,
 		ctx->base, bucket, key,		/* once for the body... */
@@ -353,8 +353,8 @@ int
 tmpl_obj_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key,
 		const char *attr)
 {
-	int		 size;
-	tmpl_format_t	*fmt	= ctx->format;
+	int size;
+	const tmpl_format_t *fmt = ctx->format;
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->obj_entry,
 		attr, ctx->base, bucket, key, attr);
