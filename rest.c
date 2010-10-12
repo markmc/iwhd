@@ -71,6 +71,7 @@ typedef struct {
 
 static int			 fs_mode	= 0;
 static unsigned short		 my_port	= MY_PORT;
+static int			 autostart	= 0;
 const char *program_name;
 
 static char *(reserved_name[]) = { "_default", "_query", "_new", NULL };
@@ -1858,6 +1859,7 @@ enum
 };
 
 static const struct option my_options[] = {
+	{ "autostart", no_argument,     NULL, 'a' },
 	{ "config",  required_argument, NULL, 'c' },
 	{ "db",      required_argument, NULL, 'd' },
 	{ "master",  required_argument, NULL, 'm' },
@@ -1884,6 +1886,7 @@ Usage: %s [OPTION]\n\
 Deltacloud image-warehouse daemon.\n\
 A configuration file must be specified.\n\
 \n\
+  -a, --autostart         start necessary back-end services\n\
   -c, --config=FILE       config file [required]\n\
   -d, --db=HOST_PORT      database server as ip[:port]\n\
   -m, --master=HOST_PORT  master (upstream) server as ip[:port]\n\
@@ -1913,7 +1916,10 @@ main (int argc, char **argv)
 
 	program_name = argv[0];
 
-	for (;;) switch (getopt_long(argc,argv,"c:d:m:p:v",my_options,NULL)) {
+	for (;;) switch (getopt_long(argc,argv,"ac:d:m:p:v",my_options,NULL)) {
+	case 'a':
+		++autostart;
+		break;
 	case 'c':
 		cfg_file = optarg;
 		break;
@@ -1955,15 +1961,31 @@ main (int argc, char **argv)
 	}
 args_done:
 
-	if (!cfg_file) {
-		error (0, 0, "no configuration file specified");
-		usage (EXIT_FAILURE);
+	if (!db_port) {
+		db_port = autostart ? AUTO_MONGOD_PORT : 27017;
 	}
 
-	me = parse_config();
-	if (!me) {
-		fprintf(stderr,"could not parse %s\n",cfg_file);
+	if (autostart && cfg_file) {
+		error(0,0,"do not use -c and -a simultaneously");
 		return !0;
+	}
+	else if (autostart && !cfg_file) {
+		me = auto_config();
+		if (!me) {
+			/* error printed */
+			return !0;
+		}
+	}
+	else if (!autostart && cfg_file) {
+		me = parse_config();
+		if (!me) {
+			error(0,0,"could not parse %s",cfg_file);
+			return !0;
+		}
+	}
+	else {
+		error(0,0,"specify at least -c or -a");
+		usage (EXIT_FAILURE);
 	}
 
 	sem_init(&the_sem,0,0);
@@ -2008,9 +2030,11 @@ args_done:
 		MHD_OPTION_END);
 	if (!the_daemon) {
 		fprintf(stderr,"Could not create daemon.\n");
+		auto_stop();
 		return !0;
 	}
 
 	sem_wait(&the_sem);
+	auto_stop();
 	return 0;
 }

@@ -31,6 +31,7 @@ typedef struct _provider {
 } provider_t;
 
 char	*parse_config		(void);
+char	*auto_config		(void);
 void	 repl_init		(void);
 void	 replicate		(const char *url, size_t size,
 				 const char *policy);
@@ -41,5 +42,8 @@ void	 update_provider	(const char *provider,
 				 const char *username, const char *password);
 char	*get_provider_value	(int i, const char *fname);
 int	 get_rep_count		(void);
+
+int	 auto_start		(int dbport);
+void	 auto_stop		(void);
 
 #endif

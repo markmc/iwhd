@@ -27,6 +27,7 @@ EXTRA_DIST = query.leg
 # iwhd is short for Image WareHouse Daemon.
 
 iwhd_SOURCES = \
+  auto.c	\
   backend.c	\
   backend.h	\
   iwh.h		\

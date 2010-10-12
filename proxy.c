@@ -266,6 +266,48 @@ err:
 	return 0;
 }
 
+char *
+auto_config(void)
+{
+	static const char auto_json[] = {
+		"[ {\n"
+		"  \"name\": \"fs_autostart\",\n"
+		"  \"type\": \"fs\",\n"
+		"  \"path\": \"" AUTO_DIR_FS "\"\n"
+		"} ]\n",
+	};
+	json_error_t	 err;
+
+	if (auto_start(db_port) != 0) {
+		return NULL;
+	}
+
+	config = json_loads(auto_json,&err);
+	if (!config) {
+		fprintf(stderr,"JSON error on line %d: %s\n",err.line,err.text);
+		return NULL;
+	}
+
+	if (json_typeof(config) != JSON_ARRAY) {
+		goto out_ie;
+	}
+
+	if (json_array_size(config) != 1) {
+		goto out_ie;
+	}
+
+	if (!validate_server(0)) {
+		goto out_ie;
+	}
+
+	printf("no replication servers defined, auto-start in effect\n");
+	return set_config();
+
+out_ie:
+	error(0, 0, "invalid autostart configuration (internal error)");
+	return NULL;
+}
+
 static size_t
 junk_writer (/* const */ void *ptr, size_t size, size_t nmemb, void *stream)
 {

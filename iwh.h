@@ -48,7 +48,7 @@ GLOBAL(unsigned short,	master_port,	MY_PORT);
 GLOBAL(unsigned int,	s3mode,		0);		/* repod/S3 */
 GLOBAL(const char *,	local_path,	"/tmp");	/* FS */
 GLOBAL(const char *,	db_host,	"localhost");
-GLOBAL(unsigned short,	db_port,	27017);
+GLOBAL(unsigned short,	db_port,	0);
 GLOBAL(char *,          me,             "here");
 
 #define DPRINTF(fmt,args...) do {	\
@@ -66,3 +66,22 @@ GLOBAL(char *,          me,             "here");
 #ifndef ATTRIBUTE_UNUSED
 # define ATTRIBUTE_UNUSED __attribute__ ((__unused__))
 #endif
+
+/*
+ * Common parts of autostart
+ *
+ * Directories are relative so they are based off local_path.
+ * Notice that we continue to use the underscore convention even though
+ * buckets are inside the AUTO_DIR_FS and do not conflict. Visual help:
+ * you can see what to delete right away.
+ *
+ * We want our own Mongo instance for autostart. Mongo does not have
+ * a feature "listen on port 0 and tell us what you got" (like Hail),
+ * so we define a port and hope it's not in use...
+ */
+#define AUTO_HOST	"localhost"
+#define AUTO_DIR_FS	"_fs"
+#define AUTO_DIR_DB	"_db"
+#define AUTO_BIN_MONGOD	"/usr/bin/mongod"
+#define AUTO_MONGOD_LOG	"_mongod.log"
+#define AUTO_MONGOD_PORT 27018
