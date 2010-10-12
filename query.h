@@ -41,6 +41,7 @@ typedef struct _value {
 			struct _value *right;
 		} as_tree;
 	};
+	char *resolved;	/* saved result for T_OFIELD/T_SFIELD/T_LINK */
 } value_t;
 
 typedef struct {
