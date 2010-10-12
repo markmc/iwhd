@@ -123,7 +123,7 @@ printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
 
 iwhd -v -p $port -c iwhd.cfg -d localhost:$m_port &
 iwhd_pid=$!
-cleanup_() { kill -9 $mongo_pid $iwhd_pid; }
+cleanup_() { kill -9 $mongo_pid; kill $iwhd_pid; }
 
 # Wait for up to 3 seconds for iwhd to begin listening on $port.
 wait_for .1 30 "curl -s http://localhost:$port" \
