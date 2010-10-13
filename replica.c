@@ -757,7 +757,6 @@ replicate (const char *url, size_t size, const char *policy)
 static void
 replicate_namespace_action (const char *name, repl_t action)
 {
-	unsigned int	 i;
 	repl_item	*item;
 	GHashTableIter	 iter;
 	gpointer	 key;
@@ -768,7 +767,8 @@ replicate_namespace_action (const char *name, repl_t action)
 		if (!strcmp(key,me)) {
 			continue;
 		}
-		DPRINTF("replicating delete(%s) on %u\n",name,i);
+		DPRINTF("replicating delete(%s) on %s\n",name,
+			((provider_t *)value)->name);
 		item = malloc(sizeof(*item));
 		if (!item) {
 			error(0,errno,"could not create repl_item for %s",
@@ -812,12 +812,22 @@ replicate_bcreate (const char *name)
 
 /* Part of our API to the query module. */
 char *
-follow_link (char *object, char *key)
+follow_link (char *object, const char *key)
 {
-	(void)object;
-	(void)key;
+	char	*slash;
+	char	*value	= NULL;
 
-	return "no_such_object";
+	slash = strchr(object,'/');
+	if (!slash) {
+		return NULL;
+	}
+
+	*(slash++) = '\0';
+	(void)meta_get_value(object,slash,key,&value);
+	*(--slash) = '/';
+
+	DPRINTF("%s: %s:%s => %s\n",__func__,object,key,value);
+	return value;
 }
 
 int
