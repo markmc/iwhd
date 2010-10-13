@@ -1,0 +1,57 @@
+#!/bin/sh
+# Test autostart functionality.
+
+. "${srcdir=.}/init.sh"; path_prepend_ ..
+
+mkdir iwhd || framework_failure_ mkdir failed
+
+port=9094
+m_port=27018 # auto-start default
+
+printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
+  > iwhd.cfg || fail=1
+
+# Make sure specifying both -a and -c fails.
+iwhd -v -a -c iwhd.cfg && fail=1
+
+# Make sure specifying *neither* fails.
+iwhd -v && fail=1
+
+# Start for real.
+iwhd -v -p $port -a &
+iwhd_pid=$!
+cleanup_() { kill $iwhd_pid; }
+
+# Wait for up to 3 seconds for mongod to begin listening.
+wait_for .1 30 'mongo localhost:$m_port < /dev/null' \
+  || framework_failure_ mongod failed to start
+# Wait for up to 3 seconds for iwhd to begin listening on $port.
+wait_for .1 30 "curl -s http://localhost:$port" \
+  || framework_failure_ iwhd failed to start
+
+mongo_pid=$(cat mongo.pid)
+echo "mongo_pid = $mongo_pid"
+cleanup_() { kill $iwhd_pid; kill -9 $mongo_pid; }
+
+# Create an empty bucket.
+curl -X PUT http://localhost:$port/b1 || fail=1
+test -d _fs/b1 || fail=1
+
+# Create a file in that bucket.
+echo foo | curl -T - http://localhost:$port/b1/f1 || fail=1
+# Test presence in the FS.
+test -f _fs/b1/f1 || fail=1
+test "$(cat _fs/b1/f1)" = foo || fail=1
+# Test through the API as well.
+curl http://localhost:$port/b1/f1 > f1copy
+test "$(cat f1copy)" = foo || fail=1
+
+# Delete an object.
+curl -X DELETE http://localhost:$port/b1/f1 || fail=1
+# Ensure that it's gone from the file system.
+test -f _fs/b1/f1 && fail=1
+# Ensure that it's gone in the API as well.
+curl -f http://localhost:$port/b1/f1 > /dev/null 2> del_object.err
+grep ' 404$' del_object.err || fail=1
+
+Exit $fail

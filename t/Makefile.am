@@ -17,7 +17,8 @@
 TESTS =						\
   basic						\
   replication					\
-  parser-test
+  parser-test					\
+  auto
 
 EXTRA_DIST =					\
   $(TESTS)					\

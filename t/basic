@@ -12,7 +12,7 @@ mongo_pid=$!
 cleanup_() { kill -9 $mongo_pid; }
 
 # Wait for up to 3 seconds for mongod to begin listening.
-wait_for .1 30 'mongo < /dev/null' \
+wait_for .1 30 'mongo localhost:$m_port < /dev/null' \
   || framework_failure_ mongod failed to start
 
 port=9091
@@ -263,6 +263,12 @@ for attr in bucket key date etag loc; do
   printf whatever | curl -f -T - $bucket/f5/$attr 2> bad_attr.err
   grep ' 400$' bad_attr.err || fail=1
 done
+
+# Test "headless" operation (no access to metadata DB).
+kill -9 $mongo_pid
+cleanup_() { kill $iwhd_pid; }
+curl $bucket/f3 > f3copy
+test "$(cat f3copy)" = "nothing" || fail=1
 
 # TBD: add attribute-delete tests when that functionality is implemented
 

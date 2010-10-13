@@ -30,6 +30,7 @@ static char *auto_arg_mongod[] = {
 	/* "--fork", */	/* chdirs god knows where, we cannot use this. */
 	/* "--logpath", AUTO_MONGOD_LOG, */	/* required by --fork */
 	/* "--logappend", */
+	"--pidfilepath", "mongo.pid",
 	NULL
 };
 
@@ -39,6 +40,7 @@ static char *auto_arg_mongod_quiet[] = {
 	"--port", auto_arg_port,
 	"--dbpath", AUTO_DIR_DB,
 	"--logpath", AUTO_MONGOD_LOG,
+	"--pidfilepath", "mongo.pid",
 	NULL
 };
 
