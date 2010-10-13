@@ -455,7 +455,7 @@ meta_query_stop (void * qobj)
 	CLIENT_UNLOCK;
 }
 
-extern "C" char *
+extern "C" const char *
 query_getter (void *ctx, const char *id)
 {
 	BSONObj *cur_bo = (BSONObj *)ctx;

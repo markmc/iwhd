@@ -35,11 +35,13 @@ iwhd_SOURCES = \
   meta.h	\
   mpipe.c	\
   mpipe.h	\
-  proxy.c	\
-  proxy.h	\
+  replica.c	\
+  replica.h	\
   query.c	\
   query.h	\
   rest.c	\
+  setup.c	\
+  setup.h	\
   state_defs.h	\
   template.c	\
   template.h

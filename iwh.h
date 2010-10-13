@@ -38,7 +38,6 @@
  */
 
 GLOBAL(int,		verbose,	0);
-GLOBAL(char *,		cfg_file,	NULL);
 GLOBAL(const char *,	proxy_host,	NULL);		/* repod/S3 */
 GLOBAL(unsigned short,	proxy_port,	MY_PORT+1);	/* repod/S3 */
 GLOBAL(const char *,	proxy_key,	"foo");		/* S3 only */
@@ -49,7 +48,7 @@ GLOBAL(unsigned int,	s3mode,		0);		/* repod/S3 */
 GLOBAL(const char *,	local_path,	"/tmp");	/* FS */
 GLOBAL(const char *,	db_host,	"localhost");
 GLOBAL(unsigned short,	db_port,	0);
-GLOBAL(char *,          me,             "here");
+GLOBAL(const char *,    me,             "here");
 
 #define DPRINTF(fmt,args...) do {	\
 	if (verbose) {			\

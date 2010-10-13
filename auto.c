@@ -16,11 +16,9 @@
 
 #include <stdarg.h>		/* for microhttpd.h (bug in there) */
 #include <stdint.h>		/* for microhttpd.h (bug in there) */
-#include <microhttpd.h>		/* for proxy.h */
-#include <curl/curl.h>		/* for proxy.h */
-#include <glib.h>		/* for pfoxy.h */
+#include <jansson.h>
 
-#include "proxy.h"
+#include "setup.h"
 #include "iwh.h"
 
 static char auto_arg_port[10];
@@ -146,8 +144,9 @@ struct server_node {
 	} a;
 };
 
-static int node_resolve(struct server_node *sn,
-			const char *hostname, const char *portstr)
+static int
+node_resolve(struct server_node *sn,
+	     const char *hostname, const char *portstr)
 {
 	struct addrinfo hints;
 	struct addrinfo *res, *res0;
@@ -182,7 +181,8 @@ static int node_resolve(struct server_node *sn,
 	return -1;
 }
 
-static int auto_test_mongod(void)
+static int
+auto_test_mongod(void)
 {
 	struct server_node snode, *sn = &snode;
 	int sfd;

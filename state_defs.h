@@ -58,6 +58,7 @@ typedef struct {
 	pthread_t			 cache_th;
 	/* for bucket/object/provider list generators */
 	tmpl_ctx_t			*gen_ctx;
+	GHashTableIter			 prov_iter;
 } my_state;
 
 #define CLEANUP_CURL	0x01

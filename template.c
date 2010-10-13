@@ -273,6 +273,12 @@ tmpl_prov_entry (tmpl_ctx_t *ctx,
 	int size;
 	const tmpl_format_t *fmt = ctx->format;
 
+	if (!name)	name = "";
+	if (!type)	type = "";
+	if (!host)	host = "";
+	if (!user)	user = "";
+	if (!pass)	pass = "";
+
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->prov_entry,
 		name, type, host, port, user, pass);
 	if (size >= TMPL_BUF_SIZE) {

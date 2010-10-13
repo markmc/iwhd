@@ -154,7 +154,7 @@ struct { char *name; char *value; } hacked_obj_fields[] = {
 };
 
 /* Fake out the eval code for unit testing. */
-char *
+const char *
 unit_oget_func (void * notused, const char *text)
 {
 	int i;
@@ -173,7 +173,7 @@ getter_t unit_oget = { unit_oget_func };
  * Same as above, but the site-field stuff is so similar to the object-field
  * stuff that it's not worth exercising too much separately.
  */
-char *
+const char *
 unit_sget_func (void * notused, const char *text)
 {
 	return "never";
@@ -213,17 +213,18 @@ extern char *follow_link (const char *object, const char *key);
  * all component parts are string-valued themselves.  That excludes numbers
  * and booleans.
  */
-char *
+const char *
 string_value (value_t *v, getter_t *oget, getter_t *sget)
 {
-	char	*left;
+	const char	*left;
 
 	switch (v->type) {
 	case T_STRING:
 		return v->as_str;
 	case T_OFIELD:
 		if (!v->resolved) {
-			v->resolved = oget ? CALL_GETTER(oget,v->as_str) : NULL;
+			v->resolved = oget
+				? CALL_GETTER(oget,v->as_str) : NULL;
 		}
 		return v->resolved;
 	case T_SFIELD:
@@ -274,11 +275,11 @@ int
 compare (value_t *left, comp_t op, value_t *right,
 	 getter_t *oget, getter_t *sget)
 {
-	char	*lstr;
-	char	*rstr;
-	int	 lval = 0; // solely to placate gcc
-	int	 rval;
-	int	 num_ok = 1;
+	const char	*lstr;
+	const char	*rstr;
+	int	 	 lval = 0; // solely to placate gcc
+	int	 	 rval;
+	int	 	 num_ok = 1;
 
 	lstr = string_value(left,oget,sget);
 	rstr = string_value(right,oget,sget);
@@ -420,11 +421,7 @@ free_value (value_t *v)
 		return;
 	}
 
-	if (v->resolved) {
-		printf("freeing resolved string \"%s\" (%p)\n",
-			v->resolved, v->resolved);
-	}
-	free(v->resolved);
+	free((char *)v->resolved);
 
 	switch (v->type) {
 	case T_STRING:
@@ -466,8 +463,8 @@ free_value (value_t *v)
 int
 eval (const value_t *v, getter_t *oget, getter_t *sget)
 {
-	int	 res;
-	char	*str;
+	int	 	 res;
+	const char	*str;
 
 	switch (v->type) {
 	case T_NUMBER:
@@ -590,10 +587,10 @@ parse (const char *text)
 int
 main (int argc, char **argv)
 {
-	int	 i;
-	value_t *expr;
-	int	 res;
-	char	*str;
+	int	 	 i;
+	value_t 	*expr;
+	int	 	 res;
+	const char	*str;
 
 	for (i = 1; i < argc; ++i) {
 		expr = parse(argv[i]);

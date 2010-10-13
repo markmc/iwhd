@@ -48,9 +48,10 @@ EOF
 emit_provider()
 {
   local xml_or_json=$1
-  case $# in 7);; *) echo "emit_provider: wrong # args" 1>&2; exit 1;; esac
+  shift 1
   case $xml_or_json in xml|json);;
     *) echo "invalid xml_or_json $xml_or_json" 1>&2; exit 1;; esac
+  case $# in 6);; *) echo "emit_provider: wrong # args" 1>&2; exit 1;; esac
 
   if test $xml_or_json = xml; then
     printf \
@@ -63,7 +64,7 @@ emit_provider()
 \t\t<password>%s</password>
 \t</provider>
 </providers>
-' $2 $3 $4 $5 $6 $7
+' "$@"
   else
     printf \
 '[
@@ -76,7 +77,7 @@ emit_provider()
 \t\t"password": "%s"
 \t}
 ]
-' $2 $3 $4 $5 $6 $7
+' "$@"
   fi
 }
 
@@ -178,11 +179,10 @@ grep ' 404$' del_nosuch.err || fail=1
 # ################## Providers
 
 p_name=primary
-host='(null)'
 
 # Verify that default providers information is as expected.
 curl http://localhost:$port/_providers > p || fail=1
-emit_provider xml "$p_name" fs "$host" 0 '' '' > p.exp || fail=1
+emit_provider xml "$p_name" fs '' 0 '' '' > p.exp || fail=1
 compare p.exp p || fail=1
 
 for i in xml json; do
@@ -193,7 +193,7 @@ for i in xml json; do
   curl_H -d provider="$p_name" -d username=u -d password=p \
     http://localhost:$port/_providers || fail=1
   curl_H http://localhost:$port/_providers > p || fail=1
-  emit_provider $i "$p_name" fs "$host" 0 u p > p.xml || fail=1
+  emit_provider $i "$p_name" fs '' 0 u p > p.xml || fail=1
   compare p.xml p || fail=1
 
   # Attempt to modify some other attribute; should fail (but curl won't)
@@ -209,20 +209,20 @@ for i in xml json; do
   curl_H -d provider="$p_name" -d username=u \
     http://localhost:$port/_providers || fail=1
   curl_H http://localhost:$port/_providers > p || fail=1
-  emit_provider $i "$p_name" fs "$host" 0 u p > p.exp || fail=1
+  emit_provider $i "$p_name" fs '' 0 u p > p.exp || fail=1
   compare p.exp p || fail=1
 
   curl_H -d provider="$p_name" -d password=p \
     http://localhost:$port/_providers || fail=1
   curl_H http://localhost:$port/_providers > p || fail=1
-  emit_provider $i "$p_name" fs "$host" 0 u p > p.exp || fail=1
+  emit_provider $i "$p_name" fs '' 0 u p > p.exp || fail=1
   compare p.exp p || fail=1
 
   # Try to change both username and password.  Now, it must succeed.
   curl_H -d provider="$p_name" -d username=v -d password=q \
     http://localhost:$port/_providers || fail=1
   curl_H http://localhost:$port/_providers > p || fail=1
-  emit_provider $i "$p_name" fs "$host" 0 v q > p.exp || fail=1
+  emit_provider $i "$p_name" fs '' 0 v q > p.exp || fail=1
   compare p.exp p || fail=1
 
   # List an empty bucket.

@@ -38,7 +38,8 @@
 #include "iwh.h"
 #include "meta.h"
 #include "backend.h"
-#include "proxy.h"
+#include "setup.h"
+#include "replica.h"
 #include "template.h"
 #include "mpipe.h"
 #include "state_defs.h"
@@ -69,10 +70,10 @@ typedef struct {
 	MHD_AccessHandlerCallback	 handler;
 } rule;
 
-static int			 fs_mode	= 0;
 static unsigned short		 my_port	= MY_PORT;
 static int			 autostart	= 0;
-const char *program_name;
+const char			*program_name;
+char				*cfg_file	= NULL;
 
 static char *(reserved_name[]) = { "_default", "_query", "_new", NULL };
 static char *(reserved_attr[]) = { "bucket", "key", "date", "etag", "loc", NULL };
@@ -247,8 +248,8 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
 		child_res = NULL;
 		pthread_join(ms->backend_th,&child_res);
 		if (child_res == THREAD_FAILED) {
-                        DPRINTF("GET producer failed\n");
-                        /* Nothing we can do; already sent status. */
+			DPRINTF("GET producer failed\n");
+			/* Nothing we can do; already sent status. */
 		}
 		if (ms->from_master) {
 			pthread_join(ms->cache_th,NULL);
@@ -271,7 +272,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	pipe_private		*pp2;
 	char			*my_etag;
 	const char		*user_etag;
-        int                      rc;
+	int                      rc;
 
 	(void)cctx;
 	(void)method;
@@ -288,10 +289,10 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	ms->cleanup |= CLEANUP_URL;
 
 	my_etag = meta_has_copy(ms->bucket,ms->key,me);
-        if (!my_etag) {
-                DPRINTF("falling back to local for %s/%s\n",ms->bucket,ms->key);
-                ms->from_master = 0;
-        }
+	if (!my_etag) {
+		DPRINTF("falling back to local for %s/%s\n",ms->bucket,ms->key);
+		ms->from_master = 0;
+	}
 	else if (*my_etag) {
 		user_etag = MHD_lookup_connection_value(
 			conn, MHD_HEADER_KIND, "If-None-Match");
@@ -351,8 +352,8 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		pp2 = NULL;
 	}
 
-        rc = pipe_cons_wait_init(&ms->pipe);
-        ms->rc = (rc == 0) ? MHD_HTTP_OK : MHD_HTTP_INTERNAL_SERVER_ERROR;
+	rc = pipe_cons_wait_init(&ms->pipe);
+	ms->rc = (rc == 0) ? MHD_HTTP_OK : MHD_HTTP_INTERNAL_SERVER_ERROR;
 
 	resp = MHD_create_response_from_callback(
 		MHD_SIZE_UNKNOWN, 65536, proxy_get_cons, pp, child_closer);
@@ -1303,10 +1304,9 @@ check_location (my_state *ms)
 static int
 register_image (my_state *ms)
 {
-	char		*site;
-	provider_t	 prov;
-	int		 i;
-	char		*next;
+	const char		*site;
+	const provider_t	*prov;
+	char			*next;
 
 	site = g_hash_table_lookup(ms->dict,"site");
 	if (!site) {
@@ -1319,15 +1319,14 @@ register_image (my_state *ms)
 		*(next++) = '\0';
 	}
 
-	for (i = 0; get_provider(i,&prov); ++i) {
-		if (strcmp(prov.name,site)) {
-			continue;
-		}
-		return prov.func_tbl->register_func(ms,&prov,next,ms->dict);
+	prov = get_provider(site);
+	if (!prov) {
+		DPRINTF("site %s not found\n",site);
+		return MHD_HTTP_BAD_REQUEST;
 	}
 
-	DPRINTF("site %s not found\n",site);
-	return MHD_HTTP_BAD_REQUEST;
+	return prov->func_tbl->register_func(ms,prov,next,ms->dict);
+
 }
 
 static int
@@ -1406,9 +1405,6 @@ static int
 show_parts (struct MHD_Connection *conn, my_state *ms)
 {
 	struct MHD_Response	*resp;
-	void			*ctx;
-	const char		*name;
-	const char		*value;
 
 	ms->aquery = meta_get_attrs(ms->bucket,ms->key);
 	if (!ms->aquery) {
@@ -1512,10 +1508,11 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 static int
 prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
 {
-	my_state	*ms	= ctx;
-	int		 len;
-	provider_t	 prov;
-	const char	*accept_hdr;
+	my_state		*ms	= ctx;
+	int			 len;
+	gpointer		 key;
+	const provider_t	*prov;
+	const char		*accept_hdr;
 
 	(void)pos;
 
@@ -1528,6 +1525,7 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
 			return -1;
 		}
 		ms->cleanup |= CLEANUP_TMPL;
+		init_prov_iter(&ms->prov_iter);
 		len = tmpl_prov_header(ms->gen_ctx);
 		if (!len) {
 			return -1;
@@ -1543,9 +1541,9 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
 		return -1;
 	}
 
-	if (get_provider(ms->gen_ctx->index,&prov)) {
-		len = tmpl_prov_entry(ms->gen_ctx,prov.name,prov.type,
-			prov.host, prov.port, prov.username, prov.password);
+	if (g_hash_table_iter_next(&ms->prov_iter,&key,(gpointer *)&prov)) {
+		len = tmpl_prov_entry(ms->gen_ctx,prov->name,prov->type,
+			prov->host, prov->port, prov->username, prov->password);
 		if (!len) {
 			return -1;
 		}
@@ -1875,13 +1873,13 @@ usage (int status)
 {
   if (status != EXIT_SUCCESS)
     fprintf (stderr, _("Try `%s --help' for more information.\n"),
-             program_name);
+	     program_name);
   else
     {
       printf (_("\
 Usage: %s [OPTION]\n\
 "),
-              program_name);
+	      program_name);
       fputs (_("\
 Deltacloud image-warehouse daemon.\n\
 A configuration file must be specified.\n\
@@ -1900,7 +1898,7 @@ A configuration file must be specified.\n\
 \n\
 Report %s bugs to %s.\n\
 "),
-              program_name, PACKAGE_BUGREPORT);
+	      program_name, PACKAGE_BUGREPORT);
     }
   exit (status);
 }
@@ -1977,7 +1975,7 @@ args_done:
 		}
 	}
 	else if (!autostart && cfg_file) {
-		me = parse_config();
+		me = parse_config(cfg_file);
 		if (!me) {
 			error(0,0,"could not parse %s",cfg_file);
 			return !0;

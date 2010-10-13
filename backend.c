@@ -41,7 +41,7 @@
 #define GLOBALS_IMPL
 #include "iwh.h"
 #include "meta.h"
-#include "proxy.h"
+#include "setup.h"
 #include "template.h"
 #include "mpipe.h"
 #include "backend.h"
@@ -86,10 +86,10 @@ bad_init (void)
 void *
 bad_get_child (void * ctx)
 {
-        my_state        *ms     = (my_state *)ctx;
+	my_state        *ms     = (my_state *)ctx;
 
 	DPRINTF("*** bad call to %s\n",__func__);
-        pipe_prod_siginit(&ms->pipe,-1);
+	pipe_prod_siginit(&ms->pipe,-1);
 	return NULL;
 }
 
@@ -224,8 +224,8 @@ s3_get_child (void * ctx)
 {
 	my_state	*ms	= ctx;
 
-        /* TBD: check existence before calling siginit */
-        pipe_prod_siginit(&ms->pipe,0);
+	/* TBD: check existence before calling siginit */
+	pipe_prod_siginit(&ms->pipe,0);
 
 	hstor_get(hstor,ms->bucket,ms->key,http_get_prod,&ms->pipe,0);
 	/* TBD: check return value */
@@ -294,7 +294,7 @@ s3_bcreate (const char *bucket)
 	return MHD_HTTP_OK;
 }
 
-char *
+static const char *
 s3_init_tmpfile (char *value)
 {
 	char	*path;
@@ -344,9 +344,9 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	char		*ramdisk	= g_hash_table_lookup(args,"ramdisk");
 	char		*api_key;
 	char		*api_secret;
-	char		*ami_cert;
-	char		*ami_key;
-	char		*ami_uid;
+	const char	*ami_cert;
+	const char	*ami_key;
+	const char	*ami_uid;
 	const char	*argv[12];
 	int	 	 argc = 0;
 	pid_t	 	 pid;
@@ -404,7 +404,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		}
 	}
 	else {
-		ami_cert = get_provider_value(prov->index,"ami-cert");
+		ami_cert = get_provider_value(prov,"ami-cert");
 		if (!ami_cert) {
 			error (0, 0, "missing EC2 AMI cert");
 			goto cleanup;
@@ -419,7 +419,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		}
 	}
 	else {
-		ami_key = get_provider_value(prov->index,"ami-key");
+		ami_key = get_provider_value(prov,"ami-key");
 		if (!ami_key) {
 			error (0, 0, "missing EC2 AMI key");
 			goto cleanup;
@@ -428,7 +428,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 
 	ami_uid = g_hash_table_lookup(args,"ami-uid");
 	if (!ami_uid) {
-		ami_uid = get_provider_value(prov->index,"ami-uid");
+		ami_uid = get_provider_value(prov,"ami-uid");
 		if (!ami_uid) {
 			error (0, 0, "missing EC2 AMI uid");
 			goto cleanup;
@@ -538,12 +538,12 @@ cleanup:
 	 */
 	if (cval && ami_cert) {
 		unlink(ami_cert);
-		free(ami_cert);
+		free((char *)ami_cert);
 	}
 	/* Same reasoning as above, with kval/ami_key. */
 	if (kval && ami_key) {
 		unlink(ami_key);
-		free(ami_key);
+		free((char *)ami_key);
 	}
 	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
 
@@ -566,7 +566,7 @@ curl_get_child (void * ctx)
 
 	ms->curl = curl_easy_init();
 	if (!ms->curl) {
-                pipe_prod_siginit(&ms->pipe,-1);
+		pipe_prod_siginit(&ms->pipe,-1);
 		return NULL;	/* TBD: flag error somehow */
 	}
 	ms->cleanup |= CLEANUP_CURL;
@@ -582,7 +582,7 @@ curl_get_child (void * ctx)
 	curl_easy_setopt(ms->curl,CURLOPT_WRITEFUNCTION,
 			 http_get_prod);
 	curl_easy_setopt(ms->curl,CURLOPT_WRITEDATA,&ms->pipe);
-        pipe_prod_siginit(&ms->pipe,0);
+	pipe_prod_siginit(&ms->pipe,0);
 	curl_easy_perform(ms->curl);
 	curl_easy_getinfo(ms->curl,CURLINFO_RESPONSE_CODE,&ms->rc);
 
@@ -796,12 +796,12 @@ fs_get_child (void * ctx)
 
 	fd = open(file, O_RDONLY);
 	if (fd < 0) {
-                pipe_prod_siginit(&ms->pipe,-1);
-                pipe_prod_finish(&ms->pipe);
+		pipe_prod_siginit(&ms->pipe,-1);
+		pipe_prod_finish(&ms->pipe);
 		return THREAD_FAILED;
 	}
 
-        pipe_prod_siginit(&ms->pipe,0);
+	pipe_prod_siginit(&ms->pipe,0);
 
 	for (;;) {
 		bytes = read(fd,buf,sizeof(buf));
