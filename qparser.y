@@ -170,7 +170,6 @@ yyerror (value_t **result, const char *msg)
 
 policy:
 	bbool_expr {
-		printf("policy complete\n");
 		if (syntax_error) {
 			printf("bad policy!\n");
 		}
@@ -314,6 +313,70 @@ paren_expr:
 
 %%
 
+#if defined PARSER_UNIT_TEST
+struct { char *name; char *value; } hacked_obj_fields[] = {
+        /* Fake object fields for generic unit testing. */
+	{ "a", "2" }, { "b", "7" }, { "c", "11" },
+        /* This one's here to test links (e.g. $template.owner.name). */
+	{ "template", "templates/the_tmpl" },
+	{ NULL }
+};
+
+/* Fake out the eval code for unit testing. */
+const char *
+unit_oget_func (void * notused, const char *text)
+{
+	int i;
+
+	for (i = 0; hacked_obj_fields[i].name; ++i) {
+		if (!strcmp(hacked_obj_fields[i].name,text)) {
+			return xstrdup(hacked_obj_fields[i].value);
+		}
+	}
+
+	return NULL;
+}
+getter_t unit_oget = { unit_oget_func };
+
+/*
+ * Same as above, but the site-field stuff is so similar to the object-field
+ * stuff that it's not worth exercising too much separately.
+ */
+const char *
+unit_sget_func (void * notused, const char *text)
+{
+	return "never";
+}
+getter_t unit_sget = { unit_sget_func };
+
+/* Fake links from an object/key tuple to an object/key string. */
+struct { char *obj; char *key; char *value; } hacked_links[] = {
+	{ "templates/the_tmpl", "owner", "users/the_user" },
+	{ "users/the_user", "name", "Jeff Darcy" },
+	{ NULL }
+};
+
+char *
+follow_link (const char *object, const char *key)
+{
+	unsigned int i;
+
+	for (i = 0; hacked_links[i].obj; ++i) {
+		if (strcmp(object,hacked_links[i].obj)) {
+			continue;
+		}
+		if (strcmp(key,hacked_links[i].key)) {
+			continue;
+		}
+		return hacked_links[i].value;
+	}
+
+	return NULL;
+}
+#else
+extern char *follow_link (const char *object, const char *key);
+#endif
+
 void
 _print_value (const value_t *v, int level)
 {
@@ -330,7 +393,7 @@ _print_value (const value_t *v, int level)
 		printf("%*sSTRING %s\n",level,"",v->as_str);
 		break;
 	case T_OFIELD:
-#if defined(UNIT_TEST)
+#if defined PARSER_UNIT_TEST
 		printf("%*sOBJECT FIELD %s (%s)\n",level,"",v->as_str,
 			unit_oget_func(NULL,v->as_str));
 #else
@@ -338,7 +401,7 @@ _print_value (const value_t *v, int level)
 #endif
 		break;
 	case T_SFIELD:
-#if defined(UNIT_TEST)
+#if defined PARSER_UNIT_TEST
 		printf("%*sSERVER FIELD %s (%s)\n",level,"",v->as_str,
 			unit_sget_func(NULL,v->as_str));
 #else
@@ -426,10 +489,208 @@ parse (const char *text)
   return r;
 }
 
+/*
+ * Return the string value of an expression for comparison or display, iff
+ * all component parts are string-valued themselves.  That excludes numbers
+ * and booleans.
+ */
+static const char *
+string_value (value_t *v, getter_t *oget, getter_t *sget)
+{
+	const char	*left;
+
+	switch (v->type) {
+	case T_STRING:
+		return v->as_str;
+	case T_OFIELD:
+		if (!v->resolved) {
+			v->resolved = oget
+				? CALL_GETTER(oget,v->as_str) : NULL;
+		}
+		return v->resolved;
+	case T_SFIELD:
+		return sget ? CALL_GETTER(sget,v->as_str) : NULL;
+	case T_LINK:
+		left = string_value(v->as_tree.left,oget,sget);
+		if (left) {
+			return follow_link((char *)left,
+				(char *)v->as_tree.right);
+		}
+		/* Fall through. */
+	default:
+		return NULL;
+	}
+}
+
+/*
+ * Check whether a string looks like a simple decimal number.  There's
+ * probably a library function for this somewhere.
+ */
+int
+is_ok_number (const char *a_str)
+{
+	const char	*p;
+
+	if (!a_str) {
+		return 0;
+	}
+
+	for (p = a_str; *p; ++p) {
+		if (!isdigit(*p)) {
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
+/*
+ * Comparisons are a bit messy.  If both sides are numbers, strings that look
+ * like numbers, or expressions that evaluate to numbers (booleans evaluate
+ * to 0/1), then we do a numeric comparison.  Otherwise, if both sides
+ * evaluate to strings, we attempt a string comparison.   That's the logic,
+ * but the code is actually structured a different way to allow re-use of
+ * common operator-specific code at the end for both cases.
+ */
+int
+compare (value_t *left, comp_t op, value_t *right,
+	 getter_t *oget, getter_t *sget)
+{
+	const char	*lstr;
+	const char	*rstr;
+	int	 	 lval = 0; // solely to placate gcc
+	int	 	 rval;
+	int	 	 num_ok = 1;
+
+	lstr = string_value(left,oget,sget);
+	rstr = string_value(right,oget,sget);
+
+	if (left->type == T_NUMBER) {
+		lval = left->as_num;
+	}
+	else if (lstr) {
+		if (is_ok_number(lstr)) {
+			lval = strtoll(lstr,NULL,0);
+		}
+		else {
+			num_ok = 0;
+		}
+	}
+	else {
+		lval = eval(left,oget,sget);
+		if (lval < 0) {
+			return lval;
+		}
+	}
+
+	if (right->type == T_NUMBER) {
+		rval = right->as_num;
+	}
+	else if (rstr) {
+		if (is_ok_number(rstr)) {
+			rval = strtoll(rstr,NULL,0);
+		}
+		else {
+			num_ok = 0;
+		}
+	}
+	else {
+		rval = eval(right,oget,sget);
+		if (rval < 0) {
+			return rval;
+		}
+	}
+
+        /*
+         * Strcmp returns -1/0/1, but -1 for us would mean an error and
+         * which of 0/1 we return depends on which comparison operatoer
+         * we're dealing with.  Therefore, we stick the strcmp result on
+         * the left side and let the switch below do an operator-appropriate
+         * compare against zero on the right.
+         */
+	if (!num_ok) {
+		if (!lstr || !rstr) {
+			return -1;
+		}
+		lval = strcmp(lstr,rstr);
+		rval = 0;
+	}
+
+	switch (op) {
+	case C_LESSTHAN:	return (lval < rval);
+	case C_LESSOREQ:	return (lval <= rval);
+	case C_EQUAL:		return (lval == rval);
+	case C_DIFFERENT:	return (lval != rval);
+	case C_GREATEROREQ:	return (lval >= rval);
+	case C_GREATERTHAN:	return (lval > rval);
+	default:
+		return -1;
+	}
+}
+
+/*
+ * Evaluate an AST in the current context to one of:
+ *      true=1
+ *      false=0
+ *      error=-1
+ * It's up to the caller whether error is functionally the same as false.
+ * Note that even T_NUMBER gets squeezed down to these three values.  The
+ * only thing numbers are used for is comparing against other numbers to
+ * yield a boolean for the query or replication-policy code.  If you want
+ * something that returns a number, this is the wrong language for it.
+ */
+
+int
+eval (const value_t *v, getter_t *oget, getter_t *sget)
+{
+	int	 	 res;
+	const char	*str;
+
+	switch (v->type) {
+	case T_NUMBER:
+		return v->as_num != 0;
+	case T_STRING:
+		return v->as_str && *v->as_str;
+	case T_OFIELD:
+		str = CALL_GETTER(oget,v->as_str);
+		return str && *str;
+	case T_SFIELD:
+		str = CALL_GETTER(sget,v->as_str);
+		return str && *str;
+	case T_LINK:
+		str = string_value(v->as_tree.left,oget,sget);
+		if (str) {
+			str = follow_link(str,(char *)v->as_tree.right);
+		}
+		return str && *str;
+	case T_COMP:
+		return compare(v->as_tree.left,(comp_t)v->as_tree.op,
+			v->as_tree.right, oget, sget);
+	case T_NOT:
+		res = eval(v->as_tree.left,oget,sget);
+		return (res >= 0) ? !res : res;
+	case T_AND:
+		res = eval(v->as_tree.left,oget,sget);
+		if (res > 0) {
+			res = eval(v->as_tree.right,oget,sget);
+		}
+		return res;
+	case T_OR:
+		res = eval(v->as_tree.left,oget,sget);
+		if (res > 0) {
+			return res;
+		}
+		return eval(v->as_tree.right,oget,sget);
+	default:
+		return -1;
+	}
+}
+
 #ifdef PARSER_UNIT_TEST
 int
 main (int argc, char **argv)
 {
+  int fail = 0;
   unsigned int i;
   for (i = 1; i < argc; ++i)
     {
@@ -437,22 +698,21 @@ main (int argc, char **argv)
       if (!expr)
 	{
 	  printf ("could not parse '%s'\n", argv[i]);
+	  fail = 1;
 	  continue;
 	}
 
       print_value (expr);
-#if 0
-      char *str = string_value (expr, &unit_oget, &unit_sget);
+
+      const char *str = string_value (expr, &unit_oget, &unit_sget);
       if (str)
 	{
 	  printf ("s= %s\n", str);
 	  continue;
 	}
-      res = eval (expr, &unit_oget, &unit_sget);
-      printf ("d= %d\n", res);
-#endif
+      printf ("d= %d\n", eval (expr, &unit_oget, &unit_sget));
     }
 
-  return 0;
+  return fail;
 }
 #endif
