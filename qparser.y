@@ -66,6 +66,7 @@ make_number (const char *text)
 	if (tmp) {
 		tmp->type = T_NUMBER;
 		tmp->as_num = strtoll(text,NULL,10);
+		tmp->resolved = NULL;
 	}
 
 	return tmp;
@@ -79,6 +80,7 @@ make_string (const char *text, type_t t)
 	if (tmp) {
 		tmp->type = t;
 		tmp->as_str = xstrdup(text);
+		tmp->resolved = NULL;
 	}
 
 	return tmp;
@@ -93,6 +95,7 @@ make_tree (type_t t, value_t *left, value_t *right)
 		tmp->type = t;
 		tmp->as_tree.left = left;
 		tmp->as_tree.right = right;
+		tmp->resolved = NULL;
 	}
 
 	return tmp;
@@ -115,7 +118,7 @@ make_link (value_t *left, char *right)
 {
 	char	*copy;
 
-	copy = strdup(right);
+	copy = xstrdup(right);
 	if (!copy) {
 		return NULL;
 	}
@@ -451,6 +454,12 @@ free_value (value_t *v)
 		return;
 	}
 
+	if (v->resolved) {
+		printf("freeing resolved string \"%s\" (%p)\n",
+			v->resolved, v->resolved);
+	}
+	free(v->resolved);
+
 	switch (v->type) {
 	case T_STRING:
 	case T_OFIELD:
@@ -504,8 +513,7 @@ string_value (value_t *v, getter_t *oget, getter_t *sget)
 		return v->as_str;
 	case T_OFIELD:
 		if (!v->resolved) {
-			v->resolved = oget
-				? CALL_GETTER(oget,v->as_str) : NULL;
+			v->resolved = oget ? CALL_GETTER(oget,v->as_str) : NULL;
 		}
 		return v->resolved;
 	case T_SFIELD:
