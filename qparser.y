@@ -519,12 +519,14 @@ string_value (value_t *v, getter_t *oget, getter_t *sget)
 	case T_SFIELD:
 		return sget ? CALL_GETTER(sget,v->as_str) : NULL;
 	case T_LINK:
-		left = string_value(v->as_tree.left,oget,sget);
-		if (left) {
-			return follow_link((char *)left,
-				(char *)v->as_tree.right);
+		if (!v->resolved) {
+			left = string_value(v->as_tree.left,oget,sget);
+			if (left) {
+				v->resolved = follow_link((char *)left,
+					(char *)v->as_tree.right);
+			}
 		}
-		/* Fall through. */
+		return v->resolved;
 	default:
 		return NULL;
 	}
