@@ -1,3 +1,6 @@
+%define api.pure
+%error-verbose
+
 %{
 #include <config.h>
 #include <error.h>
@@ -59,7 +62,7 @@ xstrdup (char const *string)
 }
 
 /* TBD: use separate function to parse dates differently */
-value_t *
+static value_t *
 make_number (const char *text)
 {
 	value_t *tmp = malloc(sizeof(*tmp));
@@ -73,7 +76,7 @@ make_number (const char *text)
 	return tmp;
 }
 
-value_t *
+static value_t *
 make_string (const char *text, type_t t)
 {
 	value_t *tmp = malloc(sizeof(*tmp));
@@ -87,23 +90,23 @@ make_string (const char *text, type_t t)
 	return tmp;
 }
 
-value_t *
-make_tree (type_t t, value_t *left, value_t *right)
+static value_t *
+make_tree (type_t t, const value_t *left, const value_t *right)
 {
 	value_t *tmp = malloc(sizeof(*tmp));
 
 	if (tmp) {
 		tmp->type = t;
-		tmp->as_tree.left = left;
-		tmp->as_tree.right = right;
+		tmp->as_tree.left = (value_t *) left;
+		tmp->as_tree.right = (value_t *) right;
 		tmp->resolved = NULL;
 	}
 
 	return tmp;
 }
 
-value_t *
-make_comp (comp_t c, value_t *left, value_t *right)
+static value_t *
+make_comp (comp_t c, const value_t *left, const value_t *right)
 {
 	value_t *tmp = make_tree(T_COMP,left,right);
 
@@ -114,8 +117,8 @@ make_comp (comp_t c, value_t *left, value_t *right)
 	return tmp;
 }
 
-value_t *
-make_link (value_t *left, char *right)
+static value_t *
+make_link (value_t *left, const char *right)
 {
 	char	*copy;
 
@@ -157,7 +160,6 @@ yyerror (value_t **result, const char *msg)
 
 %}
 
-%define api.pure
 %parse-param { value_t **result }
 
 %token T_STRING T_DATE T_NUMBER T_ID
@@ -318,7 +320,7 @@ paren_expr:
 %%
 
 #if defined PARSER_UNIT_TEST
-struct { char *name; char *value; } hacked_obj_fields[] = {
+static const struct { char *name; char *value; } hacked_obj_fields[] = {
         /* Fake object fields for generic unit testing. */
 	{ "a", "2" }, { "b", "7" }, { "c", "11" },
         /* This one's here to test links (e.g. $template.owner.name). */
@@ -327,7 +329,7 @@ struct { char *name; char *value; } hacked_obj_fields[] = {
 };
 
 /* Fake out the eval code for unit testing. */
-const char *
+static const char *
 unit_oget_func (void * notused, const char *text)
 {
 	int i;
@@ -340,18 +342,18 @@ unit_oget_func (void * notused, const char *text)
 
 	return NULL;
 }
-getter_t unit_oget = { unit_oget_func };
+static const getter_t unit_oget = { unit_oget_func };
 
 /*
  * Same as above, but the site-field stuff is so similar to the object-field
  * stuff that it's not worth exercising too much separately.
  */
-const char *
+static const char *
 unit_sget_func (void * notused, const char *text)
 {
 	return "never";
 }
-getter_t unit_sget = { unit_sget_func };
+static const getter_t unit_sget = { unit_sget_func };
 
 /* Fake links from an object/key tuple to an object/key string. */
 struct { char *obj; char *key; char *value; } hacked_links[] = {
@@ -360,7 +362,7 @@ struct { char *obj; char *key; char *value; } hacked_links[] = {
 	{ NULL }
 };
 
-char *
+static char *
 follow_link (const char *object, const char *key)
 {
 	unsigned int i;
@@ -381,7 +383,7 @@ follow_link (const char *object, const char *key)
 extern char *follow_link (const char *object, const char *key);
 #endif
 
-void
+static void
 _print_value (const value_t *v, int level)
 {
 	if (!v) {
@@ -505,7 +507,7 @@ parse (const char *text)
  * and booleans.
  */
 static const char *
-string_value (value_t *v, getter_t *oget, getter_t *sget)
+string_value (value_t *v, const getter_t *oget, const getter_t *sget)
 {
 	const char	*left;
 
@@ -537,7 +539,7 @@ string_value (value_t *v, getter_t *oget, getter_t *sget)
  * Check whether a string looks like a simple decimal number.  There's
  * probably a library function for this somewhere.
  */
-int
+static int
 is_ok_number (const char *a_str)
 {
 	const char	*p;
@@ -563,9 +565,9 @@ is_ok_number (const char *a_str)
  * but the code is actually structured a different way to allow re-use of
  * common operator-specific code at the end for both cases.
  */
-int
+static int
 compare (value_t *left, comp_t op, value_t *right,
-	 getter_t *oget, getter_t *sget)
+	 const getter_t *oget, const getter_t *sget)
 {
 	const char	*lstr;
 	const char	*rstr;
@@ -652,7 +654,7 @@ compare (value_t *left, comp_t op, value_t *right,
  */
 
 int
-eval (const value_t *v, getter_t *oget, getter_t *sget)
+eval (const value_t *v, const getter_t *oget, const getter_t *sget)
 {
 	int	 	 res;
 	const char	*str;

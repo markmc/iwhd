@@ -49,7 +49,8 @@ typedef struct {
 } getter_t;
 #define CALL_GETTER(g,x)	g->func(g->ctx,x)
 
-int	 eval		(const value_t *expr, getter_t *oget, getter_t *sget);
+int	 eval		(const value_t *expr,
+			 const getter_t *oget, const getter_t *sget);
 void	 free_value	(value_t *);
 void	 print_value	(const value_t *);
 

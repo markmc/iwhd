@@ -27,7 +27,7 @@
 
 %%
 
-int at_eof = 0;
+static int at_eof = 0;
 
 int
 yywrap (void)
@@ -37,7 +37,7 @@ yywrap (void)
 
 #if defined(UNIT_TEST)
 static void
-yyerror (char *msg)
+yyerror (const char *msg)
 {
 	printf("%s: %s\n",__func__,msg);
 }
