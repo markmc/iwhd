@@ -459,7 +459,7 @@ free_value (value_t *v)
 		printf("freeing resolved string \"%s\" (%p)\n",
 			v->resolved, v->resolved);
 	}
-	free(v->resolved);
+	free((void *)v->resolved);
 
 	switch (v->type) {
 	case T_STRING:
