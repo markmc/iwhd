@@ -163,9 +163,6 @@ yyerror (value_t **result, const char *msg)
 %parse-param { value_t **result }
 
 %token T_STRING T_DATE T_NUMBER T_ID
-%token T_DOLLAR T_WAFFLE T_DOT
-%token T_LPAREN T_RPAREN
-%token T_LESS T_GREATER T_EQUAL
 %token T_NOT T_AND T_OR
 %token T_SPACE T_INVALID
 %token T_OFIELD T_SFIELD T_COMP T_LINK
@@ -224,27 +221,27 @@ comp_expr:
 		// printf("promoting atom to comp_expr\n");
 		$$ = $1;
 	}|
-	atom T_LESS atom {
+	atom '<' atom {
 		// printf("found LESS THAN expression\n");
 		$$ = make_comp(C_LESSTHAN,$1,$3);
 	}|
-	atom T_LESS T_EQUAL atom {
+	atom '<' '=' atom {
 		// printf("found LESS OR EQUAL expression\n");
 		$$ = make_comp(C_LESSOREQ,$1,$4);
 	}|
-	atom T_EQUAL T_EQUAL atom {
+	atom '=' '=' atom {
 		// printf("found EQUAL expression\n");
 		$$ = make_comp(C_EQUAL,$1,$4);
 	}|
-	atom T_NOT T_EQUAL atom {
+	atom T_NOT '=' atom {
 		// printf("found NOT EQUAL expression\n");
 		$$ = make_comp(C_DIFFERENT,$1,$4);
 	}|
-	atom T_GREATER T_EQUAL atom {
+	atom '>' '=' atom {
 		// printf("found GREATER OR EQUAL expression\n");
 		$$ = make_comp(C_GREATEROREQ,$1,$4);
 	}|
-	atom T_GREATER atom {
+	atom '>' atom {
 		// printf("found GREATER THAN expression\n");
 		$$ = make_comp(C_GREATERTHAN,$1,$3);
 	}|
@@ -278,17 +275,17 @@ link_field:
 		// printf("promoting field to link_field\n");
 		$$ = $1;
 	}|
-	link_field T_DOT T_ID {
+	link_field '.' T_ID {
 		// printf("found LINK FIELD\n");
 		$$ = make_link($1,yytext);
 	};
 
 field:
-	T_DOLLAR T_ID {
+	'$' T_ID {
 		// printf("found DOLLAR FIELD\n");
 		$$ = make_string(yytext,T_OFIELD);
 	}|
-	T_WAFFLE T_ID {
+	'#' T_ID {
 		// printf("found WAFFLE FIELD\n");
 		$$ = make_string(yytext,T_SFIELD);
 	};
@@ -312,7 +309,7 @@ literal:
 	};
 
 paren_expr:
-	T_LPAREN bbool_expr T_RPAREN {
+	'(' bbool_expr ')' {
 		// printf("found PAREN expression\n");
 		$$ = $2;
 	};

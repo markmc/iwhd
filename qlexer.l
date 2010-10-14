@@ -11,17 +11,10 @@
 ~[^~]*~		{ return T_DATE; }
 [0-9]+		{ return T_NUMBER; }
 [a-z_]+		{ return T_ID; }
-\$		{ return T_DOLLAR; }
-#		{ return T_WAFFLE; }
-\(		{ return T_LPAREN; }
-\)		{ return T_RPAREN; }
-\<		{ return T_LESS; }
-\>		{ return T_GREATER; }
-=		{ return T_EQUAL; }
+[=$#()<>.]	{ return yytext[0]; }
 !		{ return T_NOT; }
 &		{ return T_AND; }
 \|		{ return T_OR; }
-\.		{ return T_DOT; }
 [ \t\n\r]+	{ return T_SPACE; }
 .		{ return T_INVALID; }
 
