@@ -19,16 +19,15 @@
 extern "C" {
 #endif
 
+#include "iwhd-qparser.h"
+
 typedef enum {
 	C_LESSTHAN,	C_LESSOREQ,
 	C_EQUAL,	C_DIFFERENT,
 	C_GREATEROREQ,	C_GREATERTHAN
 } comp_t;
 
-typedef enum {
-	T_NUMBER, T_STRING, T_OFIELD, T_SFIELD,
-	T_COMP, T_NOT, T_AND, T_OR, T_LINK
-} type_t;
+typedef enum yytokentype type_t;
 
 typedef struct _value {
 	type_t type;
@@ -50,11 +49,11 @@ typedef struct {
 } getter_t;
 #define CALL_GETTER(g,x)	g->func(g->ctx,x)
 
-
-value_t	*parse		(const char *text);
 int	 eval		(const value_t *expr, getter_t *oget, getter_t *sget);
 void	 free_value	(value_t *);
 void	 print_value	(const value_t *);
+
+value_t *parse (const char *text);
 
 #if defined(__CPLUSPLUS__) || defined(__cplusplus)
 }

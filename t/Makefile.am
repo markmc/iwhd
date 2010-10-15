@@ -34,8 +34,8 @@ parser_CPPFLAGS	= -I $(top_srcdir)
 
 parser.c: Makefile.am
 	rm -f $@-t $@
-	printf '#define UNIT_TEST 1\n' > $@-t
-	printf '#include "query.c"\n' >> $@-t
+	printf '#define PARSER_UNIT_TEST 1\n' > $@-t
+	printf '#include "iwhd-qparser.c"\n' >> $@-t
 	chmod a=r $@-t
 	mv $@-t $@
 

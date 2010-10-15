@@ -15,6 +15,11 @@ config.log
 config.status
 configure
 iwhd
-query-orig.c
-query.c
+iwhd-*.tar.gz
+iwhd-qparser.c
+iwhd-qparser.h
+qlexer.c
 stamp-h1
+t/*.log
+t/parser
+t/parser.c

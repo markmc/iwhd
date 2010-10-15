@@ -4,9 +4,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "query.h"
 #define YYSTYPE value_t *
-#include "qparser.h"
+#include "query.h"
+#include "iwhd-qparser.h"
 
 static void
 xalloc_die (void)
@@ -133,9 +133,6 @@ make_link (value_t *left, char *right)
  */
 extern char *yytext;
 
-/* In a sane world, yyparse would return this. */
-value_t *cur_val;
-
 /*
  * IMO it's wrong for us to get into the bbool_expr=policy rule when there's
  * a syntax error, but we do.  The good news is that it's easy to free the
@@ -144,16 +141,20 @@ value_t *cur_val;
  * ourselves) to figure out whether we got a valid tree or not.
  * No, yynerrs doesn't seem to give the right answer.
  */
-int syntax_error = 0;
+static int syntax_error = 0;
 
 void
-yyerror (char *msg)
+yyerror (value_t **result, const char *msg)
 {
-	printf("%s: %s\n",__func__,msg);
-	syntax_error = 1;
+  // error (0, 0, "parse error: %s\n", msg);
+  // FIXME do this via param, not file-global
+  syntax_error = 1;
 }
 
 %}
+
+%define api.pure
+%parse-param { value_t **result }
 
 %token T_STRING T_DATE T_NUMBER T_ID
 %token T_DOLLAR T_WAFFLE T_DOT
@@ -174,21 +175,21 @@ policy:
 			printf("bad policy!\n");
 		}
 		else {
-			cur_val = $1;
+			*result = $1;
 		}
 	};
 
 bbool_expr:
 	ubool_expr {
-		printf("promoting ubool_expr to bbool_expr\n");
+		// printf("promoting ubool_expr to bbool_expr\n");
 		$$ = $1;
 	}|
 	bbool_expr T_AND T_AND ubool_expr {
-		printf("found AND expression\n");
+		// printf("found AND expression\n");
 		$$ = make_tree(T_AND,$1,$4);
 	}|
 	bbool_expr T_OR T_OR ubool_expr {
-		printf("found OR expression\n");
+		// printf("found OR expression\n");
 		$$ = make_tree(T_OR,$1,$4);
 	}|
 	bbool_expr T_SPACE {
@@ -199,11 +200,11 @@ bbool_expr:
 
 ubool_expr:
 	comp_expr {
-		printf("promoting comp_expr to ubool_expr\n");
+		// printf("promoting comp_expr to ubool_expr\n");
 		$$ = $1;
 	}|
 	T_NOT comp_expr {
-		printf("found NOT expression\n");
+		// printf("found NOT expression\n");
 		$$ = make_tree(T_NOT,$2,NULL);
 	}|
 	ubool_expr T_SPACE {
@@ -215,31 +216,31 @@ ubool_expr:
 
 comp_expr:
 	atom {
-		printf("promoting atom to comp_expr\n");
+		// printf("promoting atom to comp_expr\n");
 		$$ = $1;
 	}|
 	atom T_LESS atom {
-		printf("found LESS THAN expression\n");
+		// printf("found LESS THAN expression\n");
 		$$ = make_comp(C_LESSTHAN,$1,$3);
 	}|
 	atom T_LESS T_EQUAL atom {
-		printf("found LESS OR EQUAL expression\n");
+		// printf("found LESS OR EQUAL expression\n");
 		$$ = make_comp(C_LESSOREQ,$1,$4);
 	}|
 	atom T_EQUAL T_EQUAL atom {
-		printf("found EQUAL expression\n");
+		// printf("found EQUAL expression\n");
 		$$ = make_comp(C_EQUAL,$1,$4);
 	}|
 	atom T_NOT T_EQUAL atom {
-		printf("found NOT EQUAL expression\n");
+		// printf("found NOT EQUAL expression\n");
 		$$ = make_comp(C_DIFFERENT,$1,$4);
 	}|
 	atom T_GREATER T_EQUAL atom {
-		printf("found GREATER OR EQUAL expression\n");
+		// printf("found GREATER OR EQUAL expression\n");
 		$$ = make_comp(C_GREATEROREQ,$1,$4);
 	}|
 	atom T_GREATER atom {
-		printf("found GREATER THAN expression\n");
+		// printf("found GREATER THAN expression\n");
 		$$ = make_comp(C_GREATERTHAN,$1,$3);
 	}|
 	comp_expr T_SPACE {
@@ -250,15 +251,15 @@ comp_expr:
 
 atom:
 	link_field {
-		printf("promoting link_field to atom\n");
+		// printf("promoting link_field to atom\n");
 		$$ = $1;
 	}|
 	literal {
-		printf("promoting literal to atom\n");
+		// printf("promoting literal to atom\n");
 		$$ = $1;
 	}|
 	paren_expr {
-		printf("promoting paren_expr to atom\n");
+		// printf("promoting paren_expr to atom\n");
 		$$ = $1;
 	}|
 	atom T_SPACE {
@@ -269,45 +270,45 @@ atom:
 
 link_field:
 	field {
-		printf("promoting field to link_field\n");
+		// printf("promoting field to link_field\n");
 		$$ = $1;
 	}|
 	link_field T_DOT T_ID {
-		printf("found LINK FIELD\n");
+		// printf("found LINK FIELD\n");
 		$$ = make_link($1,yytext);
 	};
 
 field:
 	T_DOLLAR T_ID {
-		printf("found DOLLAR FIELD\n");
+		// printf("found DOLLAR FIELD\n");
 		$$ = make_string(yytext,T_OFIELD);
 	}|
 	T_WAFFLE T_ID {
-		printf("found WAFFLE FIELD\n");
+		// printf("found WAFFLE FIELD\n");
 		$$ = make_string(yytext,T_SFIELD);
 	};
 
 literal:
 	T_NUMBER {
-		printf("found NUMBER %s\n",yytext);
+		// printf("found NUMBER %s\n",yytext);
 		$$ = make_number(yytext);
 	}|
 	T_STRING {
-		printf("found STRING %s\n",yytext);
+		// printf("found STRING %s\n",yytext);
 		$$ = make_string(yytext,T_STRING);
 	}|
 	T_DATE {
-		printf("found DATE\n");
+		// printf("found DATE\n");
 		$$ = make_string(yytext,T_DATE);
 	}|
 	T_ID {
-		printf("found ID %s\n",yytext);
+		// printf("found ID %s\n",yytext);
 		$$ = make_string(yytext,T_ID);
 	};
 
 paren_expr:
 	T_LPAREN bbool_expr T_RPAREN {
-		printf("found PAREN expression\n");
+		// printf("found PAREN expression\n");
 		$$ = $2;
 	};
 
@@ -413,39 +414,45 @@ free_value (value_t *v)
 	}
 }
 
+#include "qlexer.c"
+
+value_t *
+parse (const char *text)
+{
+  yy_scan_string(text);
+  value_t *result;
+  value_t *r = yyparse (&result) == 0 ? result : NULL;
+  yylex_destroy();
+  return r;
+}
+
+#ifdef PARSER_UNIT_TEST
 int
 main (int argc, char **argv)
 {
-	char *data = "#a==\"fubar\"&&!($b.c.d<3)";
-	char *edata = "gobbledy-gook";
-
-	yy_scan_string(data);
-	yyparse();
-	if (cur_val) {
-		if (!syntax_error) {
-			print_value(cur_val);
-		}
-		else {
-			printf("discarding erroneous parse tree\n");
-		}
-		free_value(cur_val);
-		cur_val = NULL;
+  unsigned int i;
+  for (i = 1; i < argc; ++i)
+    {
+      value_t *expr = parse (argv[i]);
+      if (!expr)
+	{
+	  printf ("could not parse '%s'\n", argv[i]);
+	  continue;
 	}
-	yylex_destroy();
 
-	yy_scan_string(edata);
-	yyparse();
-	if (cur_val) {
-		if (!syntax_error) {
-			print_value(cur_val);
-		}
-		else {
-			printf("discarding erroneous parse tree\n");
-		}
-		free_value(cur_val);
-		cur_val = NULL;
+      print_value (expr);
+#if 0
+      char *str = string_value (expr, &unit_oget, &unit_sget);
+      if (str)
+	{
+	  printf ("s= %s\n", str);
+	  continue;
 	}
-	yylex_destroy();
+      res = eval (expr, &unit_oget, &unit_sget);
+      printf ("d= %d\n", res);
+#endif
+    }
 
-	return 0;
+  return 0;
 }
+#endif

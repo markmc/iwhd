@@ -18,11 +18,14 @@ AM_CFLAGS = -W -Wall -Wextra -Wno-unused -Wformat-security \
 
 AM_CPPFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
 
+iwhd_YFLAGS = -d
+
 SUBDIRS = t
 ACLOCAL_AMFLAGS = -I ax
 
 bin_PROGRAMS = iwhd
-EXTRA_DIST = query.leg
+EXTRA_DIST = iwhd-qparser.h
+BUILT_SOURCES = iwhd-qparser.h qlexer.c
 
 # iwhd is short for Image WareHouse Daemon.
 
@@ -37,7 +40,7 @@ iwhd_SOURCES = \
   mpipe.h	\
   replica.c	\
   replica.h	\
-  query.c	\
+  qparser.y	\
   query.h	\
   rest.c	\
   setup.c	\
@@ -45,6 +48,8 @@ iwhd_SOURCES = \
   state_defs.h	\
   template.c	\
   template.h
+
+EXTRA_iwhd_SOURCES = qlexer.l
 
 iwhd_CPPFLAGS	= $(HAIL_CFLAGS)
 iwhd_LDADD =		\
@@ -60,18 +65,6 @@ iwhd_LDADD =		\
   $(GLIB2_LIB)		\
   $(HAIL_LIBS)
 
-# leg is a lexer/parser-generator
-# http://piumarta.com/software/peg/peg-0.1.4.tar.gz
-query-orig.c: query.leg
-	leg < $(srcdir)/query.leg > $@-t && mv $@-t $@
-
-# Apply this patch to fix NULL-deref bugs in the generated query-orig.c:
-query.c: query-orig.c query.c.diff
-	patch --fuzz=0 query-orig.c $(srcdir)/query.c.diff --output=$@-t
-	mv $@-t $@
-
-BUILT_SOURCES = query.c
-CLEANFILES = query-orig.c
-MOSTLYCLEANFILES = query.c query-orig.c-t
-MAINTAINERCLEANFILES = query.c query-orig.c
-EXTRA_DIST += query.c.diff
+MOSTLYCLEANFILES = qlexer.c
+MAINTAINERCLEANFILES = qlexer.c
+EXTRA_DIST += qlexer.c

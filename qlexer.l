@@ -1,22 +1,13 @@
 %{
 #include <stdio.h>
 
-#if defined(UNIT_TEST)
-enum {
-	T_STRING,	T_DATE,		T_NUMBER,	T_ID,
-	T_DOLLAR,	T_WAFFLE,	T_LPAREN,	T_RPAREN,
-	T_LESS,		T_GREATER,	T_EQUAL,	T_NOT,
-	T_AND,		T_OR,		T_DOT,		T_SPACE,
-	T_INVALID
-};
-#else
-#include "qparser.tab.h"
-#endif
+#include "iwhd-qparser.h"
+#define YY_DECL extern int yylex (YYSTYPE *lvalp)
 %}
 
 %%
 
-\"[^"]*\"	{ return T_STRING; }
+\"[^"]*\"	{ yytext[yyleng-1] = 0; yytext++; return T_STRING; }
 ~[^~]*~		{ return T_DATE; }
 [0-9]+		{ return T_NUMBER; }
 [a-z_]+		{ return T_ID; }
@@ -54,12 +45,12 @@ yyerror (char *msg)
 int
 main (int argc, char **argv)
 {
-	int	t;
 
 	yy_scan_string("\"!@#\" ~xxx~ 123 abc $#()<>=!&|.");
 
 	do {
-		t = yylex();
+		YYSTYPE v;
+		int t = yylex(&v);
 		switch (t) {
 		case T_STRING:
 			if (!yytext[0]) {
