@@ -1,9 +1,13 @@
+%option warn nounput noinput noyywrap
 %{
+#include <config.h>
 #include <stdio.h>
 
 #include "iwhd-qparser.h"
 #undef YY_DECL
 #define YY_DECL extern int yylex (YYSTYPE *lvalp)
+
+static int at_eof = 0;
 %}
 
 %%
@@ -19,15 +23,10 @@
 [ \t\n\r]+	{ return T_SPACE; }
 .		{ return T_INVALID; }
 
+<<EOF>>		{ at_eof = 1; yyterminate (); }
+
+
 %%
-
-static int at_eof = 0;
-
-int
-yywrap (void)
-{
-	return ++at_eof;
-}
 
 #if defined(UNIT_TEST)
 static void
