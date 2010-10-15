@@ -3,6 +3,10 @@
 #include <config.h>
 #include <stdio.h>
 
+#ifndef FLEX_SCANNER
+# error This scanner must be made using flex, not lex.
+#endif
+
 #include "iwhd-qparser.h"
 #undef YY_DECL
 #define YY_DECL extern int yylex (YYSTYPE *lvalp)
