@@ -2,6 +2,7 @@
 #include <stdio.h>
 
 #include "iwhd-qparser.h"
+#undef YY_DECL
 #define YY_DECL extern int yylex (YYSTYPE *lvalp)
 %}
 

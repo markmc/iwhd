@@ -12,6 +12,9 @@
 #include "query.h"
 #include "iwhd-qparser.h"
 
+#define YY_DECL int yylex(YYSTYPE *);
+YY_DECL
+
 static void
 xalloc_die (void)
 {
