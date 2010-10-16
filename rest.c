@@ -2028,11 +2028,9 @@ args_done:
 		MHD_OPTION_END);
 	if (!the_daemon) {
 		fprintf(stderr,"Could not create daemon.\n");
-		auto_stop();
 		return !0;
 	}
 
 	sem_wait(&the_sem);
-	auto_stop();
 	return 0;
 }

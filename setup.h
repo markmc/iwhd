@@ -45,8 +45,4 @@ void		  init_prov_iter	(GHashTableIter *iter);
 
 const char 	 *auto_config		(void);
 
-/* These are actually in auto.c, but it doesn't have its own header file. */
-int	 	  auto_start		(int dbport);
-void	 	  auto_stop		(void);
-
 #endif

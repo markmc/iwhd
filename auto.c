@@ -283,6 +283,12 @@ auto_set_sig (void)
 	return 0;
 }
 
+static void
+auto_stop (void)
+{
+	auto_kill_mongod(SIGTERM);
+}
+
 int
 auto_start (int dbport)
 {
@@ -326,13 +332,12 @@ auto_start (int dbport)
 		auto_kill_mongod(SIGTERM);
 		return -1;
 	}
+	if (atexit(auto_stop) != 0) {
+		error (0, 0, "atexit failed for auto_stop");
+		auto_kill_mongod(SIGTERM);
+		return -1;
+	}
 
 	DPRINTF("mongod listens on port %u\n", dbport);
 	return 0;
-}
-
-void
-auto_stop (void)
-{
-	auto_kill_mongod(SIGTERM);
 }
