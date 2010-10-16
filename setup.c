@@ -272,7 +272,7 @@ convert_provider (int i, provider_t *out)
 	return 1;
 }
 
-const char *
+static const char *
 parse_config_inner (void)
 {
 	unsigned int	 nservers;
