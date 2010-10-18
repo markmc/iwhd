@@ -42,15 +42,15 @@ typedef enum yytokentype type_t;
  * a value_t, but for T_LINK it's a bare string.
  * TBD: use a separate as_link union member for T_LINK.
  */
-typedef struct _value {
+typedef struct value_t {
 	type_t type;
 	union {
 		long long as_num;
 		char *as_str;
 		struct {
 			comp_t op;
-			struct _value *left;
-			struct _value *right;
+			struct value_t *left;
+			struct value_t *right;
 		} as_tree;
 	};
 	const char *resolved;	/* saved result for T_OFIELD/T_SFIELD/T_LINK */
