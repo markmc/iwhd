@@ -44,6 +44,7 @@ xmalloc (size_t n)
   return p;
 }
 
+#if 0 // not used
 /* Change the size of an allocated block of memory P to N bytes,
    with error checking.  */
 static void *
@@ -54,6 +55,7 @@ xrealloc (void *p, size_t n)
     xalloc_die ();
   return p;
 }
+#endif
 
 /* Clone an object P of size S, with error checking.  There's no need
    for xnmemdup (P, N, S), since xmemdup (P, N * S) works without any
