@@ -9,8 +9,6 @@
 #include "iwhd-qparser.h"
 #undef YY_DECL
 #define YY_DECL extern int yylex (YYSTYPE *yylval_param, yyscan_t yyscanner)
-
-static int at_eof = 0;
 %}
 
 %option warn nounput noinput noyywrap
@@ -30,7 +28,7 @@ static int at_eof = 0;
 [ \t\n\r]+	{ return T_SPACE; }
 .		{ return T_INVALID; }
 
-<<EOF>>		{ at_eof = 1; yyterminate (); }
+<<EOF>>		{ yyterminate (); /* aka return 0; */ }
 
 
 %%
@@ -50,9 +48,12 @@ main (int argc, char **argv)
 	YY_BUFFER_STATE buf
 	  = yy_scan_string ("\"!@#\" ~xxx~ 123 abc $#()<>=!&|.", scanner);
 
-	do {
+	while (1) {
 		YYSTYPE v;
 		int t = yylex(&v, scanner);
+		if (t == 0)
+			break;
+
 		switch (t) {
 		case T_STRING:
 			if (!yytext[0]) {
@@ -72,7 +73,7 @@ main (int argc, char **argv)
 		default:
 			printf("%d\n",t);
 		}
-	} while (!at_eof);
+	}
 
 	yy_delete_buffer (buf, scanner);
 	yylex_destroy (scanner);
