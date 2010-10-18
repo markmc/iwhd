@@ -495,7 +495,8 @@ value_t *
 parse (const char *text)
 {
   yyscan_t scanner;
-  yylex_init (&scanner);
+  if (yylex_init (&scanner))
+    error (0, errno, "failed to initialize query parser");
   YY_BUFFER_STATE buf = yy_scan_string (text, scanner);
   value_t *result;
   value_t *r = yyparse (scanner, &result) == 0 ? result : NULL;
