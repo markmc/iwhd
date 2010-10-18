@@ -19,7 +19,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define YY_DECL int yylex(YYSTYPE *);
+#define YY_DECL int yylex(YYSTYPE *, void *scanner);
 YY_DECL
 
 static void
@@ -141,16 +141,6 @@ make_link (value_t *left, const char *right)
 }
 
 /*
- * For some reason the bison-generated code isn't setting up yysv* properly,
- * so $n doesn't work with terminals.  Be very careful to use this only
- * when the token we want is the last one in the current rule.  If the
- * syntax ever gets complicated enough that we can't get away with that, we'll
- * just have to wrap all the terminals in singleton non-terminals just so that
- * $n will work in the real syntax rules.
- */
-extern char *yytext;
-
-/*
  * IMO it's wrong for us to get into the bbool_expr=policy rule when there's
  * a syntax error, but we do.  The good news is that it's easy to free the
  * erroneous tree properly this way.  The bad news is that we need to wait
@@ -161,7 +151,7 @@ extern char *yytext;
 static int syntax_error = 0;
 
 void
-yyerror (value_t **result, const char *msg)
+yyerror (void *scanner, value_t **result, const char *msg)
 {
   // error (0, 0, "parse error: %s\n", msg);
   // FIXME do this via param, not file-global
@@ -170,6 +160,8 @@ yyerror (value_t **result, const char *msg)
 
 %}
 
+%lex-param   { yyscan_t scanner }
+%parse-param { void *scanner }
 %parse-param { value_t **result }
 
 %token <str> T_STRING T_COMP T_DATE T_ID T_LINK T_NUMBER T_OFIELD T_SFIELD
@@ -288,35 +280,35 @@ link_field:
 	}|
 	link_field '.' T_ID {
 		// printf("found LINK FIELD\n");
-		$$ = make_link($1,yytext);
+		$$ = make_link($1,$3);
 	};
 
 field:
 	'$' T_ID {
 		// printf("found DOLLAR FIELD\n");
-		$$ = make_string(yytext,T_OFIELD);
+		$$ = make_string($2,T_OFIELD);
 	}|
 	'#' T_ID {
 		// printf("found WAFFLE FIELD\n");
-		$$ = make_string(yytext,T_SFIELD);
+		$$ = make_string($2,T_SFIELD);
 	};
 
 literal:
 	T_NUMBER {
-		// printf("found NUMBER %s\n",yytext);
-		$$ = make_number(yytext);
+		// printf("found NUMBER %s\n",$1);
+		$$ = make_number($1);
 	}|
 	T_STRING {
-		// printf("found STRING %s\n",yytext);
-		$$ = make_string(yytext,T_STRING);
+		// printf("found STRING %s\n",$1);
+		$$ = make_string($1,T_STRING);
 	}|
 	T_DATE {
 		// printf("found DATE\n");
-		$$ = make_string(yytext,T_DATE);
+		$$ = make_string($1,T_DATE);
 	}|
 	T_ID {
-		// printf("found ID %s\n",yytext);
-		$$ = make_string(yytext,T_ID);
+		// printf("found ID %s\n",$1);
+		$$ = make_string($1,T_ID);
 	};
 
 paren_expr:
@@ -502,10 +494,13 @@ free_value (value_t *v)
 value_t *
 parse (const char *text)
 {
-  yy_scan_string(text);
+  yyscan_t scanner;
+  yylex_init (&scanner);
+  YY_BUFFER_STATE buf = yy_scan_string (text, scanner);
   value_t *result;
-  value_t *r = yyparse (&result) == 0 ? result : NULL;
-  yylex_destroy();
+  value_t *r = yyparse (scanner, &result) == 0 ? result : NULL;
+  yy_delete_buffer (buf, scanner);
+  yylex_destroy (scanner);
   return r;
 }
 

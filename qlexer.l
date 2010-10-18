@@ -1,4 +1,3 @@
-%option warn nounput noinput noyywrap
 %{
 #include <config.h>
 #include <stdio.h>
@@ -9,17 +8,21 @@
 
 #include "iwhd-qparser.h"
 #undef YY_DECL
-#define YY_DECL extern int yylex (YYSTYPE *lvalp)
+#define YY_DECL extern int yylex (YYSTYPE *yylval_param, yyscan_t yyscanner)
 
 static int at_eof = 0;
 %}
 
+%option warn nounput noinput noyywrap
+%option bison-bridge reentrant
+
 %%
 
-\"[^"]*\"	{ yytext[yyleng-1] = 0; yytext++; return T_STRING; }
-~[^~]*~		{ return T_DATE; }
-[0-9]+		{ return T_NUMBER; }
-[a-z_]+		{ return T_ID; }
+\"[^"]*\"	{ yytext[yyleng-1] = 0; yytext++;
+		  yylval_param->str = strdup(yytext); return T_STRING; }
+~[^~]*~		{ yylval_param->str = strdup(yytext); return T_DATE; }
+[0-9]+		{ yylval_param->str = strdup(yytext); return T_NUMBER; }
+[a-z_]+		{ yylval_param->str = strdup(yytext); return T_ID; }
 [=$#()<>.]	{ return yytext[0]; }
 !		{ return T_NOT; }
 &&		{ return T_AND; }
@@ -42,12 +45,14 @@ yyerror (const char *msg)
 int
 main (int argc, char **argv)
 {
-
-	yy_scan_string("\"!@#\" ~xxx~ 123 abc $#()<>=!&|.");
+	yyscan_t scanner;
+	yylex_init (&scanner);
+	YY_BUFFER_STATE buf
+	  = yy_scan_string ("\"!@#\" ~xxx~ 123 abc $#()<>=!&|.", scanner);
 
 	do {
 		YYSTYPE v;
-		int t = yylex(&v);
+		int t = yylex(&v, scanner);
 		switch (t) {
 		case T_STRING:
 			if (!yytext[0]) {
@@ -68,6 +73,9 @@ main (int argc, char **argv)
 			printf("%d\n",t);
 		}
 	} while (!at_eof);
+
+	yy_delete_buffer (buf, scanner);
+	yylex_destroy (scanner);
 
 	return 0;
 }
