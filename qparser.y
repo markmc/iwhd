@@ -3,14 +3,21 @@
 
 %{
 #include <config.h>
+#include "query.h"
+#include "iwhd-qparser.h"
+%}
+
+%union {
+  char *str;
+  struct value_t *val;
+}
+
+%{
 #include <error.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#define YYSTYPE value_t *
-#include "query.h"
-#include "iwhd-qparser.h"
 
 #define YY_DECL int yylex(YYSTYPE *);
 YY_DECL
@@ -165,10 +172,11 @@ yyerror (value_t **result, const char *msg)
 
 %parse-param { value_t **result }
 
-%token T_STRING T_DATE T_NUMBER T_ID
-%token T_NOT T_AND T_OR
-%token T_SPACE T_INVALID
-%token T_OFIELD T_SFIELD T_COMP T_LINK
+%token <str> T_STRING T_COMP T_DATE T_ID T_LINK T_NUMBER T_OFIELD T_SFIELD
+%token T_NOT T_AND T_OR T_SPACE T_INVALID
+
+%type <val> atom bbool_expr comp_expr field
+%type <val> link_field literal paren_expr ubool_expr
 
 %start policy
 
