@@ -17,10 +17,14 @@
 %%
 
 \"[^"]*\"	{ yytext[yyleng-1] = 0; yytext++;
-		  yylval_param->str = strdup(yytext); return T_STRING; }
-~[^~]*~		{ yylval_param->str = strdup(yytext); return T_DATE; }
-[0-9]+		{ yylval_param->str = strdup(yytext); return T_NUMBER; }
-[a-z_]+		{ yylval_param->str = strdup(yytext); return T_ID; }
+		  yylval_param->str = strdup(yytext);
+		  return yylval_param->str ? T_STRING : T_INVALID; }
+~[^~]*~		{ yylval_param->str = strdup(yytext);
+		  return yylval_param->str ? T_DATE : T_INVALID; }
+[0-9]+		{ yylval_param->str = strdup(yytext);
+		  return yylval_param->str ? T_NUMBER : T_INVALID; }
+[a-z_]+		{ yylval_param->str = strdup(yytext);
+		  return yylval_param->str ? T_ID : T_INVALID; }
 [=$#()<>.]	{ return yytext[0]; }
 !		{ return T_NOT; }
 &&		{ return T_AND; }
