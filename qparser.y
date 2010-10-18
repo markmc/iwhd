@@ -82,6 +82,7 @@ make_number (const char *text)
 		tmp->as_num = strtoll(text,NULL,10);
 		tmp->resolved = NULL;
 	}
+	free ((void *) text);
 
 	return tmp;
 }
@@ -96,6 +97,7 @@ make_string (const char *text, type_t t)
 		tmp->as_str = xstrdup(text);
 		tmp->resolved = NULL;
 	}
+	free ((void *) text);
 
 	return tmp;
 }
@@ -133,6 +135,7 @@ make_link (value_t *left, const char *right)
 	char	*copy;
 
 	copy = xstrdup(right);
+	free ((void *) right);
 	if (!copy) {
 		return NULL;
 	}
