@@ -189,13 +189,13 @@ bbool_expr:
 		// printf("promoting ubool_expr to bbool_expr\n");
 		$$ = $1;
 	}|
-	bbool_expr T_AND T_AND ubool_expr {
+	bbool_expr T_AND ubool_expr {
 		// printf("found AND expression\n");
-		$$ = make_tree(T_AND,$1,$4);
+		$$ = make_tree(T_AND,$1,$3);
 	}|
-	bbool_expr T_OR T_OR ubool_expr {
+	bbool_expr T_OR ubool_expr {
 		// printf("found OR expression\n");
-		$$ = make_tree(T_OR,$1,$4);
+		$$ = make_tree(T_OR,$1,$3);
 	}|
 	bbool_expr T_SPACE {
 		$$ = $1;

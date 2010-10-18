@@ -22,8 +22,8 @@ static int at_eof = 0;
 [a-z_]+		{ return T_ID; }
 [=$#()<>.]	{ return yytext[0]; }
 !		{ return T_NOT; }
-&		{ return T_AND; }
-\|		{ return T_OR; }
+&&		{ return T_AND; }
+\|\|		{ return T_OR; }
 [ \t\n\r]+	{ return T_SPACE; }
 .		{ return T_INVALID; }
 
