@@ -16,30 +16,45 @@
 #if !defined(_STATE_DEFS_H)
 #define _STATE_DEFS_H
 
+#include <glib.h>
+#include <microhttpd.h>
 #include "mpipe.h"
 #include "template.h"
 
 #define MAX_FIELD_LEN	64
+
+/* Avoid circular (my_state->provider->backend->my_state) include. */
+struct _provider;
 
 typedef enum {
 	MS_NEW,
 	MS_NORMAL,
 } ms_state;
 
+/*
+ * This structure is used for pthread_create targets that take a void*
+ * argument, so that they can find the state_def and provider_t that they
+ * need regardless of whether they were invoked from main-line request
+ * code (using the thunk embedded here) or the replica code (using a thunk
+ * embedded in the repl_item).
+ */
 typedef struct {
+	struct _my_state	*parent;
+	struct _provider	*prov;
+} backend_thunk_t;
+
+typedef struct _my_state {
+	volatile gint			 refcnt;
 	int				 cleanup;
 	/* for everyone */
 	MHD_AccessHandlerCallback	 handler;
 	ms_state			 state;
-	/* for local ops */
-	int				 fd;
 	/* for proxy ops */
 	char				*url;
 	char				 bucket[MAX_FIELD_LEN];
 	char				 key[MAX_FIELD_LEN];
 	char				 attr[MAX_FIELD_LEN];
 	/* for proxy gets */
-	CURL				*curl;
 	long				 rc;
 	/* for proxy puts */
 	size_t				 size;
@@ -59,9 +74,12 @@ typedef struct {
 	/* for bucket/object/provider list generators */
 	tmpl_ctx_t			*gen_ctx;
 	GHashTableIter			 prov_iter;
+	/* for back-end functions */
+	backend_thunk_t			 thunk;
+	int				 be_flags;
 } my_state;
 
-#define CLEANUP_CURL	0x01
+#define CLEANUP_CURL	0x01	/* no longer needed */
 #define CLEANUP_BUF_PTR	0x02
 #define CLEANUP_POST	0x04
 #define CLEANUP_DICT	0x08
@@ -69,5 +87,9 @@ typedef struct {
 #define CLEANUP_TMPL	0x20
 #define CLEANUP_URL	0x40
 #define CLEANUP_AQUERY	0x80
+
+#define BACKEND_GET_SIZE	0x01	/* used in put_child_func */
+
+void free_ms (my_state *ms);
 
 #endif

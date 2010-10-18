@@ -30,9 +30,8 @@
 #include <unistd.h>
 #include <assert.h>
 
-#include <microhttpd.h>
-#include <curl/curl.h>
 #include <hstor.h>
+#include <microhttpd.h>	/* for HTTP status values */
 
 #include "iwh.h"
 #include "setup.h"
@@ -58,6 +57,7 @@ typedef struct _repl_item {
 	provider_t		*server;
 	size_t			 size;
 	int			 pipes[2];
+	my_state		*ms;
 } repl_item;
 
 typedef struct {
@@ -70,482 +70,94 @@ static repl_item	*queue_head	= NULL;
 static repl_item	*queue_tail	= NULL;
 static pthread_mutex_t	 queue_lock;
 static sem_t		 queue_sema;
-static int		 rep_count	= 0;
-
-static size_t
-junk_writer (/* const */ void *ptr, size_t size, size_t nmemb, void *stream)
-{
-	size_t	n;
-
-	n = fwrite(ptr,size,nmemb,stream);
-	if (n != nmemb)
-		error(0, 0, "warning: write failed");
-	if (fflush(stream))
-		error(0, 0, "warning: write failed");
-	DPRINTF("in %s(%zu,%zu) => %zu\n",__func__,size,nmemb,n);
-
-	return n;
-}
-
-static void *
-proxy_repl_prod_fs (void *ctx)
-{
-	repl_item		*item	= ctx;
-	int		 	 ifd;
-	int			 ofd;
-	char		 	 buf[1<<16];
-	ssize_t		 	 ibytes;
-	ssize_t		 	 obytes;
-	ssize_t			 offset;
-
-	DPRINTF("replicating from %s (FS)\n",item->path);
-
-	ifd = open(item->path,O_RDONLY);
-	if (ifd < 0) {
-		error(0,errno,"ifd open");
-		return THREAD_FAILED;
-	}
-	ofd = item->pipes[1];
-
-	for (;;) {
-		ibytes = read(ifd,buf,sizeof(buf));
-		if (ibytes <= 0) {
-			if (ibytes < 0) {
-				error(0,errno,"%s: read failed", item->path);
-			}
-			else {
-				DPRINTF("EOF on ifd\n");
-			}
-			break;
-		}
-		offset = 0;
-		do {
-			obytes = write(ofd,buf+offset,ibytes);
-			if (obytes <= 0) {
-				if (obytes < 0) {
-					error(0,errno,"ofd write");
-				}
-				else {
-					DPRINTF("zero-length write on ofd\n");
-				}
-				break;
-			}
-			ibytes -= obytes;
-			offset += obytes;
-		} while (ibytes > 0);
-	}
-
-	close(ifd);
-	close(ofd);
-
-	DPRINTF("%s returning\n",__func__);
-	close(item->pipes[1]);
-	return NULL;
-}
+static volatile gint	 rep_count	= 0;
 
 static void *
 proxy_repl_prod (void *ctx)
 {
 	repl_item		*item	= ctx;
-	FILE			*fp	= fdopen(item->pipes[1],"w");
-	char			 addr[ADDR_SIZE];
-	CURL			*curl;
-	char			 svc_acc[SVC_ACC_SIZE];
-	struct hstor_client	*hstor;
-	char			*bucket;
-	char			*key;
-	char			*stctx;
-	char			*myurl;
-	int			 chars;
+	backend_thunk_t		 thunk;
+	void			*result;
 
-	if (fp == NULL) {
-		error(0, errno, "%s: fdopen failed", __func__);
-		return NULL;
-	}
+	thunk.parent = item->ms;
+	thunk.prov = main_prov;
 
-	chars = snprintf(addr,ADDR_SIZE,
-		"http://%s:%u/%s",proxy_host,proxy_port,item->path);
-	if (chars >= ADDR_SIZE) {
-		error(0,0,"path too long in %s",__func__);
-		goto done;
-	}
-	DPRINTF("replicating from %s\n",addr);
-
-	if (s3mode) {
-		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",
-			proxy_host,proxy_port);
-		if (chars >= SVC_ACC_SIZE) {
-			error(0,0,"svc_acc too long in %s",__func__);
-			goto done;
-		}
-		hstor = hstor_new(svc_acc,proxy_host,
-				     proxy_key,proxy_secret);
-		/* Blech.  Can't conflict with consumer, though. */
-		myurl = strdup(item->path);
-		assert (myurl);
-		bucket = strtok_r(myurl,"/",&stctx);
-		key = strtok_r(NULL,"/",&stctx);
-		hstor_get(hstor,bucket,key,
-			     junk_writer,fp,0);
-		hstor_free(hstor);
-		free(myurl);
-	}
-	else {
-		curl = curl_easy_init();
-		curl_easy_setopt(curl,CURLOPT_URL,addr);
-		curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,junk_writer);
-		curl_easy_setopt(curl,CURLOPT_WRITEDATA,fp);
-		DPRINTF("%s calling curl_easy_perform\n",__func__);
-		curl_easy_perform(curl);
-		curl_easy_cleanup(curl);
-	}
-
-done:
-	DPRINTF("%s returning\n",__func__);
-	/* Closing should signal to the consumer that we're finished. */
-	fclose(fp);
-	return NULL;
-}
-
-static size_t
-junk_reader (void *ptr, size_t size, size_t nmemb, void *stream)
-{
-	size_t	n;
-
-	n = fread(ptr,size,nmemb,stream);
-	printf("in %s(%zu,%zu) => %zu\n",__func__,size,nmemb,n);
-	return n;
-}
-
-static size_t
-cf_writer (void *ptr ATTRIBUTE_UNUSED, size_t size, size_t nmemb,
-	   void *stream ATTRIBUTE_UNUSED)
-{
-	return size * nmemb;
-}
-
-static size_t
-cf_header (void *ptr, size_t size, size_t nmemb, void *stream)
-{
-	char		*next;
-	char		*sctx;
-	provider_t	*server	= (provider_t *)stream;
-
-	next = strtok_r(ptr,":",&sctx);
-	if (next) {
-		if (!strcasecmp(next,"X-Storage-Url")) {
-			next = strtok_r(NULL," \n\r",&sctx);
-			if (next) {
-				DPRINTF("got CF URL %s\n",next);
-				/* NB: after this, original "host" is gone. */
-				free((char *)server->host);
-				server->host = strdup(next);
-			}
-		}
-		else if (!strcasecmp(next,"X-Storage-Token")) {
-			next = strtok_r(NULL," \n\r",&sctx);
-			if (next) {
-				DPRINTF("got CF token %s\n",next);
-				server->token = strdup(next);
-			}
-		}
-	}
-	return size * nmemb;
-}
-
-static const char *
-get_cloudfiles_token (provider_t *server, const char *host, unsigned int port,
-	const char * user, const char * key)
-{
-	CURL			*curl;
-	char	 		 addr[ADDR_SIZE];
-	char	 		 auth_user[HEADER_SIZE];
-	char	 		 auth_key[HEADER_SIZE];
-	char			*token;
-	struct curl_slist	*slist;
-	int			 chars;
-
-	token = server->token;
-	if (token) {
-		return token;
-	}
-
-	chars = snprintf(addr,ADDR_SIZE,"https://%s:%u/v1.0",host,port);
-	if (chars >= ADDR_SIZE) {
-		error(0,0,"API URL too long in %s",__func__);
-		return NULL;
-	}
-
-	chars = snprintf(auth_user,HEADER_SIZE,"X-Auth-User: %s",user);
-	if (chars >= HEADER_SIZE) {
-		error(0,0,"auth_user too long in %s",__func__);
-		return NULL;
-	}
-
-	chars = snprintf(auth_key,HEADER_SIZE,"X-Auth-Key: %s",key);
-	if (chars >= HEADER_SIZE) {
-		error(0,0,"auth_key too long in %s",__func__);
-		return NULL;
-	}
-
-	curl = curl_easy_init();
-	curl_easy_setopt(curl,CURLOPT_URL,addr);
-	curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,cf_writer);
-	curl_easy_setopt(curl,CURLOPT_HEADERFUNCTION,cf_header);
-	curl_easy_setopt(curl,CURLOPT_WRITEHEADER,server);
-	slist = curl_slist_append(NULL,auth_user);
-	slist = curl_slist_append(slist,auth_key);
-	curl_easy_setopt(curl,CURLOPT_HTTPHEADER,slist);
-	curl_easy_perform(curl);
-	curl_easy_cleanup(curl);
-	curl_slist_free_all(slist);
-
-	return server->token;
+	result = thunk.prov->func_tbl->get_child_func(&thunk);
+	return result;
 }
 
 static void *
 proxy_repl_cons (void *ctx)
 {
 	repl_item		*item	= ctx;
-	FILE			*fp	= fdopen(item->pipes[0],"r");
-	char			 addr[ADDR_SIZE];
-	CURL			*curl;
-	provider_t		*server;
-	char			 svc_acc[SVC_ACC_SIZE];
-	char			 auth_hdr[HEADER_SIZE];
-	struct hstor_client	*hstor;
-	char			*bucket;
-	char			*key;
-	char			*stctx;
-	const char		*s_host;
-	unsigned int		 s_port;
-	const char		*s_key;
-	const char		*s_secret;
-	const char		*s_type;
-	const char		*s_name;
-	struct curl_slist	*slist;
-	char			*myurl;
-	int			 chars;
+	my_state		*ms	= item->ms;
+	pipe_private		*pp;
+	void			*rc;
 
-	if (fp == NULL) {
-		error(0, errno, "%s: fdopen failed", __func__);
+	/*
+	 * Do a full initialization here, not just in the rest.  It's
+	 * necessary in the oddball case where we're re-replicating as
+	 * a result of an attribute/policy change, and it's not harmful
+	 * in the normal case where we're actually storing a new file.
+	 */
+	pipe_init_shared(&ms->pipe,ms,1);
+	pp = pipe_init_private(&ms->pipe);
+	if (!pp) {
+		pipe_cons_siginit(&ms->pipe,-1);
 		return THREAD_FAILED;
 	}
 
-	server = item->server;
-	s_host = server->host;
-	s_port = server->port;
-	s_key = server->username;
-	s_secret = server->password;
-	s_type = server->type;
-	s_name = server->name;
+	pp->prov = item->server;
+	ms->be_flags = 0;
 
-	myurl = strdup(item->path);
-	assert (myurl);
-	bucket = strtok_r(myurl,"/",&stctx);
-	key = strtok_r(NULL,"/",&stctx);
-
-	if (!strcasecmp(s_type,"s3")) {
-		DPRINTF("replicating %zu to %s/%s (S3)\n",item->size,s_host,
-			item->path);
-		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",s_host,s_port);
-		if (chars >= SVC_ACC_SIZE) {
-			error(0,0,"svc_acc too long in %s",__func__);
-			return THREAD_FAILED;
-		}
-		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
-		/* Blech.  Can't conflict with producer, though. */
-		hstor_put(hstor,bucket,key,
-			     junk_reader,item->size,fp,NULL);
-		hstor_free(hstor);
-	}
-	else {
-		const char *token_str = NULL;
-		if (!strcasecmp(s_type,"cf")) {
-			token_str = get_cloudfiles_token(server,s_host,s_port,
-				s_key, s_secret);
-			if (!token_str) {
-				DPRINTF("could not get CF token\n");
-				return THREAD_FAILED;
-			}
-			/* Re-fetch as this might have changed. */
-			s_host = server->host;
-			chars = snprintf(addr,ADDR_SIZE,"%s/%s",
-				s_host,item->path);
-			if (chars >= ADDR_SIZE) {
-				error(0,0,"CF path too long in %s",__func__);
-				return THREAD_FAILED;
-			}
-			DPRINTF("replicating %zu to %s (CF)\n",item->size,
-				addr);
-		}
-		else {
-			chars = snprintf(addr,ADDR_SIZE,"http://%s:%u/%s",
-				s_host,s_port,item->path);
-			if (chars >= ADDR_SIZE) {
-				error(0,0,"HTTP path too long in %s",
-					__func__);
-				return THREAD_FAILED;
-			}
-			DPRINTF("replicating %zu to %s (repod)\n",item->size,
-				addr);
-		}
-		curl = curl_easy_init();
-		curl_easy_setopt(curl,CURLOPT_URL,addr);
-		curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
-		curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,
-			(curl_off_t)item->size);
-		curl_easy_setopt(curl,CURLOPT_READFUNCTION,junk_reader);
-		if (!strcasecmp(s_type,"cf")) {
-			chars = snprintf(auth_hdr,HEADER_SIZE,
-				"X-Auth-Token: %s",token_str);
-			if (chars >= HEADER_SIZE) {
-				error(0,0,"auth_token too long in %s",
-					__func__);
-				return THREAD_FAILED;
-			}
-			slist = curl_slist_append(NULL,auth_hdr);
-			/*
-			 * Rackspace doesn't clearly document that you'll get
-			 * 412 (Precondition Failed) if you omit this.
-			 */
-			slist = curl_slist_append(slist,
-				"Content-Type: binary/octet-stream");
-		}
-		else {
-			slist = curl_slist_append(NULL,"X-redhat-role: master");
-		}
-		curl_easy_setopt(curl,CURLOPT_HTTPHEADER,slist);
-		curl_easy_setopt(curl,CURLOPT_READDATA,fp);
-		DPRINTF("%s calling curl_easy_perform\n",__func__);
-		curl_easy_perform(curl);
-		curl_easy_cleanup(curl);
-		curl_slist_free_all(slist);
-	}
-
-	DPRINTF("%s returning\n",__func__);
-	fclose(fp);
-	meta_got_copy(bucket,key,s_name);
-	free(myurl);
-	return NULL;
+	return item->server->func_tbl->put_child_func(pp);
 }
 
 static void
 repl_worker_del (const repl_item *item)
 {
-	provider_t		*server;
-	const char		*s_host;
-	unsigned int		 s_port;
-	const char		*s_key;
-	const char		*s_secret;
-	const char		*s_type;
-	char			 svc_acc[SVC_ACC_SIZE];
-	struct hstor_client	*hstor;
-	char			 addr[ADDR_SIZE];
-	CURL			*curl;
-	char			*bucket;
-	char			*key;
-	char			*stctx;
-	int			 chars;
+	char	*bucket;
+	char	*key;
+	int	 rc;
 
-	server = item->server;
-	s_host = server->host;
-	s_port = server->port;
-	s_key = server->username;
-	s_secret = server->password;
-	s_type = server->type;
-
-	if (!strcasecmp(s_type,"s3")) {
-		DPRINTF("%s replicating delete of %s on %s:%u (S3)\n",__func__,
-			item->path, s_host, s_port);
-		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",s_host,s_port);
-		if (chars >= SVC_ACC_SIZE) {
-			error(0,0,"svc_acc too long in %s",__func__);
-			return;
-		}
-		/* TBD: check return */
-		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
-		assert (item->path);
-		bucket = strtok_r(item->path,"/",&stctx);
-		key = strtok_r(NULL,"/",&stctx);
-		(void)hstor_del(hstor,bucket,key);
-		hstor_free(hstor);
-	}
-	else {
-		DPRINTF("%s replicating delete of %s on %s:%u (HTTP)\n",
-			__func__, item->path, s_host, s_port);
-		chars = snprintf(addr,ADDR_SIZE,"http://%s:%d%s",
-			s_host,s_port,item->path);
-		if (chars >= ADDR_SIZE) {
-			error(0,0,"path too long in %s",__func__);
-			return;
-		}
-		curl = curl_easy_init();
-		curl_easy_setopt(curl,CURLOPT_URL,addr);
-		curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"DELETE");
-		curl_easy_perform(curl);
-		curl_easy_cleanup(curl);
+	bucket = strdup(item->path);
+	if (!bucket) {
+		error(0,errno,"ran out of memory replicating delete for %s",
+			item->path);
+		return;
 	}
 
-	DPRINTF("%s returning\n",__func__);
+	key = strchr(bucket,'/');
+	if (!key) {
+		error(0,0,"invalid path replicating delete for %s",item->path);
+		free(bucket);
+		return;
+	}
+	++key;
+
+	rc = item->server->func_tbl->delete_func(item->server,
+		bucket, key, item->path);
+	if (rc != MHD_HTTP_OK) {
+		error(0,0,"got status %d replicating delete for %s",
+			rc, item->path);
+	}
+	free(bucket);
+
+	DPRINTF("finished replicating delete for %s, rc = %d\n",item->path,rc);
 }
 
 static void
 repl_worker_bcreate (repl_item *item)
 {
-	provider_t		*server;
-	const char		*s_host;
-	unsigned int		 s_port;
-	const char		*s_key;
-	const char		*s_secret;
-	const char		*s_type;
-	char			 svc_acc[SVC_ACC_SIZE];
-	struct hstor_client	*hstor;
-	char			 addr[ADDR_SIZE];
-	CURL			*curl;
-	int			 chars;
+	int	 rc;
 
-	server = item->server;
-	s_host = server->host;
-	s_port = server->port;
-	s_key = server->username;
-	s_secret = server->password;
-	s_type = server->type;
-
-	if (!strcasecmp(s_type,"s3")) {
-		DPRINTF("%s replicating create of bucket %s on %s:%u (S3)\n",
-			__func__, item->path, s_host, s_port);
-		chars = snprintf(svc_acc,SVC_ACC_SIZE,"%s:%u",s_host,s_port);
-		if (chars >= SVC_ACC_SIZE) {
-			error(0,0,"svc_acc too long in %s",__func__);
-			return;
-		}
-		/* TBD: check return */
-		hstor = hstor_new(svc_acc,s_host,s_key,s_secret);
-		assert (item->path);
-		if (!hstor_add_bucket(hstor,item->path)) {
-			error(0,0,"bucket create failed for %s",
-				item->path);
-		}
-		hstor_free(hstor);
-	}
-	else {
-		DPRINTF("%s replicating create of bucket %s on %s:%u (HTTP)\n",
-			__func__, item->path, s_host, s_port);
-		chars = snprintf(addr,ADDR_SIZE,"http://%s:%d/%s",
-			s_host,s_port,item->path);
-		if (chars >= ADDR_SIZE) {
-			error(0,0,"path too long in %s",__func__);
-			return;
-		}
-		curl = curl_easy_init();
-		curl_easy_setopt(curl,CURLOPT_URL,addr);
-		curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"PUT");
-		curl_easy_perform(curl);
-		curl_easy_cleanup(curl);
+	rc = item->server->func_tbl->bcreate_func(item->server,item->path);
+	if (rc != MHD_HTTP_OK) {
+		error(0,0,"got status %d replicating bcreate for %s",
+			rc, item->path);
 	}
 
-	DPRINTF("%s returning\n",__func__);
+	DPRINTF("finished replicating bcreate for %s, rc = %d\n",item->path,rc);
 }
 
 /* Use this to diagnose failed thread creation.  */
@@ -578,10 +190,7 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 		switch (item->type) {
 		case REPL_PUT:
 			if (pipe(item->pipes) >= 0) {
-				xpthread_create(&prod, (proxy_host
-							? proxy_repl_prod
-							: proxy_repl_prod_fs),
-						item,
+				xpthread_create(&prod,proxy_repl_prod,item,
 					    "failed to start producer thread");
 				xpthread_create(&cons,proxy_repl_cons,item,
 					    "failed to start consumer thread");
@@ -602,6 +211,7 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 			error(0,0,"bad repl type %d (url=%s) skipped",
 				item->type, item->path);
 		}
+		free_ms(item->ms);
 		free(item->path);
 		free(item);
 		/* No atomic dec without test?  Lame. */
@@ -659,7 +269,7 @@ repl_sget (void *ctx, const char *id)
 }
 
 void
-replicate (const char *url, size_t size, const char *policy)
+replicate (const char *url, size_t size, const char *policy, my_state *ms)
 {
 	repl_item	*item;
 	value_t		*expr;
@@ -733,6 +343,8 @@ replicate (const char *url, size_t size, const char *policy)
 		}
 		item->server = prov;
 		item->size = size;
+		item->ms = ms;
+		g_atomic_int_inc(&ms->refcnt);
 		pthread_mutex_lock(&queue_lock);
 		if (queue_tail) {
 			item->next = queue_tail->next;
@@ -755,7 +367,7 @@ replicate (const char *url, size_t size, const char *policy)
 }
 
 static void
-replicate_namespace_action (const char *name, repl_t action)
+replicate_namespace_action (const char *name, repl_t action, my_state *ms)
 {
 	repl_item	*item;
 	GHashTableIter	 iter;
@@ -782,6 +394,8 @@ replicate_namespace_action (const char *name, repl_t action)
 			return;
 		}
 		item->server = (provider_t *)value;
+		item->ms = ms;
+		g_atomic_int_inc(&ms->refcnt);
 		pthread_mutex_lock(&queue_lock);
 		if (queue_tail) {
 			item->next = queue_tail->next;
@@ -799,15 +413,15 @@ replicate_namespace_action (const char *name, repl_t action)
 }
 
 void
-replicate_delete (const char *name)
+replicate_delete (const char *name, my_state *ms)
 {
-	replicate_namespace_action(name,REPL_ODELETE);
+	replicate_namespace_action(name,REPL_ODELETE,ms);
 }
 
 void
-replicate_bcreate (const char *name)
+replicate_bcreate (const char *name, my_state *ms)
 {
-	replicate_namespace_action(name,REPL_BCREATE);
+	replicate_namespace_action(name,REPL_BCREATE,ms);
 }
 
 /* Part of our API to the query module. */

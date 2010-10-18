@@ -26,6 +26,12 @@ pipe_init_shared (pipe_shared *ps, void *owner, unsigned short ncons)
 	pthread_mutex_init(&ps->lock,NULL);
 	pthread_cond_init(&ps->prod_cond,NULL);
 	pthread_cond_init(&ps->cons_cond,NULL);
+	pipe_reset(ps,ncons);
+}
+
+void
+pipe_reset (pipe_shared *ps, unsigned short ncons)
+{
 	ps->data_ptr = NULL;
 	ps->data_len = 0;
 	ps->sequence = 0;	/* TBD: randomize? */

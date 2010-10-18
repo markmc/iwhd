@@ -18,8 +18,8 @@
 #include <stdint.h>		/* for microhttpd.h (bug in there) */
 #include <jansson.h>
 
-#include "setup.h"
 #include "iwh.h"
+#include "state_defs.h"
 
 static char auto_arg_port[10];
 

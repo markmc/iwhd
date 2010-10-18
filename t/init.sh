@@ -225,7 +225,7 @@ remove_tmp_()
   cd "$initial_cwd_" || cd / || cd /tmp
   chmod -R u+rwx "$test_dir_"
   # If removal fails and exit status was to be 0, then change it to 1.
-  rm -rf "$test_dir_" || { test $__st = 0 && __st=1; }
+  #rm -rf "$test_dir_" || { test $__st = 0 && __st=1; }
   exit $__st
 }
 

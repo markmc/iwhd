@@ -18,16 +18,18 @@
 
 #include "state_defs.h"
 
-/* Avoid circular include, suppress warning. */
-struct _provider;
-
-typedef void	 init_func_t		(void);
+typedef void	 init_func_t		(struct _provider *prov);
+/* Get provider from passed backend_thunk. */
 typedef void	*get_child_func_t	(void *);
+/* Get provider from passed pipe_private. */
 typedef void	*put_child_func_t	(void *);
 typedef void	*cache_child_func_t	(void *);
-typedef int	 delete_func_t		(const char *bucket, const char *key,
+/* Get provider as an argument. */
+typedef int	 delete_func_t		(const struct _provider *prov,
+					 const char *bucket, const char *key,
 					 const char *url);
-typedef int	 bcreate_func_t		(const char *bucket);
+typedef int	 bcreate_func_t		(const struct _provider *prov,
+					 const char *bucket);
 typedef int	 register_func_t	(my_state *ms,
 					 const struct _provider *prov,
 					 const char *next, GHashTable *args);

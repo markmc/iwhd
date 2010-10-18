@@ -34,6 +34,9 @@ typedef struct _provider {
 	char			*token;
 } provider_t;
 
+provider_t	*main_prov;
+provider_t	*master_prov;
+
 const char	 *parse_config		(char *);
 const provider_t *get_provider		(const char *name);
 void	 	  update_provider	(const char *provname,

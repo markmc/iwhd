@@ -65,10 +65,14 @@
 extern backend_func_tbl	bad_func_tbl;
 extern backend_func_tbl	s3_func_tbl;
 extern backend_func_tbl	curl_func_tbl;
+extern backend_func_tbl	cf_func_tbl;
 extern backend_func_tbl	fs_func_tbl;
 
 static json_t		*config		= NULL;
 static GHashTable	*prov_hash	= NULL;
+
+provider_t	*main_prov	= NULL;
+provider_t	*master_prov	= NULL;
 
 static int
 validate_server (unsigned int i)
@@ -155,29 +159,6 @@ validate_server (unsigned int i)
 	return 1;
 }
 
-/* We've already validated, so minimal checking here. */
-static const char *
-set_config (provider_t *prov)
-{
-	if (strcasecmp(prov->type,"fs")) {
-		proxy_host = prov->host;
-		proxy_port = prov->port;
-		if (!strcasecmp(prov->type,"s3")) {
-			s3mode = 1;
-			proxy_key = prov->username;
-			proxy_secret = prov->password;
-		}
-		else {
-			s3mode = 0;
-		}
-	}
-	else {
-		local_path = prov->path;
-	}
-
-	return prov->name;
-}
-
 static const char *
 dup_json_string (json_t *obj, char *field)
 {
@@ -238,6 +219,9 @@ convert_provider (int i, provider_t *out)
 	}
 	else if (!strcasecmp(out->type,"http")) {
 		out->func_tbl = &curl_func_tbl;
+	}
+	else if (!strcasecmp(out->type,"cf")) {
+		out->func_tbl = &cf_func_tbl;
 	}
 	else if (!strcasecmp(out->type,"fs")) {
 		out->func_tbl = &fs_func_tbl;
@@ -329,8 +313,10 @@ parse_config_inner (void)
 		}
 		g_hash_table_insert(prov_hash,(char *)new_key,new_prov);
 		if (!i) {
-			primary = set_config(new_prov);
+			main_prov = new_prov;
+			primary = new_prov->name;
 		}
+		new_prov->func_tbl->init_func(new_prov);
 	}
 	return primary;
 
@@ -346,6 +332,22 @@ parse_config (char *cfg_file)
 {
 	json_error_t	 err;
 	const char	*primary	= NULL;
+
+	/*
+	 * The master provider is special.  It's not in the provider hash
+	 * (so replication code doesn't try to initiate replication to it)
+	 * and it's always assumed to be our own protocol (which we access
+	 * using CURL).
+	 *
+	 * TBD: initialize this in a separate module-init function, passing
+	 * in master_host and master_port instead of using globals.
+	 */
+	if (!master_prov) {
+		master_prov = malloc(sizeof(*master_prov));
+		if (master_prov) {
+			master_prov->func_tbl = &curl_func_tbl;
+		}
+	}
 
 	if (access(cfg_file,R_OK) < 0) {
 		error(0,errno,"failed to open %s for reading", cfg_file);

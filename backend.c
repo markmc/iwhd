@@ -51,6 +51,11 @@ struct hstor_client	*hstor;
 
 /***** Generic module stuff, not specific to one back end *****/
 
+/* Sizes for internal string buffers for CF code. */
+#define ADDR_SIZE	1024
+#define SVC_ACC_SIZE	128
+#define HEADER_SIZE	64
+
 #define S3_IMAGE_PATTERN "^IMAGE[[:blank:]]+([^[:space:]]+)"
 #define S3_ERROR_PATTERN "^ERROR[[:blank:]]+([^[:space:]]+)"
 
@@ -77,23 +82,26 @@ backend_init (void)
 
 /***** Stub functions for unimplemented stuff. *****/
 
-void
-bad_init (void)
+static void
+bad_init (provider_t *prov)
 {
+	(void)prov;
+
 	DPRINTF("*** bad call to %s\n",__func__);
 }
 
-void *
+static void *
 bad_get_child (void * ctx)
 {
-	my_state        *ms     = (my_state *)ctx;
+	backend_thunk_t	*tp	= (backend_thunk_t *)ctx;
+	my_state        *ms     = tp->parent;
 
 	DPRINTF("*** bad call to %s\n",__func__);
 	pipe_prod_siginit(&ms->pipe,-1);
 	return NULL;
 }
 
-void *
+static void *
 bad_put_child (void * ctx)
 {
 	pipe_private	*pp	= ctx;
@@ -105,7 +113,7 @@ bad_put_child (void * ctx)
 	return THREAD_FAILED;
 }
 
-void *
+static void *
 bad_cache_child (void * ctx)
 {
 	(void)ctx;
@@ -114,9 +122,11 @@ bad_cache_child (void * ctx)
 	return NULL;
 }
 
-int
-bad_delete (const char *bucket, const char *key, const char *url)
+static int
+bad_delete (const provider_t *prov, const char *bucket, const char *key,
+	    const char *url)
 {
+	(void)prov;
 	(void)bucket;
 	(void)key;
 	(void)url;
@@ -125,16 +135,17 @@ bad_delete (const char *bucket, const char *key, const char *url)
 	return MHD_HTTP_BAD_REQUEST;
 }
 
-int
-bad_bcreate (const char *bucket)
+static int
+bad_bcreate (const provider_t *prov, const char *bucket)
 {
+	(void)prov;
 	(void)bucket;
 
 	DPRINTF("*** bad call to %s\n",__func__);
 	return MHD_HTTP_NOT_IMPLEMENTED;
 }
 
-int
+static int
 bad_register (my_state *ms, const provider_t *prov, const char *next,
 	      GHashTable *args)
 {
@@ -150,7 +161,7 @@ bad_register (my_state *ms, const provider_t *prov, const char *next,
 /***** Generic functions shared by the HTTP back ends. */
 
 /* Invoked from S3/CURL/CF. */
-size_t
+static size_t
 http_get_prod (void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	size_t		 total	= size * nmemb;
@@ -164,7 +175,7 @@ http_get_prod (void *ptr, size_t size, size_t nmemb, void *stream)
 }
 
 /* Invoked from S3/CURL/CF. */
-size_t
+static size_t
 http_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	size_t		 total	= size * nmemb;
@@ -173,8 +184,6 @@ http_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 	size_t		 done;
 
 	DPRINTF("consumer asked to read %zu\n",total);
-
-	pipe_cons_siginit(ps, 0);
 
 	if (!pipe_cons_wait(pp)) {
 		return 0;
@@ -200,14 +209,13 @@ http_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 
 /***** S3-specific functions *****/
 
-void
-s3_init (void)
+static void
+s3_init (provider_t *prov)
 {
 	char svc_acc[128];
 
-	snprintf(svc_acc,sizeof(svc_acc),"%s:%u",
-		proxy_host,proxy_port);
-	hstor = hstor_new(svc_acc,proxy_host,proxy_key,proxy_secret);
+	snprintf(svc_acc,sizeof(svc_acc),"%s:%u",prov->host,prov->port);
+	hstor = hstor_new(svc_acc,prov->host,prov->username,prov->password);
 	if (hstor) {
 		if (verbose) {
 			hstor->verbose = 1;
@@ -219,10 +227,11 @@ s3_init (void)
 }
 
 /* Start an S3 _producer_. */
-void *
+static void *
 s3_get_child (void * ctx)
 {
-	my_state	*ms	= ctx;
+	backend_thunk_t	*tp	= (backend_thunk_t *)ctx;
+	my_state        *ms     = tp->parent;
 
 	/* TBD: check existence before calling siginit */
 	pipe_prod_siginit(&ms->pipe,0);
@@ -237,7 +246,7 @@ s3_get_child (void * ctx)
 }
 
 /* Start an S3 _consumer_. */
-void *
+static void *
 s3_put_child (void * ctx)
 {
 	pipe_private	*pp	= ctx;
@@ -247,16 +256,19 @@ s3_put_child (void * ctx)
 	const char	*clen;
 	bool		 rcb;
 
-	clen = MHD_lookup_connection_value(
-		ms->conn, MHD_HEADER_KIND, "Content-Length");
-	if (clen) {
-		llen = strtoll(clen,NULL,10);
-	}
-	else {
-		error (0, 0, "missing Content-Length");
-		llen = (curl_off_t)MHD_SIZE_UNKNOWN;
+	llen = (curl_off_t)MHD_SIZE_UNKNOWN;
+	if (ms->be_flags & BACKEND_GET_SIZE) {
+		clen = MHD_lookup_connection_value(
+			ms->conn, MHD_HEADER_KIND, "Content-Length");
+		if (clen) {
+			llen = strtoll(clen,NULL,10);
+		}
+		else {
+			error (0, 0, "missing Content-Length");
+		}
 	}
 
+	pipe_cons_siginit(ps, 0);
 	rcb = hstor_put(hstor,ms->bucket,ms->key,http_put_cons,llen,pp,NULL);
 	if (!rcb) {
 		DPRINTF("%s returning with error\n",__func__);
@@ -270,9 +282,11 @@ s3_put_child (void * ctx)
 	return NULL;
 }
 
-int
-s3_delete (const char *bucket, const char *key, const char *url)
+static int
+s3_delete (const provider_t *prov, const char *bucket, const char *key,
+	   const char *url)
 {
+	(void)prov;
 	(void)url;
 
 	hstor_del(hstor,bucket,key);
@@ -281,9 +295,11 @@ s3_delete (const char *bucket, const char *key, const char *url)
 	return MHD_HTTP_OK;
 }
 
-int
-s3_bcreate (const char *bucket)
+static int
+s3_bcreate (const provider_t *prov, const char *bucket)
 {
+	(void)prov;
+
 	DPRINTF("creating bucket %s\n",bucket);
 
 	if (!hstor_add_bucket(hstor,bucket)) {
@@ -336,7 +352,7 @@ s3_init_tmpfile (char *value)
 	return path;
 }
 
-int
+static int
 s3_register (my_state *ms, const provider_t *prov, const char *next,
 	     GHashTable *args)
 {
@@ -552,66 +568,72 @@ cleanup:
 
 /***** CURL-specific functions *****/
 
-void
-curl_init (void)
+static void
+curl_init (provider_t *prov)
 {
+	(void)prov;
 }
 
 /* Start a CURL _producer_. */
-void *
+static void *
 curl_get_child (void * ctx)
 {
 	char		 fixed[1024];
-	my_state	*ms	= ctx;
+	backend_thunk_t	*tp	= (backend_thunk_t *)ctx;
+	my_state        *ms     = tp->parent;
+	provider_t	*prov	= tp->prov;
+	CURL		*curl;
 
-	ms->curl = curl_easy_init();
-	if (!ms->curl) {
+	curl = curl_easy_init();
+	if (!curl) {
 		pipe_prod_siginit(&ms->pipe,-1);
 		return NULL;	/* TBD: flag error somehow */
 	}
-	ms->cleanup |= CLEANUP_CURL;
 	if (ms->from_master) {
 		sprintf(fixed,"http://%s:%u%s",
 			master_host, master_port, ms->url);
 	}
 	else {
 		sprintf(fixed,"http://%s:%u%s",
-			proxy_host, proxy_port, ms->url);
+			prov->host, prov->port, ms->url);
 	}
-	curl_easy_setopt(ms->curl,CURLOPT_URL,fixed);
-	curl_easy_setopt(ms->curl,CURLOPT_WRITEFUNCTION,
-			 http_get_prod);
-	curl_easy_setopt(ms->curl,CURLOPT_WRITEDATA,&ms->pipe);
+	curl_easy_setopt(curl,CURLOPT_URL,fixed);
+	curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION, http_get_prod);
+	curl_easy_setopt(curl,CURLOPT_WRITEDATA,&ms->pipe);
 	pipe_prod_siginit(&ms->pipe,0);
-	curl_easy_perform(ms->curl);
-	curl_easy_getinfo(ms->curl,CURLINFO_RESPONSE_CODE,&ms->rc);
 
+	curl_easy_perform(curl);
+	curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&ms->rc);
 	pipe_prod_finish(&ms->pipe);
 
 	DPRINTF("producer exiting\n");
+	curl_easy_cleanup(curl);
 	return NULL;
 }
 
 /* Start a CURL _consumer_. */
-void *
+static void *
 curl_put_child (void * ctx)
 {
 	pipe_private	*pp	= ctx;
 	pipe_shared	*ps	= pp->shared;
 	my_state	*ms	= ps->owner;
+	provider_t	*prov	= pp->prov;
 	curl_off_t	 llen;
 	char		 fixed[1024];
 	CURL		*curl;
 	const char	*clen;
 
-	clen = MHD_lookup_connection_value(
-		ms->conn, MHD_HEADER_KIND, "Content-Length");
-	if (clen) {
-		llen = strtoll(clen,NULL,10);
-	}
-	else {
-		error (0, 0, "missing Content-Length");
-		llen = (curl_off_t)MHD_SIZE_UNKNOWN;
+	llen = (curl_off_t)MHD_SIZE_UNKNOWN;
+	if (ms->be_flags & BACKEND_GET_SIZE) {
+		clen = MHD_lookup_connection_value(
+			ms->conn, MHD_HEADER_KIND, "Content-Length");
+		if (clen) {
+			llen = strtoll(clen,NULL,10);
+		}
+		else {
+			error (0, 0, "missing Content-Length");
+		}
 	}
 
 	curl = curl_easy_init();
@@ -620,13 +642,14 @@ curl_put_child (void * ctx)
 		free(pp);
 		return THREAD_FAILED;
 	}
-	sprintf(fixed,"http://%s:%u%s",proxy_host,proxy_port,
+	sprintf(fixed,"http://%s:%u%s",prov->host,prov->port,
 		ms->url);
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
 	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,llen);
 	curl_easy_setopt(curl,CURLOPT_READFUNCTION,http_put_cons);
 	curl_easy_setopt(curl,CURLOPT_READDATA,pp);
+	pipe_cons_siginit(ps, 0);
 	curl_easy_perform(curl);
 	curl_easy_cleanup(curl);
 
@@ -636,12 +659,13 @@ curl_put_child (void * ctx)
 }
 
 /* Start a CURL cache consumer. */
-void *
+static void *
 curl_cache_child (void * ctx)
 {
 	pipe_private	*pp	= ctx;
 	pipe_shared	*ps	= pp->shared;
 	my_state	*ms	= ps->owner;
+	provider_t	*prov	= pp->prov;
 	char		 fixed[1024];
 	CURL		*curl;
 	char		*slash;
@@ -654,9 +678,10 @@ curl_cache_child (void * ctx)
 	curl = curl_easy_init();
 	if (!curl) {
 		free(my_url);
+		pipe_cons_siginit(ps,-1);
 		return THREAD_FAILED;
 	}
-	sprintf(fixed,"http://%s:%u%s",proxy_host,proxy_port,
+	sprintf(fixed,"http://%s:%u%s",prov->host,prov->port,
 		ms->url);
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
@@ -677,8 +702,9 @@ curl_cache_child (void * ctx)
 	return NULL;
 }
 
-int
-curl_delete (const char *bucket, const char *key, const char *url)
+static int
+curl_delete (const provider_t *prov, const char *bucket, const char *key,
+	     const char *url)
 {
 	CURL			*curl;
 	char			 fixed[1024];
@@ -691,7 +717,7 @@ curl_delete (const char *bucket, const char *key, const char *url)
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	sprintf(fixed,"http://%s:%u%s",proxy_host,proxy_port,url);
+	sprintf(fixed,"http://%s:%u%s",prov->host,prov->port,url);
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"DELETE");
 	curl_easy_perform(curl);
@@ -700,15 +726,29 @@ curl_delete (const char *bucket, const char *key, const char *url)
 	return MHD_HTTP_OK;
 }
 
-int
-curl_bcreate (const char *bucket)
+static int
+curl_bcreate (const provider_t *prov, const char *bucket)
 {
-	(void)bucket;
+	char	 addr[ADDR_SIZE];
+	int	 chars;
+	CURL	*curl;
 
-	DPRINTF("cannot create bucket in non-S3 mode\n");
-	/* TBD: pretend this works for testing, fix for release
-	rc = MHD_HTTP_NOT_IMPLEMENTED;
-	*/
+	chars = snprintf(addr,ADDR_SIZE,"http://%s:%d/%s",
+		prov->host,prov->port,bucket);
+	if (chars >= ADDR_SIZE) {
+		error(0,0,"path too long in %s",__func__);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	curl = curl_easy_init();
+	if (!curl) {
+		error(0,errno,"no memory in %s",__func__);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	curl_easy_setopt(curl,CURLOPT_URL,addr);
+	curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"PUT");
+	curl_easy_perform(curl);
+	curl_easy_cleanup(curl);
 	return MHD_HTTP_OK;
 }
 
@@ -717,7 +757,7 @@ curl_bcreate (const char *bucket)
  * eventually has to terminate at an S3 back end.
  */
 
-int
+static int
 curl_register (my_state *ms, const provider_t *prov, const char *next,
 	       GHashTable *args)
 {
@@ -770,25 +810,331 @@ curl_register (my_state *ms, const provider_t *prov, const char *next,
 	return MHD_HTTP_OK;
 }
 
-/***** CF-specific functions (TBD) *****/
+/***** CF-specific functions *****/
+
+/*
+ * TBD: refactor to maximize common code.  Despite the de-duplication between
+ * this module and replica.c, there's still a lot more that could be done to
+ * combine xxx_yyy_child for xxx={http,cf} and yyy={put,cache}.  A rough
+ * outline might be:
+ *
+ * 	if xxx=cf, call CF-specific routine to add CF auth header
+ * 	do common curl setup and execution
+ * 	if yyy=cache, call meta_got_copy
+ *
+ * There might even be an opportunity to combine code for put and bucket
+ * create in some cases, since the only difference is the URL and the
+ * lack of a data transfer in the bucket-create case.
+ */
+
+static size_t
+cf_writer (void *ptr ATTRIBUTE_UNUSED, size_t size, size_t nmemb,
+	   void *stream ATTRIBUTE_UNUSED)
+{
+	return size * nmemb;
+}
+
+static size_t
+cf_header (void *ptr, size_t size, size_t nmemb, void *stream)
+{
+	char		*next;
+	char		*sctx;
+	provider_t	*prov	= (provider_t *)stream;
+
+	next = strtok_r(ptr,":",&sctx);
+	if (next) {
+		if (!strcasecmp(next,"X-Storage-Url")) {
+			next = strtok_r(NULL," \n\r",&sctx);
+			if (next) {
+				DPRINTF("got CF URL %s\n",next);
+				/* NB: after this, original "host" is gone. */
+				free((char *)prov->host);
+				prov->host = strdup(next);
+			}
+		}
+		else if (!strcasecmp(next,"X-Storage-Token")) {
+			next = strtok_r(NULL," \n\r",&sctx);
+			if (next) {
+				DPRINTF("got CF token %s\n",next);
+				prov->token = strdup(next);
+			}
+		}
+	}
+	return size * nmemb;
+}
+
+static struct curl_slist *
+cf_add_token (struct curl_slist *in_slist, const char *token)
+{
+	int		 	chars;
+	char		 	auth_hdr[HEADER_SIZE];
+	struct curl_slist	*out_slist;
+
+	if (!token) {
+		return in_slist;
+	}
+
+	chars = snprintf(auth_hdr,HEADER_SIZE,"X-Auth-Token: %s",token);
+	if (chars >= HEADER_SIZE) {
+		error(0,0,"auth_token too long");
+		return in_slist;
+	}
+
+	return curl_slist_append(NULL,auth_hdr);
+}
+
+static void
+cf_init (provider_t *prov)
+{
+	CURL			*curl;
+	char	 		 addr[ADDR_SIZE];
+	char	 		 auth_user[HEADER_SIZE];
+	char	 		 auth_key[HEADER_SIZE];
+	char			*token;
+	struct curl_slist	*slist;
+	int			 chars;
+
+	if (prov->token) {
+		return;
+	}
+
+	chars = snprintf(addr,ADDR_SIZE,"https://%s:%u/v1.0",
+		prov->host, prov->port);
+	if (chars >= ADDR_SIZE) {
+		error(0,0,"API URL too long in %s",__func__);
+		return;
+	}
+
+	chars = snprintf(auth_user,HEADER_SIZE,"X-Auth-User: %s",
+		prov->username);
+	if (chars >= HEADER_SIZE) {
+		error(0,0,"auth_user too long in %s",__func__);
+		return;
+	}
+
+	chars = snprintf(auth_key,HEADER_SIZE,"X-Auth-Key: %s",
+		prov->password);
+	if (chars >= HEADER_SIZE) {
+		error(0,0,"auth_key too long in %s",__func__);
+		return;
+	}
+
+	curl = curl_easy_init();
+	curl_easy_setopt(curl,CURLOPT_URL,addr);
+	curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,cf_writer);
+	curl_easy_setopt(curl,CURLOPT_HEADERFUNCTION,cf_header);
+	curl_easy_setopt(curl,CURLOPT_WRITEHEADER,prov);
+	slist = curl_slist_append(NULL,auth_user);
+	slist = curl_slist_append(slist,auth_key);
+	curl_easy_setopt(curl,CURLOPT_HTTPHEADER,slist);
+	curl_easy_perform(curl);
+	curl_easy_cleanup(curl);
+	curl_slist_free_all(slist);
+
+	DPRINTF("CF token = %s\n",prov->token);
+}
+
+/* Start a CloudFiles _producer_. */
+static void *
+cf_get_child (void * ctx)
+{
+	char		 	 fixed[1024];
+	backend_thunk_t		*tp	= (backend_thunk_t *)ctx;
+	my_state        	*ms     = tp->parent;
+	provider_t		*prov	= tp->prov;
+	CURL			*curl;
+	struct curl_slist	*slist	= NULL;
+
+	slist = cf_add_token(slist,prov->token);
+	if (!slist) {
+		return THREAD_FAILED;
+	}
+	/*
+	 * Rackspace doesn't clearly document that you'll get
+	 * 412 (Precondition Failed) if you omit this.
+	 */
+	slist = curl_slist_append(slist,
+		"Content-Type: binary/octet-stream");
+
+	curl = curl_easy_init();
+	if (!curl) {
+		pipe_prod_siginit(&ms->pipe,-1);
+		curl_slist_free_all(slist);
+		return NULL;	/* TBD: flag error somehow */
+	}
+	sprintf(fixed,"%s%s", prov->host, ms->url);
+	curl_easy_setopt(curl,CURLOPT_URL,fixed);
+	curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION, http_get_prod);
+	curl_easy_setopt(curl,CURLOPT_WRITEDATA,&ms->pipe);
+	curl_easy_setopt(curl,CURLOPT_HTTPHEADER,slist);
+	pipe_prod_siginit(&ms->pipe,0);
+
+	curl_easy_perform(curl);
+	curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&ms->rc);
+	pipe_prod_finish(&ms->pipe);
+
+	DPRINTF("producer exiting\n");
+	curl_easy_cleanup(curl);
+	curl_slist_free_all(slist);
+	return NULL;
+}
+
+/* Start a CloudFiles _consumer_. */
+void *
+cf_put_child (void * ctx)
+{
+	pipe_private		*pp	= ctx;
+	pipe_shared		*ps	= pp->shared;
+	my_state		*ms	= ps->owner;
+	provider_t		*prov	= pp->prov;
+	curl_off_t		 llen;
+	char			 fixed[1024];
+	CURL			*curl;
+	const char		*clen;
+	struct curl_slist	*slist	= NULL;
+
+	slist = cf_add_token(slist,prov->token);
+	if (!slist) {
+		return THREAD_FAILED;
+	}
+
+	llen = (curl_off_t)MHD_SIZE_UNKNOWN;
+	if (ms->be_flags & BACKEND_GET_SIZE) {
+		clen = MHD_lookup_connection_value(
+			ms->conn, MHD_HEADER_KIND, "Content-Length");
+		if (clen) {
+			llen = strtoll(clen,NULL,10);
+		}
+		else {
+			error (0, 0, "missing Content-Length");
+		}
+	}
+
+	curl = curl_easy_init();
+	if (!curl) {
+		pipe_cons_siginit(ps, -1);
+		free(pp);
+		curl_slist_free_all(slist);
+		return THREAD_FAILED;
+	}
+	sprintf(fixed,"%s%s",prov->host,ms->url);
+	curl_easy_setopt(curl,CURLOPT_URL,fixed);
+	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
+	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,llen);
+	curl_easy_setopt(curl,CURLOPT_READFUNCTION,http_put_cons);
+	curl_easy_setopt(curl,CURLOPT_READDATA,pp);
+	curl_easy_setopt(curl,CURLOPT_HTTPHEADER,slist);
+	pipe_cons_siginit(ps, 0);
+
+	curl_easy_perform(curl);
+	curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&ms->rc);
+
+	DPRINTF("%s returning\n",__func__);
+	curl_easy_cleanup(curl);
+	curl_slist_free_all(slist);
+	free(pp);
+	return NULL;
+}
+
+static int
+cf_delete (const provider_t *prov, const char *bucket, const char *key,
+	     const char *url)
+{
+	CURL			*curl;
+	char			 fixed[1024];
+	int		 	 chars;
+	char		 	 auth_hdr[HEADER_SIZE];
+	long			 rc;
+	struct curl_slist	*slist	= NULL;
+
+	slist = cf_add_token(slist,prov->token);
+	if (!slist) {
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	curl = curl_easy_init();
+	if (!curl) {
+		curl_slist_free_all(slist);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	sprintf(fixed,"%s%s",prov->host,url);
+	curl_easy_setopt(curl,CURLOPT_URL,fixed);
+	curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"DELETE");
+	curl_easy_setopt(curl,CURLOPT_HTTPHEADER,slist);
+
+	curl_easy_perform(curl);
+	curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&rc);
+	DPRINTF("%s: rc = %ld\n",__func__,rc);
+
+	curl_easy_cleanup(curl);
+	curl_slist_free_all(slist);
+
+	return MHD_HTTP_OK;
+}
+
+static size_t
+cf_null_reader (void *ptr, size_t size, size_t nmemb, void *stream)
+{
+	return 0;
+}
+
+static int
+cf_bcreate (const provider_t *prov, const char *bucket)
+{
+	char			 fixed[1024];
+	CURL			*curl;
+	int		 	 chars;
+	char		 	 auth_hdr[HEADER_SIZE];
+	long			 rc;
+	struct curl_slist	*slist	= NULL;
+
+	slist = cf_add_token(slist,prov->token);
+	if (!slist) {
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	curl = curl_easy_init();
+	if (!curl) {
+		curl_slist_free_all(slist);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	sprintf(fixed,"%s/%s",prov->host,bucket);
+	curl_easy_setopt(curl,CURLOPT_URL,fixed);
+	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
+	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,
+		(curl_off_t)MHD_SIZE_UNKNOWN);
+	curl_easy_setopt(curl,CURLOPT_READFUNCTION,cf_null_reader);
+	curl_easy_setopt(curl,CURLOPT_HTTPHEADER,slist);
+
+	curl_easy_perform(curl);
+	curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&rc);
+	DPRINTF("%s: rc = %ld\n",__func__,rc);
+
+	DPRINTF("%s returning\n",__func__);
+	curl_easy_cleanup(curl);
+	curl_slist_free_all(slist);
+	return MHD_HTTP_OK;
+}
 
 /***** FS-specific functions *****/
 
-void
-fs_init (void)
+static void
+fs_init (provider_t *prov)
 {
-	DPRINTF("changing directory to %s\n",local_path);
-	if (chdir(local_path) < 0) {
+	DPRINTF("changing directory to %s\n",prov->path);
+	if (chdir(prov->path) < 0) {
 		error(0,errno,"chdir failed, unsafe to continue");
 		exit(!0); /* Value doesn't matter, as long as it's not zero. */
 	}
 }
 
 /* Start an FS _producer_. */
-void *
+static void *
 fs_get_child (void * ctx)
 {
-	my_state	*ms	= ctx;
+	backend_thunk_t	*tp	= (backend_thunk_t *)ctx;
+	my_state        *ms     = tp->parent;
 	int		 fd;
 	char		 buf[1<<16];
 	ssize_t		 bytes;
@@ -822,7 +1168,7 @@ fs_get_child (void * ctx)
 }
 
 /* Start an FS _consumer_. */
-void *
+static void *
 fs_put_child (void * ctx)
 {
 	pipe_private	*pp	= ctx;
@@ -868,9 +1214,11 @@ done:
 	return NULL;
 }
 
-int
-fs_delete (const char *bucket, const char *key, const char *url)
+static int
+fs_delete (const provider_t *prov, const char *bucket, const char *key,
+	   const char *url)
 {
+	(void)prov;
 	(void)bucket;
 	(void)key;
 
@@ -882,9 +1230,11 @@ fs_delete (const char *bucket, const char *key, const char *url)
 	return MHD_HTTP_OK;
 }
 
-int
-fs_bcreate (const char *bucket)
+static int
+fs_bcreate (const provider_t *prov, const char *bucket)
 {
+	(void)prov;
+
 	DPRINTF("creating bucket %s\n",bucket);
 
 	if (mkdir(bucket,0700) < 0) {
@@ -928,6 +1278,17 @@ backend_func_tbl curl_func_tbl = {
 	curl_delete,
 	curl_bcreate,
 	curl_register,
+};
+
+backend_func_tbl cf_func_tbl = {
+	"CF",
+	cf_init,
+	cf_get_child,
+	cf_put_child,
+	bad_cache_child,
+	cf_delete,
+	cf_bcreate,
+	bad_register,
 };
 
 backend_func_tbl fs_func_tbl = {

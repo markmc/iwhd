@@ -91,6 +91,7 @@ typedef struct {
 	pipe_shared	*shared;
 	unsigned long	 sequence;
 	size_t		 offset;
+	void		*prov;
 } pipe_private;
 
 
@@ -106,5 +107,6 @@ int              pipe_cons_wait_init    (pipe_shared *ps);
 void		 pipe_prod_signal	(pipe_shared *ps,
 					 void *ptr, size_t total);
 void		 pipe_prod_finish	(pipe_shared *ps);
+void		 pipe_reset		(pipe_shared *ps, unsigned short ncons);
 
 #endif

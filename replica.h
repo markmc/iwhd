@@ -16,11 +16,13 @@
 #if !defined(_REPLICA_H)
 #define _REPLICA_H
 
+#include "state_defs.h"
+
 void	 	  repl_init		(void);
 void	 	  replicate		(const char *url, size_t size,
-					 const char *policy);
-void	 	  replicate_delete	(const char *url);
-void	 	  replicate_bcreate	(const char *bucket);
+					 const char *policy, my_state *ms);
+void	 	  replicate_delete	(const char *url, my_state *ms);
+void	 	  replicate_bcreate	(const char *bucket, my_state *ms);
 int	 	  get_rep_count		(void);
 
 #endif

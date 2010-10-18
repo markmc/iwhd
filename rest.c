@@ -54,11 +54,6 @@
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION
 #endif
 
-extern backend_func_tbl	bad_func_tbl;
-extern backend_func_tbl	s3_func_tbl;
-extern backend_func_tbl	curl_func_tbl;
-extern backend_func_tbl	fs_func_tbl;
-
 typedef enum {
 	URL_ROOT=0, URL_BUCKET, URL_OBJECT, URL_ATTR, URL_INVAL,
 	URL_QUERY, URL_PROVLIST
@@ -78,13 +73,11 @@ char				*cfg_file	= NULL;
 static char *(reserved_name[]) = { "_default", "_query", "_new", NULL };
 static char *(reserved_attr[]) = { "bucket", "key", "date", "etag", "loc", NULL };
 
-static backend_func_tbl *main_func_tbl = &bad_func_tbl;
-
-static void
+void
 free_ms (my_state *ms)
 {
-	if (ms->cleanup & CLEANUP_CURL) {
-		curl_easy_cleanup(ms->curl);
+	if (!g_atomic_int_dec_and_test(&ms->refcnt)) {
+		return;
 	}
 
 	if (ms->cleanup & CLEANUP_BUF_PTR) {
@@ -328,15 +321,10 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (!pp) {
 		return MHD_NO;
 	}
-	/* Master is always assumed to be CURL (i.e. our own protocol) */
-	if (ms->from_master) {
-		pthread_create(&ms->backend_th,NULL,
-			curl_func_tbl.get_child_func,ms);
-	}
-	else {
-		pthread_create(&ms->backend_th,NULL,
-			main_func_tbl->get_child_func,ms);
-	}
+	ms->thunk.parent = ms;
+	ms->thunk.prov = ms->from_master ? master_prov : main_prov;
+	pthread_create(&ms->backend_th,NULL,
+		ms->thunk.prov->func_tbl->get_child_func,&ms->thunk);
 	/* TBD: check return value */
 
 	if (ms->from_master) {
@@ -344,8 +332,9 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!pp2) {
 			return MHD_NO;
 		}
+		pp2->prov = main_prov;
 		pthread_create(&ms->cache_th,NULL,
-			main_func_tbl->cache_child_func,pp2);
+			main_prov->func_tbl->cache_child_func,pp2);
 		/* TBD: check return value */
 	}
 	else {
@@ -409,7 +398,7 @@ recheck_replication (my_state * ms, char *policy)
 		 * and in that case ms->url points to the bucket.
 		 */
 		snprintf(fixed,sizeof(fixed),"%s/%s",ms->bucket,ms->key);
-		replicate(fixed,0,policy);
+		replicate(fixed,0,policy,ms);
 		if (free_it) {
 			free(policy);
 		}
@@ -461,8 +450,10 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!pp) {
 			return MHD_NO;
 		}
+		pp->prov = main_prov;
+		ms->be_flags = BACKEND_GET_SIZE;
 		pthread_create(&ms->backend_th,NULL,
-			main_func_tbl->put_child_func,pp);
+			main_prov->func_tbl->put_child_func,pp);
 		/* TBD: check return value */
 
 		/*
@@ -899,7 +890,10 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	DPRINTF("PROXY DELETE %s\n",url);
 
-	rc = main_func_tbl->delete_func(ms->bucket,ms->key,url);
+	ms->thunk.parent = ms;
+	ms->thunk.prov = main_prov;
+	rc = ms->thunk.prov->func_tbl->delete_func(main_prov,
+		ms->bucket,ms->key,url);
 	if (rc == MHD_HTTP_OK) {
 		copied_url = strdup(url);
 		assert (copied_url);
@@ -907,7 +901,7 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 		key = strtok_r(NULL,"/",&stctx);
 		meta_delete(bucket,key);
 		free(copied_url);
-		replicate_delete(url);
+		replicate_delete(url,ms);
 	}
 
 	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
@@ -1115,7 +1109,7 @@ post_foreach (gpointer key, gpointer value, gpointer ctx)
 }
 
 static int
-create_bucket (char *name)
+create_bucket (char *name, my_state *ms)
 {
 	int	rc;
 
@@ -1123,7 +1117,7 @@ create_bucket (char *name)
 		return MHD_HTTP_BAD_REQUEST;
 	}
 
-	rc = main_func_tbl->bcreate_func(name);
+	rc = main_prov->func_tbl->bcreate_func(main_prov,name);
 	if (rc == MHD_HTTP_OK) {
 		if (meta_set_value(name,"_default", "_policy","0") != 0) {
 			DPRINTF("default-policy " "create failed\n");
@@ -1140,7 +1134,7 @@ create_bucket (char *name)
 		 * point solution here/now.  Revisit when we have a more
 		 * general replica-repair policy/system in place.
 		 */
-		replicate_bcreate(name);
+		replicate_bcreate(name,ms);
 	}
 
 	return rc;
@@ -1262,7 +1256,7 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		else if (!strcmp(ms->bucket,"_new")) {
 			key = g_hash_table_lookup(ms->dict,"name");
 			if (key != NULL) {
-				rc = create_bucket(key);
+				rc = create_bucket(key,ms);
 			}
 		}
 		else  {
@@ -1686,7 +1680,7 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)url;
 
 	/* curl -T moo.empty http://localhost:9090/_new   by accident */
-	rc = create_bucket(ms->bucket);
+	rc = create_bucket(ms->bucket,ms);
 
 	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 	if (!resp) {
@@ -1806,6 +1800,7 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (!ms) {
 		return MHD_NO;
 	}
+	ms->refcnt = 1;
 
 	utype = parse_url(url,ms);
 
@@ -1821,7 +1816,6 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		ms->handler	= my_rules[i].handler;
 		ms->state	= MS_NEW;
-		ms->fd		= (-1);
 		ms->url		= NULL;
 		ms->post	= NULL;
 		ms->conn	= conn;
@@ -1830,13 +1824,15 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 			data,data_size,rctx);
 	}
 
+	/* Don't need this after all.  Free before the next check. */
+	free_ms(ms);
+
 	if (!strcmp(method,"QUIT")) {
 		(void)sem_post((sem_t *)cctx);
 		return MHD_NO;
 	}
 
 	fprintf(stderr,"bad request m=%s u=%s\n",method,url);
-	free_ms(ms);
 
 	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 	if (!resp) {
@@ -1987,20 +1983,9 @@ args_done:
 	}
 
 	sem_init(&the_sem,0,0);
-	if (proxy_host) {
-		if (s3mode) {
-			main_func_tbl = &s3_func_tbl;
-		}
-		else {
-			main_func_tbl = &curl_func_tbl;
-		}
-	}
-	else {
-		main_func_tbl = &fs_func_tbl;
-	}
 
 	if (verbose) {
-		printf("primary store type is %s\n",main_func_tbl->name);
+		printf("primary store type is %s\n",main_prov->type);
 		if (master_host) {
 			printf("operating as slave to %s:%u\n",
 				master_host, master_port);
@@ -2013,7 +1998,6 @@ args_done:
 	}
 
 	backend_init();
-	main_func_tbl->init_func();
 	meta_init();
 	repl_init();
 
