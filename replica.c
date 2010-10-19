@@ -37,6 +37,7 @@
 #include "setup.h"
 #include "query.h"
 #include "meta.h"
+#include "replica.h"
 
 /* Sizes for internal string buffers. */
 #define ADDR_SIZE	1024
@@ -379,7 +380,9 @@ replicate_namespace_action (const char *name, repl_t action, my_state *ms)
 		if (!strcmp(key,me)) {
 			continue;
 		}
-		DPRINTF("replicating delete(%s) on %s\n",name,
+		DPRINTF("replicating %s(%s) on %s\n",
+			(action == REPL_ODELETE ? "delete" : "create"),
+			name,
 			((provider_t *)value)->name);
 		item = malloc(sizeof(*item));
 		if (!item) {
