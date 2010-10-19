@@ -66,7 +66,6 @@ typedef struct {
 } rule;
 
 static unsigned short		 my_port	= MY_PORT;
-static int			 autostart	= 0;
 const char			*program_name;
 char				*cfg_file	= NULL;
 
@@ -1907,6 +1906,7 @@ main (int argc, char **argv)
 	sem_t			 the_sem;
 	char			*stctx = NULL;
 	char			*port_tmp;
+	int			 autostart = 0;
 
 	program_name = argv[0];
 
