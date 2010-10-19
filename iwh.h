@@ -31,6 +31,7 @@ GLOBAL(const char *,    me,             "here");
 #define DPRINTF(fmt,args...) do {	\
 	if (verbose) {			\
 		printf(fmt,##args);	\
+		fflush(stdout);		\
 	}				\
 } while (0)
 
