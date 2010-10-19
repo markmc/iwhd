@@ -20,7 +20,7 @@ AM_CPPFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
 
 iwhd_YFLAGS = -d
 
-SUBDIRS = t
+SUBDIRS = . t man
 ACLOCAL_AMFLAGS = -I ax
 
 # iwhd is short for Image WareHouse Daemon.

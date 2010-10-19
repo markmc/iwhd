@@ -57,6 +57,7 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %doc AUTHORS COPYING README NEWS
 %{_bindir}/iwhd
+%{_mandir}/man8/iwhd.8*
 
 %changelog
 * Wed Oct  7 2010 Jim Meyering <meyering@redhat.com> - 0.90-1

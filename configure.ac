@@ -30,6 +30,7 @@ AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_YACC
 AC_PROG_LEX
+AM_MISSING_PROG([HELP2MAN], [help2man])
 
 AC_CHECK_LIB([curl], [curl_easy_init],
 	[CURL_LIB=-lcurl],
@@ -88,5 +89,9 @@ AC_FUNC_MALLOC
 AC_FUNC_REALLOC
 AC_CHECK_FUNCS([gettimeofday memmove memset strcasecmp strdup strndup strtoul])
 
-AC_CONFIG_FILES([Makefile t/Makefile])
+AC_CONFIG_FILES([
+Makefile
+t/Makefile
+man/Makefile
+])
 AC_OUTPUT
