@@ -45,9 +45,11 @@ cleanup_() { kill -9 $mongo_pid; kill $iwhd_pid $iwhd_d_pid; }
 
 api=http://localhost:$port
 wait_for_repl() {
-	curl -d op=rep_status $api > repl.out || return 1
-	test "$(cat repl.out)" = "0 requests" || return 1
-	return 0
+	local n_req=$(curl -d op=rep_status $api) || return 1
+	case $n_req in
+	  '0 requests') return 1 ;;
+	  *) return 0 ;;
+	esac
 }
 bkt=$api/rbucket
 
