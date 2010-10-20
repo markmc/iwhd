@@ -21,6 +21,10 @@
 
 #include "iwh.h"
 
+/* Return a pointer to this when allocation fails in a value_t-returning
+   function.  */
+static value_t invalid = { T_INVALID, {0}, NULL };
+
 #define YY_DECL int yylex(YYSTYPE *, void *scanner);
 YY_DECL
 
@@ -80,71 +84,79 @@ static value_t *
 make_number (const char *text)
 {
 	value_t *tmp = malloc(sizeof(*tmp));
+	if (!tmp)
+		return &invalid;
 
-	if (tmp) {
-		tmp->type = T_NUMBER;
-		tmp->as_num = strtoll(text,NULL,10);
-		tmp->resolved = NULL;
-	}
+	tmp->type = T_NUMBER;
+	tmp->as_num = strtoll(text,NULL,10);
+	tmp->resolved = NULL;
 	free ((void *) text);
 
 	return tmp;
 }
 
+/* Return a malloc'd value_t buffer, with its type to T and using TEXT
+   (already malloc'd) as its string.  */
 static value_t *
 make_string (const char *text, type_t t)
 {
 	value_t *tmp = malloc(sizeof(*tmp));
+	if (!tmp)
+		return &invalid;
 
-	if (tmp) {
-		tmp->type = t;
-		tmp->as_str = xstrdup(text);
-		tmp->resolved = NULL;
-	}
-	free ((void *) text);
+	tmp->type = t;
+	tmp->as_str = (char *) text;
+	tmp->resolved = NULL;
 
 	return tmp;
 }
 
+/* Return a malloc'd tree_t, with type T and branches LEFT and RIGHT.
+   LEFT must be non-NULL.  RIGHT may be NULL (solely for use in handling
+   a negated expression).  */
 static value_t *
 make_tree (type_t t, const value_t *left, const value_t *right)
 {
+	if (left->type == T_INVALID)
+		return (value_t *) left;
+	if (t != T_LINK && right && right->type == T_INVALID)
+		return (value_t *) right;
 	value_t *tmp = malloc(sizeof(*tmp));
 
-	if (tmp) {
-		tmp->type = t;
-		tmp->as_tree.left = (value_t *) left;
-		tmp->as_tree.right = (value_t *) right;
-		tmp->resolved = NULL;
-	}
+	if (!tmp)
+		return &invalid;
+
+	tmp->type = t;
+	tmp->as_tree.left = (value_t *) left;
+	tmp->as_tree.right = (value_t *) right;
+	tmp->resolved = NULL;
 
 	return tmp;
 }
 
+/* Return a malloc'd comp_t, with type T and branches LEFT and RIGHT.
+   LEFT and RIGHT must both be non-NULL.  */
 static value_t *
 make_comp (comp_t c, const value_t *left, const value_t *right)
 {
+	if (left->type == T_INVALID)
+		return (value_t *) left;
+	if (right->type == T_INVALID)
+		return (value_t *) right;
 	value_t *tmp = make_tree(T_COMP,left,right);
 
-	if (tmp) {
-		tmp->as_tree.op = c;
-	}
+	if (!tmp)
+		return &invalid;
+
+	tmp->as_tree.op = c;
 
 	return tmp;
 }
 
 static value_t *
-make_link (value_t *left, const char *right)
+make_link (const value_t *left, const char *right)
 {
-	char	*copy;
-
-	copy = xstrdup(right);
-	free ((void *) right);
-	if (!copy) {
-		return NULL;
-	}
-
-	return make_tree(T_LINK,left,(value_t *)copy);
+	return make_tree(T_LINK,left,(value_t *)right);
 }
 
 static void
