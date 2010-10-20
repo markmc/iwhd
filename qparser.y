@@ -28,44 +28,6 @@ static value_t invalid = { T_INVALID, {0}, NULL };
 #define YY_DECL int yylex(YYSTYPE *, void *scanner);
 YY_DECL
 
-static void
-xalloc_die (void)
-{
-  error (EXIT_FAILURE, 0, "%s", "memory exhausted");
-
-  /* The `noreturn' cannot be given to error, since it may return if
-     its first argument is 0.  To help compilers understand the
-     xalloc_die does not return, call abort.  Also, the abort is a
-     safety feature if exit_failure is 0 (which shouldn't happen).  */
-  abort ();
-}
-
-/* Allocate N bytes of memory dynamically, with error checking.  */
-static void *
-xmalloc (size_t n)
-{
-  void *p = malloc (n);
-  if (!p && n != 0)
-    xalloc_die ();
-  return p;
-}
-
-/* Clone an object P of size S, with error checking.  There's no need
-   for xnmemdup (P, N, S), since xmemdup (P, N * S) works without any
-   need for an arithmetic overflow check.  */
-static void *
-xmemdup (void const *p, size_t s)
-{
-  return memcpy (xmalloc (s), p, s);
-}
-
-/* Clone STRING.  */
-static char *
-xstrdup (char const *string)
-{
-  return xmemdup (string, strlen (string) + 1);
-}
-
 /* TBD: use separate function to parse dates differently */
 static value_t *
 make_number (const char *text)
@@ -292,6 +254,45 @@ paren_expr:
 %%
 
 #if defined PARSER_UNIT_TEST
+
+static void
+xalloc_die (void)
+{
+  error (EXIT_FAILURE, 0, "%s", "memory exhausted");
+
+  /* The `noreturn' cannot be given to error, since it may return if
+     its first argument is 0.  To help compilers understand the
+     xalloc_die does not return, call abort.  Also, the abort is a
+     safety feature if exit_failure is 0 (which shouldn't happen).  */
+  abort ();
+}
+
+/* Allocate N bytes of memory dynamically, with error checking.  */
+static void *
+xmalloc (size_t n)
+{
+  void *p = malloc (n);
+  if (!p && n != 0)
+    xalloc_die ();
+  return p;
+}
+
+/* Clone an object P of size S, with error checking.  There's no need
+   for xnmemdup (P, N, S), since xmemdup (P, N * S) works without any
+   need for an arithmetic overflow check.  */
+static void *
+xmemdup (void const *p, size_t s)
+{
+  return memcpy (xmalloc (s), p, s);
+}
+
+/* Clone STRING.  */
+static char *
+xstrdup (char const *string)
+{
+  return xmemdup (string, strlen (string) + 1);
+}
+
 static const struct { char *name; char *value; } hacked_obj_fields[] = {
         /* Fake object fields for generic unit testing. */
 	{ "a", "2" }, { "b", "7" }, { "c", "11" },
