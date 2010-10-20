@@ -868,7 +868,6 @@ cf_add_token (struct curl_slist *in_slist, const char *token)
 {
 	int		 	chars;
 	char		 	auth_hdr[HEADER_SIZE];
-	struct curl_slist	*out_slist;
 
 	if (!token) {
 		return in_slist;
@@ -887,10 +886,9 @@ static void
 cf_init (provider_t *prov)
 {
 	CURL			*curl;
-	char	 		 addr[ADDR_SIZE];
-	char	 		 auth_user[HEADER_SIZE];
-	char	 		 auth_key[HEADER_SIZE];
-	char			*token;
+	char			 addr[ADDR_SIZE];
+	char			 auth_user[HEADER_SIZE];
+	char			 auth_key[HEADER_SIZE];
 	struct curl_slist	*slist;
 	int			 chars;
 
@@ -1084,8 +1082,6 @@ cf_bcreate (const provider_t *prov, const char *bucket)
 {
 	char			 fixed[1024];
 	CURL			*curl;
-	int		 	 chars;
-	char		 	 auth_hdr[HEADER_SIZE];
 	long			 rc;
 	struct curl_slist	*slist	= NULL;
 

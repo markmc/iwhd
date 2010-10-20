@@ -93,7 +93,6 @@ proxy_repl_cons (void *ctx)
 	repl_item		*item	= ctx;
 	my_state		*ms	= item->ms;
 	pipe_private		*pp;
-	void			*rc;
 
 	pp = pipe_init_private(&ms->pipe);
 	if (!pp) {

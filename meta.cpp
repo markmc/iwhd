@@ -644,10 +644,7 @@ RepoMeta::GetAttrList (const char *bucket, const char *key)
 {
 	auto_ptr<DBClientCursor>	curs;
 	Query				q;
-	AttrList *			poc;
 	BSONObj				bo;
-	const char *			name;
-	const char *			value;
 
 	q = QUERY("bucket"<<bucket<<"key"<<key);
 	curs = GetCursor(q);
