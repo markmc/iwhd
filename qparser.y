@@ -148,8 +148,11 @@ make_link (value_t *left, const char *right)
 }
 
 static void
-yyerror (void *scanner, value_t **result, const char *msg)
+yyerror (void *scanner ATTRIBUTE_UNUSED,
+	 value_t **result ATTRIBUTE_UNUSED,
+	 const char *msg ATTRIBUTE_UNUSED)
 {
+	/* empty */
 }
 
 %}
