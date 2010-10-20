@@ -95,13 +95,6 @@ proxy_repl_cons (void *ctx)
 	pipe_private		*pp;
 	void			*rc;
 
-	/*
-	 * Do a full initialization here, not just in the rest.  It's
-	 * necessary in the oddball case where we're re-replicating as
-	 * a result of an attribute/policy change, and it's not harmful
-	 * in the normal case where we're actually storing a new file.
-	 */
-	pipe_init_shared(&ms->pipe,ms,1);
 	pp = pipe_init_private(&ms->pipe);
 	if (!pp) {
 		pipe_cons_siginit(&ms->pipe,-1);
@@ -177,6 +170,7 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 	repl_item	*item;
 	pthread_t	 cons;
 	pthread_t	 prod;
+	my_state	*ms;
 
 	for (;;) {
 		sem_wait(&queue_sema);
@@ -188,6 +182,14 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 		}
 		pthread_mutex_unlock(&queue_lock);
 
+		/*
+		 * Do a full initialization here, not just in the rest.  It's
+		 * necessary in the oddball case where we're re-replicating as
+		 * a result of an attribute/policy change, and it's not harmful
+		 * in the normal case where we're actually storing a new file.
+		 */
+		ms = item->ms;
+		pipe_init_shared(&ms->pipe,ms,1);
 		switch (item->type) {
 		case REPL_PUT:
 			if (pipe(item->pipes) >= 0) {

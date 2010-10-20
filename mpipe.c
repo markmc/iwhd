@@ -51,7 +51,12 @@ pipe_init_private (pipe_shared *ps)
 	pp = malloc(sizeof(*pp));
 	if (pp) {
 		pp->shared = ps;
-		pp->sequence = ps->sequence + 1;
+		/*
+		 * The producer might already have posted #1, so we can't use
+		 * ps->sequence+1.  This precludes consumers joining
+		 * mid-stream, but that was never a goal anyway.
+		 */
+		pp->sequence = 1;
 		pp->offset = 0;
 	}
 	return pp;
@@ -63,6 +68,7 @@ pipe_cons_wait (pipe_private *pp)
 	pipe_shared	*ps	= pp->shared;
 	int		 rc;
 
+	pp->offset = 0;
 	pthread_mutex_lock(&ps->lock);
 
 	while (ps->sequence != pp->sequence) {
@@ -212,4 +218,5 @@ pipe_prod_finish (pipe_shared *ps)
 			ps->cons_total,ps->cons_done,ps->cons_error);
 	}
 	pthread_mutex_unlock(&ps->lock);
+	DPRINTF("producer finished with sequence %ld\n",ps->sequence);
 }

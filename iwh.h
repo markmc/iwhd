@@ -28,11 +28,11 @@ GLOBAL(const char *,	db_host,	"localhost");
 GLOBAL(unsigned short,	db_port,	0);
 GLOBAL(const char *,    me,             "here");
 
-#define DPRINTF(fmt,args...) do {	\
-	if (verbose) {			\
-		printf(fmt,##args);	\
-		fflush(stdout);		\
-	}				\
+#define DPRINTF(fmt,args...) do {			\
+	if (verbose) {					\
+		printf("%d " fmt,getpid(),##args);	\
+		fflush(stdout);				\
+	}						\
 } while (0)
 
 #ifndef __attribute__

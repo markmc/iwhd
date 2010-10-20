@@ -1189,24 +1189,24 @@ fs_put_child (void * ctx)
 	pipe_cons_siginit(ps, 0);
 
 	while (pipe_cons_wait(pp)) {
-		offset = 0;
-		do {
+		for (offset = 0; offset < ps->data_len; offset += bytes) {
 			bytes = write(fd,
 				ps->data_ptr+offset,ps->data_len-offset);
 			if (bytes <= 0) {
 				if (bytes < 0) {
 					error (0, errno, "%s: write failed",
 					       file);
+					pipe_cons_signal(pp, errno);
 				}
-				pipe_cons_signal(pp, errno);
-				goto done;
+				else {
+					pipe_cons_signal(pp, ENOSPC);
+				}
+				break;
 			}
-			offset += bytes;
-		} while (offset < ps->data_len);
+		}
 		pipe_cons_signal(pp, 0);
 	}
 
-done:
 	close(fd);
 
 	DPRINTF("%s returning\n",__func__);

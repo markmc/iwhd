@@ -463,7 +463,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		 * out peace.
 		 */
 		rc = pipe_prod_wait_init(&ms->pipe);
-		if (rc < 0) {
+		if (rc != 0) {
 			DPRINTF("producer wait failed\n");
 			resp = MHD_create_response_from_data(0,NULL,
 				MHD_NO,MHD_NO);
