@@ -27,8 +27,12 @@ parser '#a == "fubar" && ! ( $b.c.d < 3)' > white-space 2> err || fail=1
 compare white-space f.exp || fail=1
 compare /dev/null err || fail=1
 
-parser '$ a' > e1.out 2>&1; test $? = 1 || fail=1
-printf "could not parse '$ a'\n" > e1.exp
+parser '$ a' > a.out 2>&1 || fail=1
+printf "OBJECT FIELD a (2)\ns= 2\n" > a.exp
+compare a.out a.exp || fail=1
+
+parser '$.a' > e1.out 2>&1; test $? = 1 || fail=1
+printf "could not parse '$.a'\n" > e1.exp
 compare e1.exp e1.out || fail=1
 
 parser '1 = = 1' > e2.out 2>&1; test $? = 1 || fail=1

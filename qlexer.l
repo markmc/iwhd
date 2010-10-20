@@ -35,7 +35,7 @@
 !		{ return T_NOT; }
 &&		{ return T_AND; }
 \|\|		{ return T_OR; }
-[ \t\n\r]+	{ return T_SPACE; }
+[ \t\n\r]+	{ }
 .		{ return T_INVALID; }
 
 <<EOF>>		{ yyterminate (); /* aka return 0; */ }

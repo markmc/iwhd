@@ -162,7 +162,7 @@ yyerror (void *scanner ATTRIBUTE_UNUSED,
 %parse-param { value_t **result }
 
 %token <str> T_STRING T_COMP T_DATE T_ID T_LINK T_NUMBER T_OFIELD T_SFIELD
-%token T_EQ T_NE T_NOT T_AND T_OR T_SPACE T_INVALID
+%token T_EQ T_NE T_NOT T_AND T_OR T_INVALID
 %token T_LT T_GT T_LE T_GE
 
 %type <val> atom bbool_expr comp_expr field
@@ -189,11 +189,6 @@ bbool_expr:
 	bbool_expr T_OR ubool_expr {
 		// printf("found OR expression\n");
 		$$ = make_tree(T_OR,$1,$3);
-	}|
-	bbool_expr T_SPACE {
-		$$ = $1;
-	}| T_SPACE bbool_expr {
-		$$ = $2;
 	};
 
 ubool_expr:
@@ -204,11 +199,6 @@ ubool_expr:
 	T_NOT comp_expr {
 		// printf("found NOT expression\n");
 		$$ = make_tree(T_NOT,$2,NULL);
-	}|
-	ubool_expr T_SPACE {
-		$$ = $1;
-	}| T_SPACE ubool_expr {
-		$$ = $2;
 	};
 
 
@@ -240,11 +230,6 @@ comp_expr:
 	atom T_GT atom {
 		// printf("found GREATER THAN expression\n");
 		$$ = make_comp(C_GREATERTHAN,$1,$3);
-	}|
-	comp_expr T_SPACE {
-		$$ = $1;
-	}| T_SPACE comp_expr {
-		$$ = $2;
 	};
 
 atom:
@@ -259,11 +244,6 @@ atom:
 	paren_expr {
 		// printf("promoting paren_expr to atom\n");
 		$$ = $1;
-	}|
-	atom T_SPACE {
-		$$ = $1;
-	}| T_SPACE atom {
-		$$ = $2;
 	};
 
 link_field:
