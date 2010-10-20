@@ -647,6 +647,11 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 			return MHD_YES;
 		}
 		meta_set_value(ms->bucket,ms->key,ms->attr,ms->pipe.data_ptr);
+		/* This might get stomped by replication. */
+		if (ms->cleanup & CLEANUP_BUF_PTR) {
+			free(ms->pipe.data_ptr);
+			ms->cleanup &= ~CLEANUP_BUF_PTR;
+		}
 		/*
 		 * We should always re-replicate, because the replication
 		 * policy might refer to this attr.

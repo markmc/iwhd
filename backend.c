@@ -642,8 +642,8 @@ curl_put_child (void * ctx)
 		free(pp);
 		return THREAD_FAILED;
 	}
-	sprintf(fixed,"http://%s:%u%s",prov->host,prov->port,
-		ms->url);
+	sprintf(fixed,"http://%s:%u/%s/%s",prov->host,prov->port,
+		ms->bucket,ms->key);
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
 	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,llen);
@@ -1015,7 +1015,7 @@ cf_put_child (void * ctx)
 		curl_slist_free_all(slist);
 		return THREAD_FAILED;
 	}
-	sprintf(fixed,"%s%s",prov->host,ms->url);
+	sprintf(fixed,"%s/%s/%s",prov->host,ms->bucket,ms->key);
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
 	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,llen);
@@ -1176,9 +1176,10 @@ fs_put_child (void * ctx)
 	int		 fd;
 	ssize_t		 bytes;
 	size_t		 offset;
-	char		*file = ms->url+1;
+	char		 fixed[1024];
 
-	fd = open(file,O_WRONLY|O_CREAT,0666);
+	sprintf(fixed,"%s/%s",ms->bucket,ms->key);
+	fd = open(fixed,O_WRONLY|O_CREAT,0666);
 	if (fd < 0) {
 		pipe_cons_siginit(ps, errno);
 		free(pp);
@@ -1194,7 +1195,7 @@ fs_put_child (void * ctx)
 			if (bytes <= 0) {
 				if (bytes < 0) {
 					error (0, errno, "%s: write failed",
-					       file);
+					       fixed);
 					pipe_cons_signal(pp, errno);
 				}
 				else {
