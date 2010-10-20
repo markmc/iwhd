@@ -47,8 +47,8 @@ api=http://localhost:$port
 wait_for_repl() {
 	local n_req=$(curl -d op=rep_status $api) || return 1
 	case $n_req in
-	  '0 requests') return 1 ;;
-	  *) return 0 ;;
+	  '0 requests') return 0 ;;
+	  *) return 1 ;;
 	esac
 }
 bkt=$api/rbucket
