@@ -26,6 +26,7 @@
 [a-z_]+		{ yylval_param->str = strdup(yytext);
 		  return yylval_param->str ? T_ID : T_INVALID; }
 [=$#()<>.]	{ return yytext[0]; }
+==		{ return T_EQ; }
 !=		{ return T_NE; }
 !		{ return T_NOT; }
 &&		{ return T_AND; }

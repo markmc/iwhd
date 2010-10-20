@@ -162,7 +162,7 @@ yyerror (void *scanner ATTRIBUTE_UNUSED,
 %parse-param { value_t **result }
 
 %token <str> T_STRING T_COMP T_DATE T_ID T_LINK T_NUMBER T_OFIELD T_SFIELD
-%token T_NE T_NOT T_AND T_OR T_SPACE T_INVALID
+%token T_EQ T_NE T_NOT T_AND T_OR T_SPACE T_INVALID
 
 %type <val> atom bbool_expr comp_expr field
 %type <val> link_field literal paren_expr ubool_expr
@@ -224,9 +224,9 @@ comp_expr:
 		// printf("found LESS OR EQUAL expression\n");
 		$$ = make_comp(C_LESSOREQ,$1,$4);
 	}|
-	atom '=' '=' atom {
+	atom T_EQ atom {
 		// printf("found EQUAL expression\n");
-		$$ = make_comp(C_EQUAL,$1,$4);
+		$$ = make_comp(C_EQUAL,$1,$3);
 	}|
 	atom T_NE atom {
 		// printf("found NOT EQUAL expression\n");
