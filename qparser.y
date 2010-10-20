@@ -19,6 +19,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#include "iwh.h"
+
 #define YY_DECL int yylex(YYSTYPE *, void *scanner);
 YY_DECL
 
@@ -145,22 +147,9 @@ make_link (value_t *left, const char *right)
 	return make_tree(T_LINK,left,(value_t *)copy);
 }
 
-/*
- * IMO it's wrong for us to get into the bbool_expr=policy rule when there's
- * a syntax error, but we do.  The good news is that it's easy to free the
- * erroneous tree properly this way.  The bad news is that we need to wait
- * until yyparse is done, then check this flag (which we have to maintain
- * ourselves) to figure out whether we got a valid tree or not.
- * No, yynerrs doesn't seem to give the right answer.
- */
-static int syntax_error = 0;
-
-void
+static void
 yyerror (void *scanner, value_t **result, const char *msg)
 {
-  // error (0, 0, "parse error: %s\n", msg);
-  // FIXME do this via param, not file-global
-  syntax_error = 1;
 }
 
 %}
@@ -181,12 +170,7 @@ yyerror (void *scanner, value_t **result, const char *msg)
 
 policy:
 	bbool_expr {
-		if (syntax_error) {
-			printf("bad policy!\n");
-		}
-		else {
-			*result = $1;
-		}
+		*result = $1;
 	};
 
 bbool_expr:
