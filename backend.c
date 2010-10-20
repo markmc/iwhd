@@ -1035,13 +1035,13 @@ cf_put_child (void * ctx)
 }
 
 static int
-cf_delete (const provider_t *prov, const char *bucket, const char *key,
-	     const char *url)
+cf_delete (const provider_t *prov,
+	   const char *bucket ATTRIBUTE_UNUSED,
+	   const char *key ATTRIBUTE_UNUSED,
+	   const char *url)
 {
 	CURL			*curl;
 	char			 fixed[1024];
-	int		 	 chars;
-	char		 	 auth_hdr[HEADER_SIZE];
 	long			 rc;
 	struct curl_slist	*slist	= NULL;
 
@@ -1072,7 +1072,10 @@ cf_delete (const provider_t *prov, const char *bucket, const char *key,
 }
 
 static size_t
-cf_null_reader (void *ptr, size_t size, size_t nmemb, void *stream)
+cf_null_reader (void *ptr ATTRIBUTE_UNUSED,
+		size_t size ATTRIBUTE_UNUSED,
+		size_t nmemb ATTRIBUTE_UNUSED,
+		void *stream ATTRIBUTE_UNUSED)
 {
 	return 0;
 }
