@@ -163,6 +163,7 @@ yyerror (void *scanner ATTRIBUTE_UNUSED,
 
 %token <str> T_STRING T_COMP T_DATE T_ID T_LINK T_NUMBER T_OFIELD T_SFIELD
 %token T_EQ T_NE T_NOT T_AND T_OR T_SPACE T_INVALID
+%token T_LT T_GT T_LE T_GE
 
 %type <val> atom bbool_expr comp_expr field
 %type <val> link_field literal paren_expr ubool_expr
@@ -216,13 +217,13 @@ comp_expr:
 		// printf("promoting atom to comp_expr\n");
 		$$ = $1;
 	}|
-	atom '<' atom {
+	atom T_LT atom {
 		// printf("found LESS THAN expression\n");
 		$$ = make_comp(C_LESSTHAN,$1,$3);
 	}|
-	atom '<' '=' atom {
+	atom T_LE atom {
 		// printf("found LESS OR EQUAL expression\n");
-		$$ = make_comp(C_LESSOREQ,$1,$4);
+		$$ = make_comp(C_LESSOREQ,$1,$3);
 	}|
 	atom T_EQ atom {
 		// printf("found EQUAL expression\n");
@@ -232,11 +233,11 @@ comp_expr:
 		// printf("found NOT EQUAL expression\n");
 		$$ = make_comp(C_DIFFERENT,$1,$3);
 	}|
-	atom '>' '=' atom {
+	atom T_GE atom {
 		// printf("found GREATER OR EQUAL expression\n");
-		$$ = make_comp(C_GREATEROREQ,$1,$4);
+		$$ = make_comp(C_GREATEROREQ,$1,$3);
 	}|
-	atom '>' atom {
+	atom T_GT atom {
 		// printf("found GREATER THAN expression\n");
 		$$ = make_comp(C_GREATERTHAN,$1,$3);
 	}|
