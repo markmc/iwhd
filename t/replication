@@ -92,10 +92,19 @@ wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
 test -f fs_downstream/rbucket/file5 && fail=1
 
 # Test replication of deletes.
-curl -X DELETE $bkt/file4 || fail=2
+curl -X DELETE $bkt/file4 || fail=1
 wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
 test -f fs_upstream/rbucket/file4 && fail=1
 test -f fs_downstream/rbucket/file4 && fail=1
+
+# Test re-replication when we change an attribute.
+echo hello | curl -T - $bkt/file6
+echo -n 'red' | curl -T - $bkt/file6/color
+echo -n '$color=="blue"' | curl -T - $bkt/file6/_policy
+test -f fs_downstream/rbucket/file6 && fail=1
+echo -n 'blue' | curl -T - $bkt/file6/color
+wait_for .1 50 "wait_for_repl $api" || fail_ "replication seems stuck"
+test -f fs_downstream/rbucket/file6 || fail=1
 
 # TBD: add op=check result checks
 
