@@ -628,15 +628,16 @@ curl_get_child (void * ctx)
 static void *
 curl_put_child (void * ctx)
 {
-	pipe_private	*pp	= ctx;
-	pipe_shared	*ps	= pp->shared;
-	my_state	*ms	= ps->owner;
-	provider_t	*prov	= pp->prov;
-	curl_off_t	 llen;
-	char		 fixed[ADDR_SIZE];
-	CURL		*curl;
-	const char	*clen;
-	int		 chars;
+	pipe_private		*pp	= ctx;
+	pipe_shared		*ps	= pp->shared;
+	my_state		*ms	= ps->owner;
+	provider_t		*prov	= pp->prov;
+	curl_off_t		 llen;
+	char			 fixed[ADDR_SIZE];
+	CURL			*curl;
+	const char		*clen;
+	struct curl_slist	*slist	= NULL;
+	int			 chars;
 
 	llen = (curl_off_t)MHD_SIZE_UNKNOWN;
 	if (ms->be_flags & BACKEND_GET_SIZE) {
@@ -649,6 +650,13 @@ curl_put_child (void * ctx)
 			error (0, 0, "missing Content-Length");
 		}
 	}
+
+	/*
+	 * This is how the iwhd at the other end knows this is a replication
+	 * request and not just a PUT from some random user.
+	 * TBD: add some auth* for this.
+	 */
+	slist = curl_slist_append(slist,"X-redhat-role: master");
 
 	curl = curl_easy_init();
 	if (!curl) {
@@ -667,9 +675,11 @@ curl_put_child (void * ctx)
 	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,llen);
 	curl_easy_setopt(curl,CURLOPT_READFUNCTION,http_put_cons);
 	curl_easy_setopt(curl,CURLOPT_READDATA,pp);
+	curl_easy_setopt(curl,CURLOPT_HTTPHEADER,slist);
 	pipe_cons_siginit(ps, 0);
 	curl_easy_perform(curl);
 	curl_easy_cleanup(curl);
+	curl_slist_free_all(slist);
 
 	DPRINTF("%s returning\n",__func__);
 	free(pp);
