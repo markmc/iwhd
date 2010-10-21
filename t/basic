@@ -2,13 +2,13 @@
 # Test basic functionality.
 
 # TEST-FILE USAGE
-#	f1	object put/get/delete
-#	f2	bucket listing
-#	f3	attribute PUT, headless operation
-#	f4	attribute POST
-#	f5	reserved attr
-#	f6	X-redhat-role
-#	f7	truncation
+#	obj_test	object put/get/delete
+#	list_test	bucket listing
+#	attr_put	attribute PUT, headless operation
+#	attr_post	attribute POST
+#	rsvd_attr	reserved attr
+#	role_test	X-redhat-role
+#	trunc_test	truncation
 
 . "${srcdir=.}/init.sh"; path_prepend_ ..
 
@@ -154,12 +154,12 @@ curl -f -X PUT http://localhost:$port 2> root_put.err
 grep ' 404$' root_put.err || fail=1
 
 # Create a file in that bucket.
-echo foo | curl -T - $bucket/f1 || fail=1
+echo foo | curl -T - $bucket/obj_test || fail=1
 # Test presence in the FS.
-test -f FS/b1/f1 || fail=1
-test "$(cat FS/b1/f1)" = foo || fail=1
+test -f FS/b1/obj_test || fail=1
+test "$(cat FS/b1/obj_test)" = foo || fail=1
 # Test through the API as well.
-curl $bucket/f1 > f1copy
+curl $bucket/obj_test > f1copy
 test "$(cat f1copy)" = foo || fail=1
 
 
@@ -174,11 +174,11 @@ curl -H 'Accept: */json' http://localhost:$port > root || fail=1
 compare root root.json || fail=1
 
 # Delete an object.
-curl -X DELETE $bucket/f1 || fail=1
+curl -X DELETE $bucket/obj_test || fail=1
 # Ensure that it's gone from the file system.
-test -f FS/b1/f1 && fail=1
+test -f FS/b1/obj_test && fail=1
 # Ensure that it's gone in the API as well.
-curl -f $bucket/f1 > /dev/null 2> del_object.err
+curl -f $bucket/obj_test > /dev/null 2> del_object.err
 grep ' 404$' del_object.err || fail=1
 
 # Try to delete a nonexistent object.
@@ -186,7 +186,8 @@ curl -f -X DELETE $bucket/no-such-obj 2> del_nosuch.err
 grep ' 404$' del_nosuch.err || fail=1
 
 # Make sure the X-redhat-role header causes failure on a master iwhd.
-echo hello | curl -f -T - -H "X-redhat-role: master" $bucket/f6 2> role.err
+echo hello | curl -f -T - -H "X-redhat-role: master" $bucket/role_test \
+	2> role.err
 grep ' 403$' role.err || fail=1
 
 # ################## Providers
@@ -244,49 +245,49 @@ for i in xml json; do
   compare b.exp b || fail=1
 
   # Add an object, list non-empty bucket.
-  echo bar | curl -T - $bucket/f2 || fail=1
+  echo bar | curl -T - $bucket/list_test || fail=1
 
   # Ensure that new name appears in the listing.
   curl_H $bucket > b || fail=1
-  emit_bucket_list $i b1:f2 > b.exp || fail=1
+  emit_bucket_list $i b1:list_test > b.exp || fail=1
   compare b.exp b || fail=1
 
-  # Remove b1/f2, to restore state for next iteration of this loop.
-  curl -X DELETE $bucket/f2 || fail=1
+  # Remove b1/list_test, to restore state for next iteration of this loop.
+  curl -X DELETE $bucket/list_test || fail=1
 
 done
 
 
 # Add a single attribute to an object using the PUT method.
 bucket=$bucket
-printf nothing | curl -T - $bucket/f3 || fail=1
-printf blue | curl -T - $bucket/f3/color || fail=1
-test "$(curl $bucket/f3/color)" = blue || fail=1
+printf nothing | curl -T - $bucket/attr_put || fail=1
+printf blue | curl -T - $bucket/attr_put/color || fail=1
+test "$(curl $bucket/attr_put/color)" = blue || fail=1
 
 # Add multiple attributes to an object using the POST method.
 # NB use a file which doesn't yet exist (yes, this should work too)
-curl -d key=f4 -d shape=round -d size=big $bucket || fail=1
-test "$(curl $bucket/f4/shape)" = round || fail=1
-test "$(curl $bucket/f4/size)" = big || fail=1
+curl -d key=attr_post -d shape=round -d size=big $bucket || fail=1
+test "$(curl $bucket/attr_post/shape)" = round || fail=1
+test "$(curl $bucket/attr_post/size)" = big || fail=1
 
 # Ensure that an attempt to add each reserved attribute fails.
 # FIXME: keep this list in sync with the one in rest.c:
 # grep '^static.*reserved_attr' rest.c
 for attr in bucket key date etag loc; do
-  printf whatever | curl -f -T - $bucket/f5/$attr 2> bad_attr.err
+  printf whatever | curl -f -T - $bucket/rsvd_attr/$attr 2> bad_attr.err
   grep ' 400$' bad_attr.err || fail=1
 done
 
 # Make sure PUTting a file truncates.
-echo hello | curl -f -T - $bucket/f7 || fail=1
-echo bye | curl -f -T - $bucket/f7 || fail=1
-cat FS/b1/f7
-test "$(cat FS/b1/f7)" = bye || fail=1
+echo hello | curl -f -T - $bucket/trunc_test || fail=1
+echo bye | curl -f -T - $bucket/trunc_test || fail=1
+cat FS/b1/trunc_test
+test "$(cat FS/b1/trunc_test)" = bye || fail=1
 
 # Test "headless" operation (no access to metadata DB).
 kill -9 $mongo_pid
 cleanup_() { kill $iwhd_pid; }
-curl $bucket/f3 > f3copy
+curl $bucket/attr_put > f3copy
 test "$(cat f3copy)" = "nothing" || fail=1
 
 # TBD: add attribute-delete tests when that functionality is implemented
