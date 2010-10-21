@@ -115,14 +115,25 @@ validate_put (struct MHD_Connection *conn)
 {
 	const char	*mhdr;
 
-	if (!master_host) {
-		/* We're not a slave, so we don't care. */
-		return 1;
-	}
-
 	mhdr = MHD_lookup_connection_value(conn,MHD_HEADER_KIND,
 		"X-redhat-role");
-	return (mhdr && !strcmp(mhdr,"master"));
+	/*
+	 * This will fail most obviously in the case where we are not the
+	 * master, we know we're not the master, and we don't see this
+	 * header (which is set in master-to-slave replication requests).
+	 * It will *also* fail, deliberately, if we do see this header when
+	 * we think we're the master, as it means there's a mismatch between
+	 * their config and ours.  This avoids "strange" behavior in such
+	 * cases, in favor of a more obvious failure.
+	 * TBD: this will be less of a problem if/when we identify the
+	 * master and DB via the config file instead of -m/-d.
+	 */
+	if (master_host) {
+		return (mhdr && !strcmp(mhdr,"master"));
+	}
+	else {
+		return !mhdr;
+	}
 }
 
 static int

@@ -16,11 +16,13 @@ wait_for .1 30 'mongo localhost:$m_port < /dev/null' \
   || framework_failure_ mongod failed to start
 
 port=9091
+bucket=http://localhost:$port/b1
+
 cat <<EOF > root.xml || framework_failure_
 <api service="image_warehouse" version="$VERSION">
 	<link rel="bucket_factory" href="http://localhost:$port/_new"/>
 	<link rel="provider_list" href="http://localhost:$port/_providers"/>
-	<link rel="bucket" href="http://localhost:$port/b1"/>
+	<link rel="bucket" href="$bucket"/>
 </api>
 EOF
 
@@ -39,7 +41,7 @@ cat <<EOF > root.json || framework_failure_
 		},
 		{
 			"rel": "bucket",
-			"link": "http://localhost:$port/b1"
+			"link": "$bucket"
 		}
 	]
 }
@@ -130,13 +132,12 @@ cleanup_() { kill -9 $mongo_pid; kill $iwhd_pid; }
 wait_for .1 30 "curl -s http://localhost:$port" \
   || { echo iwhd failed to listen; Exit 1; }
 
-
 # Create an empty bucket.
-curl -X PUT http://localhost:$port/b1 || fail=1
+curl -X PUT $bucket || fail=1
 test -d FS/b1 || fail=1
 
 # Try to create a duplicate bucket.
-curl -f -X PUT http://localhost:$port/b1 2> dup_bucket.err
+curl -f -X PUT $bucket 2> dup_bucket.err
 grep ' 500$' dup_bucket.err || fail=1
 
 # PUT to root; should fail
@@ -144,12 +145,12 @@ curl -f -X PUT http://localhost:$port 2> root_put.err
 grep ' 404$' root_put.err || fail=1
 
 # Create a file in that bucket.
-echo foo | curl -T - http://localhost:$port/b1/f1 || fail=1
+echo foo | curl -T - $bucket/f1 || fail=1
 # Test presence in the FS.
 test -f FS/b1/f1 || fail=1
 test "$(cat FS/b1/f1)" = foo || fail=1
 # Test through the API as well.
-curl http://localhost:$port/b1/f1 > f1copy
+curl $bucket/f1 > f1copy
 test "$(cat f1copy)" = foo || fail=1
 
 
@@ -164,16 +165,20 @@ curl -H 'Accept: */json' http://localhost:$port > root || fail=1
 compare root root.json || fail=1
 
 # Delete an object.
-curl -X DELETE http://localhost:$port/b1/f1 || fail=1
+curl -X DELETE $bucket/f1 || fail=1
 # Ensure that it's gone from the file system.
 test -f FS/b1/f1 && fail=1
 # Ensure that it's gone in the API as well.
-curl -f http://localhost:$port/b1/f1 > /dev/null 2> del_object.err
+curl -f $bucket/f1 > /dev/null 2> del_object.err
 grep ' 404$' del_object.err || fail=1
 
 # Try to delete a nonexistent object.
-curl -f -X DELETE http://localhost:$port/b1/no-such-obj 2> del_nosuch.err
+curl -f -X DELETE $bucket/no-such-obj 2> del_nosuch.err
 grep ' 404$' del_nosuch.err || fail=1
+
+# Make sure the X-redhat-role header causes failure on a master iwhd.
+echo hello | curl -f -T - -H "X-redhat-role: master" $bucket/f6 2> role.err
+grep ' 403$' role.err || fail=1
 
 
 # ################## Providers
@@ -226,26 +231,26 @@ for i in xml json; do
   compare p.exp p || fail=1
 
   # List an empty bucket.
-  curl_H http://localhost:$port/b1 > b || fail=1
+  curl_H $bucket > b || fail=1
   emit_bucket_list $i > b.exp || fail=1
   compare b.exp b || fail=1
 
   # Add an object, list non-empty bucket.
-  echo bar | curl -T - http://localhost:$port/b1/f2 || fail=1
+  echo bar | curl -T - $bucket/f2 || fail=1
 
   # Ensure that new name appears in the listing.
-  curl_H http://localhost:$port/b1 > b || fail=1
+  curl_H $bucket > b || fail=1
   emit_bucket_list $i b1:f2 > b.exp || fail=1
   compare b.exp b || fail=1
 
   # Remove b1/f2, to restore state for next iteration of this loop.
-  curl -X DELETE http://localhost:$port/b1/f2 || fail=1
+  curl -X DELETE $bucket/f2 || fail=1
 
 done
 
 
 # Add a single attribute to an object using the PUT method.
-bucket=http://localhost:$port/b1
+bucket=$bucket
 printf nothing | curl -T - $bucket/f3 || fail=1
 printf blue | curl -T - $bucket/f3/color || fail=1
 test "$(curl $bucket/f3/color)" = blue || fail=1

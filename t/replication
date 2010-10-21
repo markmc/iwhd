@@ -37,7 +37,7 @@ cat > iwhd_d.cfg << EOF
 EOF
 
 d_port=9093
-iwhd -v -p $d_port -c iwhd_d.cfg -d localhost:$m_port &
+iwhd -v -p $d_port -c iwhd_d.cfg -d localhost:$m_port -m localhost:$port &
 iwhd_d_pid=$!
 wait_for .1 30 "curl http://localhost:$d_port" \
 	|| framework_failure_ "iwhd downstream"
