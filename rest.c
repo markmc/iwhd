@@ -910,6 +910,7 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 	if (!resp) {
+		free_ms(ms);
 		return MHD_NO;
 	}
 	MHD_queue_response(conn,rc,resp);
