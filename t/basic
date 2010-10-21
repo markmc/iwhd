@@ -1,6 +1,15 @@
 #!/bin/sh
 # Test basic functionality.
 
+# TEST-FILE USAGE
+#	f1	object put/get/delete
+#	f2	bucket listing
+#	f3	attribute PUT, headless operation
+#	f4	attribute POST
+#	f5	reserved attr
+#	f6	X-redhat-role
+#	f7	truncation
+
 . "${srcdir=.}/init.sh"; path_prepend_ ..
 
 mkdir FS mongod iwhd || framework_failure_ mkdir failed
@@ -180,7 +189,6 @@ grep ' 404$' del_nosuch.err || fail=1
 echo hello | curl -f -T - -H "X-redhat-role: master" $bucket/f6 2> role.err
 grep ' 403$' role.err || fail=1
 
-
 # ################## Providers
 
 p_name=primary
@@ -268,6 +276,12 @@ for attr in bucket key date etag loc; do
   printf whatever | curl -f -T - $bucket/f5/$attr 2> bad_attr.err
   grep ' 400$' bad_attr.err || fail=1
 done
+
+# Make sure PUTting a file truncates.
+echo hello | curl -f -T - $bucket/f7 || fail=1
+echo bye | curl -f -T - $bucket/f7 || fail=1
+cat FS/b1/f7
+test "$(cat FS/b1/f7)" = bye || fail=1
 
 # Test "headless" operation (no access to metadata DB).
 kill -9 $mongo_pid

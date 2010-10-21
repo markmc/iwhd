@@ -1,6 +1,13 @@
 #!/bin/sh
 # Test replication functionality.
 
+# TEST-FILE USAGE
+#	file2	default policy (negative)
+#	file3	always-replicate policy (positive)
+#	file4	selective positive, delete
+#	file5	selective negative
+#	file6	attribute change (positive)
+
 . "${srcdir=.}/init.sh"; path_prepend_ ..
 
 mkdir mongod fs_upstream fs_downstream || framework_failure_ mkdir failed
