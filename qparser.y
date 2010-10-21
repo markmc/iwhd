@@ -329,7 +329,7 @@ unit_sget_func (void * notused, const char *text)
 static const getter_t unit_sget = { unit_sget_func };
 
 /* Fake links from an object/key tuple to an object/key string. */
-struct { char *obj; char *key; char *value; } hacked_links[] = {
+static const struct { char *obj; char *key; char *value; } hacked_links[] = {
 	{ "templates/the_tmpl", "owner", "users/the_user" },
 	{ "users/the_user", "name", "Jeff Darcy" },
 	{ NULL }
