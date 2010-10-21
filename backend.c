@@ -51,9 +51,13 @@ struct hstor_client	*hstor;
 
 /***** Generic module stuff, not specific to one back end *****/
 
-/* Sizes for internal string buffers for CF code. */
-#define ADDR_SIZE	1024
-#define SVC_ACC_SIZE	128
+/*
+ * Sizes for internal string buffers.  In general, ADDR_SIZE needs to be
+ * big enough to hold a hostname, a port number, a bucket and key (each
+ * MAX_FIELD_LEN=64) and some punctuation.  Header size needs to be big
+ * enough to hold the header name plus a CF token (32 bytes).
+ */
+#define ADDR_SIZE	256
 #define HEADER_SIZE	64
 
 #define S3_IMAGE_PATTERN "^IMAGE[[:blank:]]+([^[:space:]]+)"
@@ -78,7 +82,6 @@ backend_init (void)
 		regex_ok = FALSE;
 	}
 }
-
 
 /***** Stub functions for unimplemented stuff. *****/
 
@@ -212,9 +215,14 @@ http_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 static void
 s3_init (provider_t *prov)
 {
-	char svc_acc[128];
+	char	svc_acc[128];
+	int	chars;
 
-	snprintf(svc_acc,sizeof(svc_acc),"%s:%u",prov->host,prov->port);
+	chars = snprintf(svc_acc,sizeof(svc_acc),"%s:%u",prov->host,prov->port);
+	if (chars >= (int)sizeof(svc_acc)) {
+		error(0,0,"hostname %s too long in %s",prov->host,__func__);
+		return;
+	}
 	hstor = hstor_new(svc_acc,prov->host,prov->username,prov->password);
 	if (hstor) {
 		if (verbose) {
@@ -368,7 +376,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	pid_t	 	 pid;
 	int		 organ[2];
 	FILE		*fp;
-	char		 buf[1024];
+	char		 buf[ADDR_SIZE];
 	char		*cval	= NULL;
 	char		*kval	= NULL;
 	int		 rc	= MHD_HTTP_BAD_REQUEST;
@@ -578,11 +586,12 @@ curl_init (provider_t *prov)
 static void *
 curl_get_child (void * ctx)
 {
-	char		 fixed[1024];
+	char		 fixed[ADDR_SIZE];
 	backend_thunk_t	*tp	= (backend_thunk_t *)ctx;
 	my_state        *ms     = tp->parent;
 	provider_t	*prov	= tp->prov;
 	CURL		*curl;
+	int		 chars;
 
 	curl = curl_easy_init();
 	if (!curl) {
@@ -590,12 +599,16 @@ curl_get_child (void * ctx)
 		return NULL;	/* TBD: flag error somehow */
 	}
 	if (ms->from_master) {
-		sprintf(fixed,"http://%s:%u%s",
+		chars = snprintf(fixed,sizeof(fixed),"http://%s:%u%s",
 			master_host, master_port, ms->url);
 	}
 	else {
-		sprintf(fixed,"http://%s:%u%s",
+		chars = snprintf(fixed,sizeof(fixed),"http://%s:%u%s",
 			prov->host, prov->port, ms->url);
+	}
+	if (chars >= (int)sizeof(fixed)) {
+		error(0,0,"path too long in %s",__func__);
+		return NULL;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION, http_get_prod);
@@ -620,9 +633,10 @@ curl_put_child (void * ctx)
 	my_state	*ms	= ps->owner;
 	provider_t	*prov	= pp->prov;
 	curl_off_t	 llen;
-	char		 fixed[1024];
+	char		 fixed[ADDR_SIZE];
 	CURL		*curl;
 	const char	*clen;
+	int		 chars;
 
 	llen = (curl_off_t)MHD_SIZE_UNKNOWN;
 	if (ms->be_flags & BACKEND_GET_SIZE) {
@@ -642,8 +656,12 @@ curl_put_child (void * ctx)
 		free(pp);
 		return THREAD_FAILED;
 	}
-	sprintf(fixed,"http://%s:%u/%s/%s",prov->host,prov->port,
-		ms->bucket,ms->key);
+	chars = snprintf(fixed,sizeof(fixed),
+		"http://%s:%u/%s/%s",prov->host,prov->port,ms->bucket,ms->key);
+	if (chars >= (int)sizeof(fixed)) {
+		error(0,0,"path too long in %s",__func__);
+		return NULL;
+	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
 	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,llen);
@@ -666,10 +684,11 @@ curl_cache_child (void * ctx)
 	pipe_shared	*ps	= pp->shared;
 	my_state	*ms	= ps->owner;
 	provider_t	*prov	= pp->prov;
-	char		 fixed[1024];
+	char		 fixed[ADDR_SIZE];
 	CURL		*curl;
 	char		*slash;
 	char		*my_url = strdup(ms->url);
+	int		 chars;
 
 	if (!my_url) {
 		return THREAD_FAILED;
@@ -681,8 +700,12 @@ curl_cache_child (void * ctx)
 		pipe_cons_siginit(ps,-1);
 		return THREAD_FAILED;
 	}
-	sprintf(fixed,"http://%s:%u%s",prov->host,prov->port,
-		ms->url);
+	chars = snprintf(fixed,sizeof(fixed),
+		"http://%s:%u%s",prov->host,prov->port,ms->url);
+	if (chars >= (int)sizeof(fixed)) {
+		error(0,0,"path too long in %s",__func__);
+		return NULL;
+	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
 	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,
@@ -707,7 +730,8 @@ curl_delete (const provider_t *prov, const char *bucket, const char *key,
 	     const char *url)
 {
 	CURL			*curl;
-	char			 fixed[1024];
+	char			 fixed[ADDR_SIZE];
+	int			 chars;
 
 	(void)bucket;
 	(void)key;
@@ -717,7 +741,12 @@ curl_delete (const provider_t *prov, const char *bucket, const char *key,
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	sprintf(fixed,"http://%s:%u%s",prov->host,prov->port,url);
+	chars = snprintf(fixed,sizeof(fixed),
+		"http://%s:%u%s",prov->host,prov->port,url);
+	if (chars >= (int)sizeof(fixed)) {
+		error(0,0,"path too long in %s",__func__);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"DELETE");
 	curl_easy_perform(curl);
@@ -733,9 +762,9 @@ curl_bcreate (const provider_t *prov, const char *bucket)
 	int	 chars;
 	CURL	*curl;
 
-	chars = snprintf(addr,ADDR_SIZE,"http://%s:%d/%s",
+	chars = snprintf(addr,sizeof(addr),"http://%s:%d/%s",
 		prov->host,prov->port,bucket);
-	if (chars >= ADDR_SIZE) {
+	if (chars >= (int)sizeof(addr)) {
 		error(0,0,"path too long in %s",__func__);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
@@ -761,12 +790,13 @@ static int
 curl_register (my_state *ms, const provider_t *prov, const char *next,
 	       GHashTable *args)
 {
-	char			 fixed[1024];
+	char			 fixed[ADDR_SIZE];
 	CURL			*curl;
 	struct curl_httppost	*first	= NULL;
 	struct curl_httppost	*last	= NULL;
 	char	*kernel		= g_hash_table_lookup(args,"kernel");
 	char	*ramdisk	= g_hash_table_lookup(args,"ramdisk");
+	int	 chars;
 
 	if (!next) {
 		DPRINTF("CURL register with next==NULL\n");
@@ -780,8 +810,12 @@ curl_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!curl) {
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
-	sprintf(fixed,"http://%s:%d/%s/%s",
+	chars = snprintf(fixed,sizeof(fixed),"http://%s:%d/%s/%s",
 		prov->host,prov->port, ms->bucket, ms->key);
+	if (chars >= (int)sizeof(fixed)) {
+		error(0,0,"path too long in %s",__func__);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_formadd(&first,&last,
 		CURLFORM_COPYNAME, "op",
@@ -873,9 +907,9 @@ cf_add_token (struct curl_slist *in_slist, const char *token)
 		return in_slist;
 	}
 
-	chars = snprintf(auth_hdr,HEADER_SIZE,"X-Auth-Token: %s",token);
-	if (chars >= HEADER_SIZE) {
-		error(0,0,"auth_token too long");
+	chars = snprintf(auth_hdr,sizeof(auth_hdr),"X-Auth-Token: %s",token);
+	if (chars >= (int)sizeof(auth_hdr)) {
+		error(0,0,"auth_hdr too long");
 		return in_slist;
 	}
 
@@ -896,23 +930,23 @@ cf_init (provider_t *prov)
 		return;
 	}
 
-	chars = snprintf(addr,ADDR_SIZE,"https://%s:%u/v1.0",
+	chars = snprintf(addr,sizeof(addr),"https://%s:%u/v1.0",
 		prov->host, prov->port);
-	if (chars >= ADDR_SIZE) {
+	if (chars >= (int)sizeof(addr)) {
 		error(0,0,"API URL too long in %s",__func__);
 		return;
 	}
 
-	chars = snprintf(auth_user,HEADER_SIZE,"X-Auth-User: %s",
+	chars = snprintf(auth_user,sizeof(auth_user),"X-Auth-User: %s",
 		prov->username);
-	if (chars >= HEADER_SIZE) {
+	if (chars >= (int)sizeof(auth_user)) {
 		error(0,0,"auth_user too long in %s",__func__);
 		return;
 	}
 
-	chars = snprintf(auth_key,HEADER_SIZE,"X-Auth-Key: %s",
+	chars = snprintf(auth_key,sizeof(auth_key),"X-Auth-Key: %s",
 		prov->password);
-	if (chars >= HEADER_SIZE) {
+	if (chars >= (int)sizeof(auth_key)) {
 		error(0,0,"auth_key too long in %s",__func__);
 		return;
 	}
@@ -936,12 +970,13 @@ cf_init (provider_t *prov)
 static void *
 cf_get_child (void * ctx)
 {
-	char		 	 fixed[1024];
+	char		 	 fixed[ADDR_SIZE];
 	backend_thunk_t		*tp	= (backend_thunk_t *)ctx;
 	my_state        	*ms     = tp->parent;
 	provider_t		*prov	= tp->prov;
 	CURL			*curl;
 	struct curl_slist	*slist	= NULL;
+	int			 chars;
 
 	slist = cf_add_token(slist,prov->token);
 	if (!slist) {
@@ -960,7 +995,11 @@ cf_get_child (void * ctx)
 		curl_slist_free_all(slist);
 		return NULL;	/* TBD: flag error somehow */
 	}
-	sprintf(fixed,"%s%s", prov->host, ms->url);
+	chars = snprintf(fixed,sizeof(fixed),"%s%s", prov->host, ms->url);
+	if (chars >= (int)sizeof(fixed)) {
+		error(0,0,"path too long in %s",__func__);
+		return NULL;
+	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION, http_get_prod);
 	curl_easy_setopt(curl,CURLOPT_WRITEDATA,&ms->pipe);
@@ -986,10 +1025,11 @@ cf_put_child (void * ctx)
 	my_state		*ms	= ps->owner;
 	provider_t		*prov	= pp->prov;
 	curl_off_t		 llen;
-	char			 fixed[1024];
+	char			 fixed[ADDR_SIZE];
 	CURL			*curl;
 	const char		*clen;
 	struct curl_slist	*slist	= NULL;
+	int			 chars;
 
 	slist = cf_add_token(slist,prov->token);
 	if (!slist) {
@@ -1015,7 +1055,12 @@ cf_put_child (void * ctx)
 		curl_slist_free_all(slist);
 		return THREAD_FAILED;
 	}
-	sprintf(fixed,"%s/%s/%s",prov->host,ms->bucket,ms->key);
+	chars = snprintf(fixed,sizeof(fixed),
+		"%s/%s/%s",prov->host,ms->bucket,ms->key);
+	if (chars >= (int)sizeof(fixed)) {
+		error(0,0,"path too long in %s",__func__);
+		return NULL;
+	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
 	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,llen);
@@ -1041,9 +1086,10 @@ cf_delete (const provider_t *prov,
 	   const char *url)
 {
 	CURL			*curl;
-	char			 fixed[1024];
+	char			 fixed[ADDR_SIZE];
 	long			 rc;
 	struct curl_slist	*slist	= NULL;
+	int			 chars;
 
 	slist = cf_add_token(slist,prov->token);
 	if (!slist) {
@@ -1056,7 +1102,11 @@ cf_delete (const provider_t *prov,
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 
-	sprintf(fixed,"%s%s",prov->host,url);
+	chars = snprintf(fixed,sizeof(fixed),"%s%s",prov->host,url);
+	if (chars >= (int)sizeof(fixed)) {
+		error(0,0,"path too long in %s",__func__);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_CUSTOMREQUEST,"DELETE");
 	curl_easy_setopt(curl,CURLOPT_HTTPHEADER,slist);
@@ -1083,10 +1133,11 @@ cf_null_reader (void *ptr ATTRIBUTE_UNUSED,
 static int
 cf_bcreate (const provider_t *prov, const char *bucket)
 {
-	char			 fixed[1024];
+	char			 fixed[ADDR_SIZE];
 	CURL			*curl;
 	long			 rc;
 	struct curl_slist	*slist	= NULL;
+	int			 chars;
 
 	slist = cf_add_token(slist,prov->token);
 	if (!slist) {
@@ -1098,7 +1149,11 @@ cf_bcreate (const provider_t *prov, const char *bucket)
 		curl_slist_free_all(slist);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
-	sprintf(fixed,"%s/%s",prov->host,bucket);
+	chars = snprintf(fixed,sizeof(fixed),"%s/%s",prov->host,bucket);
+	if (chars >= (int)sizeof(fixed)) {
+		error(0,0,"path too long in %s",__func__);
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
 	curl_easy_setopt(curl,CURLOPT_UPLOAD,1);
 	curl_easy_setopt(curl,CURLOPT_INFILESIZE_LARGE,
@@ -1176,9 +1231,14 @@ fs_put_child (void * ctx)
 	int		 fd;
 	ssize_t		 bytes;
 	size_t		 offset;
-	char		 fixed[1024];
+	char		 fixed[ADDR_SIZE];
+	int		 chars;
 
-	sprintf(fixed,"%s/%s",ms->bucket,ms->key);
+	chars = snprintf(fixed,sizeof(fixed),"%s/%s",ms->bucket,ms->key);
+	if (chars >= (int)sizeof(fixed)) {
+		error(0,0,"path too long in %s",__func__);
+		return NULL;
+	}
 	fd = open(fixed,O_WRONLY|O_CREAT,0666);
 	if (fd < 0) {
 		pipe_cons_siginit(ps, errno);
