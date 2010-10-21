@@ -1249,7 +1249,10 @@ fs_put_child (void * ctx)
 		error(0,0,"path too long in %s",__func__);
 		return NULL;
 	}
-	fd = open(fixed,O_WRONLY|O_CREAT,0666);
+	if (unlink(fixed) < 0) {
+		error(0,errno,"unlink failed for %s (non-fatal)",fixed);
+	}
+	fd = open(fixed,O_WRONLY|O_CREAT|O_EXCL,0666);
 	if (fd < 0) {
 		pipe_cons_siginit(ps, errno);
 		free(pp);
