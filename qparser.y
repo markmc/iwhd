@@ -426,14 +426,10 @@ print_value (const value_t *v)
 void
 free_value (value_t *v)
 {
-	if (!v) {
+	if (v == NULL || v == &invalid) {
 		return;
 	}
 
-	if (v->resolved) {
-		printf("freeing resolved string \"%s\" (%p)\n",
-			v->resolved, v->resolved);
-	}
 	free((void *)v->resolved);
 
 	switch (v->type) {
@@ -471,8 +467,10 @@ parse (const char *text)
   if (yylex_init (&scanner))
     error (0, errno, "failed to initialize query parser");
   YY_BUFFER_STATE buf = yy_scan_string (text, scanner);
-  value_t *result;
+  value_t *result = NULL;
   value_t *r = yyparse (scanner, &result) == 0 ? result : NULL;
+  if (r == NULL)
+    free_value (result);
   yy_delete_buffer (buf, scanner);
   yylex_destroy (scanner);
   return r;
@@ -689,7 +687,7 @@ main (int argc, char **argv)
 	{
 	  printf ("could not parse '%s'\n", argv[i]);
 	  fail = 1;
-	  continue;
+	  goto next;
 	}
 
       print_value (expr);
@@ -698,9 +696,12 @@ main (int argc, char **argv)
       if (str)
 	{
 	  printf ("s= %s\n", str);
-	  continue;
+	  goto next;
 	}
       printf ("d= %d\n", eval (expr, &unit_oget, &unit_sget));
+
+    next:
+      free_value (expr);
     }
 
   return fail;
