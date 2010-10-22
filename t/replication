@@ -18,8 +18,8 @@ mongod --port $m_port --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1
 mongo_pid=$!
 cleanup_() { kill -9 $mongo_pid; }
 
-# Wait for up to 3 seconds for mongod to begin listening.
-wait_for .1 30 'mongo localhost:$m_port < /dev/null' \
+# Wait for up to 12 seconds for mongod to begin listening.
+wait_for .1 120 'mongo localhost:$m_port < /dev/null' \
   || framework_failure_ mongod failed to start
 
 cat > iwhd_u.cfg << EOF

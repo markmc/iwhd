@@ -22,11 +22,11 @@ iwhd -v -p $port -a &
 iwhd_pid=$!
 cleanup_() { kill $iwhd_pid; }
 
-# Wait for up to 3 seconds for mongod to begin listening.
-wait_for .1 30 'mongo localhost:$m_port < /dev/null' \
+# Wait for up to 10 seconds for mongod to begin listening.
+wait_for .1 100 'mongo localhost:$m_port < /dev/null' \
   || framework_failure_ mongod failed to start
-# Wait for up to 3 seconds for iwhd to begin listening on $port.
-wait_for .1 30 "curl -s http://localhost:$port" \
+# Wait for up to 20 seconds for iwhd to begin listening on $port.
+wait_for .1 200 "curl -s http://localhost:$port" \
   || framework_failure_ iwhd failed to start
 
 mongo_pid=$(cat mongo.pid)

@@ -183,7 +183,7 @@ auto_wait_mongod(void)
 		rc = auto_test_mongod();
 		if (rc == 0)
 			break;
-		if (time(NULL) >= start_time + 5) {
+		if (time(NULL) >= start_time + 20) {
 			error(0, 0, "failed to verify mongod using port %s",
 			      auto_arg_port);
 			return -1;
