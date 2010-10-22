@@ -21,6 +21,7 @@
 #include "iwh.h"
 #include "state_defs.h"
 
+static int auto_db_port;
 static char auto_arg_port[10];
 
 static char *auto_arg_mongod[] = {
@@ -132,84 +133,34 @@ auto_spawn (const char *prog, char *argv[])
 	return pid;
 }
 
-/*
- * The server_node and node_resolve are taken verbatim from wait-for-listen.
- * Is this time to factor?
- */
-#define ADDRSIZE 40
-
-struct server_node {
-	unsigned		alen;
-	union {
-		struct sockaddr addr;
-		unsigned char x[ADDRSIZE];
-	} a;
-};
-
-static int
-node_resolve(struct server_node *sn,
-	     const char *hostname, const char *portstr)
-{
-	struct addrinfo hints;
-	struct addrinfo *res, *res0;
-	int rc;
-
-	memset(&hints, 0, sizeof(struct addrinfo));
-	hints.ai_family = PF_UNSPEC;
-	hints.ai_socktype = SOCK_DGRAM;
-
-	rc = getaddrinfo(hostname, portstr, &hints, &res0);
-	if (rc) {
-		error(0, 0, "getaddrinfo(%s:%s) failed: %s",
-		       hostname, portstr, gai_strerror(rc));
-		return -1;
-	}
-
-	for (res = res0; res; res = res->ai_next) {
-		if (res->ai_family != AF_INET && res->ai_family != AF_INET6)
-			continue;
-
-		if (res->ai_addrlen > ADDRSIZE)		/* should not happen */
-			continue;
-
-		memcpy(&sn->a.addr, res->ai_addr, res->ai_addrlen);
-		sn->alen = res->ai_addrlen;
-
-		freeaddrinfo(res0);
-		return 0;
-	}
-
-	freeaddrinfo(res0);
-	return -1;
-}
-
 static int
 auto_test_mongod(void)
 {
-	struct server_node snode, *sn = &snode;
+	union {
+		struct sockaddr_in a4;
+		struct sockaddr a;
+	} addr;
 	int sfd;
 	int rc;
 
-	memset(sn, 0, sizeof(struct server_node));
-	if (node_resolve(sn, AUTO_HOST, auto_arg_port) != 0) {
-		/*
-		 * Most likely nothing else would work anyway. So abend.
-		 */
-		error(0, 0, "unable to resolve host %s port %s",
-		      AUTO_HOST, auto_arg_port);
-		return -1;
-	}
+	/*
+	 * We hardcode IPv4 because Mongo often listens on IPv4 only.
+	 */
+	memset(&addr, 0, sizeof(addr));
+	addr.a4.sin_family = AF_INET;
+	addr.a4.sin_port = htons(auto_db_port);
+	addr.a4.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-	DPRINTF("trying to connect to mongod (host %s port %s) ...\n",
-		AUTO_HOST, auto_arg_port);
+	DPRINTF("trying to connect to mongod (host 127.0.0.1 port %u) ...\n",
+		auto_db_port);
 
-	sfd = socket(sn->a.addr.sa_family, SOCK_STREAM, 0);
+	sfd = socket(addr.a.sa_family, SOCK_STREAM, 0);
 	if (sfd < 0) {
 		error(0, errno, "socket");
 		return -1;
 	}
 
-	rc = connect(sfd, &sn->a.addr, sn->alen);
+	rc = connect(sfd, &addr.a, sizeof(addr.a4));
 	if (rc != 0) {
 		DPRINTF("connect: %s\n", strerror(errno));
 		close(sfd);
@@ -296,6 +247,7 @@ auto_start (int dbport)
 	char **earg;
 	int pid;
 
+	auto_db_port = dbport;
 	snprintf(auto_arg_port, sizeof(auto_arg_port), "%u", dbport);
 
 	if (auto_prepare_area() < 0)
