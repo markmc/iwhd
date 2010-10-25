@@ -173,7 +173,7 @@ dup_json_string (json_t *obj, char *field)
 static int
 is_reserved_attr (const char *name)
 {
-	static const char const *rsvd[] = {
+	static char const *const rsvd[] = {
 		"name", "type", "host", "port", "key", "secret", "path",
 		NULL
 	};
