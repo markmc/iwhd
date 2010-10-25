@@ -26,6 +26,7 @@ skip_low_priority =			\
   sc_prohibit_strcmp			\
   sc_unmarked_diagnostics		\
   sc_error_message_uppercase		\
+  sc_cast_of_argument_to_free		\
   sc_file_system
 
 # Tests not to run as part of "make distcheck".
