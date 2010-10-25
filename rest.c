@@ -35,6 +35,7 @@
 #include <glib.h>
 
 #include "iwh.h"
+#include "closeout.h"
 #include "progname.h"
 #include "meta.h"
 #include "backend.h"
@@ -1937,6 +1938,7 @@ main (int argc, char **argv)
 	int			 autostart = 0;
 
 	set_program_name (argv[0]);
+	atexit (close_stdout);
 
 	for (;;) switch (getopt_long(argc,argv,"ac:d:m:p:v",my_options,NULL)) {
 	case 'a':
