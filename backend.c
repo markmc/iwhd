@@ -319,13 +319,14 @@ s3_bcreate (const provider_t *prov, const char *bucket)
 }
 
 static const char *
-s3_init_tmpfile (char *value)
+s3_init_tmpfile (const char *value)
 {
 	char	*path;
 	int	 fd;
 	size_t	 len;
 	ssize_t	 written;
 
+	/* FIXME: do not hard-code /tmp.  */
 	path = strdup("/tmp/iwtmp.XXXXXX");
 	if (!path) {
 		return NULL;
