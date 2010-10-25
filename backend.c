@@ -416,7 +416,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!api_secret) {
 		api_secret = (char *)prov->password;
 		if (!prov->password) {
-			error (0, 0, "missing EC2 API key");
+			error (0, 0, "missing EC2 API secret");
 			goto cleanup;
 		}
 	}
