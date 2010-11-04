@@ -69,8 +69,8 @@ static unsigned short		 my_port	= MY_PORT;
 const char			*program_name;
 char				*cfg_file	= NULL;
 
-static char *(reserved_name[]) = { "_default", "_query", "_new", NULL };
-static char *(reserved_attr[]) = { "bucket", "key", "date", "etag", "loc", NULL };
+static const char *const (reserved_name[]) = {"_default", "_new", "_policy", "_query", NULL};
+static const char *const (reserved_attr[]) = {"bucket", "date", "etag", "key", "loc", NULL};
 
 void
 free_ms (my_state *ms)
@@ -137,7 +137,7 @@ validate_put (struct MHD_Connection *conn)
 }
 
 static int
-is_reserved (const char *cand, char **resv_list)
+is_reserved (const char *cand, char const *const *resv_list)
 {
 	int	i;
 

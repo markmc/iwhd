@@ -270,6 +270,19 @@ curl -d key=attr_post -d shape=round -d size=big $bucket || fail=1
 test "$(curl $bucket/attr_post/shape)" = round || fail=1
 test "$(curl $bucket/attr_post/size)" = big || fail=1
 
+# Ensure that an attempt to add reserved object name fails.
+# FIXME: keep this list in sync with the one in rest.c:
+# grep '^static.*reserved_name' rest.c
+for obj_name in _default _new _policy _query; do
+  echo reserved-obj-name | curl -f -T - $bucket/$obj_name 2> bad_oname.err
+  # _query evokes 404.  all others evoke 403
+  case $obj_name in
+    _query) exp=404;;
+    *) exp=403;;
+  esac
+  grep " $exp\$" bad_oname.err || fail=1
+done
+
 # Ensure that an attempt to add each reserved attribute fails.
 # FIXME: keep this list in sync with the one in rest.c:
 # grep '^static.*reserved_attr' rest.c
