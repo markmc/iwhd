@@ -291,6 +291,21 @@ for attr in bucket key date etag loc; do
   grep ' 400$' bad_attr.err || fail=1
 done
 
+# Ensure that an attempt to create a bucket with a reserved name fails.
+# FIXME: keep this list in sync with the one in rest.c:
+# grep '^static.*reserved_bucket_name' rest.c
+for b in _new _providers; do
+  invalid_bucket=http://localhost:$port/$b
+  curl -f -X PUT $invalid_bucket 2> invalid_bucket.err
+  # FIXME: change the code so that these are the same
+  case $b in
+    _new) exp=400;; # MHD_HTTP_BAD_REQUEST
+    *) exp=404;;
+  esac
+  cat invalid_bucket.err
+  grep " $exp\$" invalid_bucket.err || fail=1
+done
+
 # Make sure PUTting a file truncates.
 echo hello | curl -f -T - $bucket/trunc_test || fail=1
 echo bye | curl -f -T - $bucket/trunc_test || fail=1

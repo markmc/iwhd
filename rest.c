@@ -71,6 +71,7 @@ char				*cfg_file	= NULL;
 
 static const char *const (reserved_name[]) = {"_default", "_new", "_policy", "_query", NULL};
 static const char *const (reserved_attr[]) = {"bucket", "date", "etag", "key", "loc", NULL};
+static const char *const (reserved_bucket_name[]) = {"_new", "_providers", NULL};
 
 void
 free_ms (my_state *ms)
@@ -937,6 +938,8 @@ typedef struct {
 	char *link;
 } fake_bucket_t;
 
+/* FIXME: ensure that the RHS values here stay in sync with those
+   in reserved_bucket_name.  */
 static const fake_bucket_t fake_bucket_list[] = {
 	{ "bucket_factory",	"_new" },
 	{ "provider_list",	"_providers" },
@@ -1129,7 +1132,8 @@ create_bucket (char *name, my_state *ms)
 {
 	int	rc;
 
-	if (is_reserved(name,reserved_name)) {
+	if (is_reserved(name, reserved_name)
+	    || is_reserved(name, reserved_bucket_name)) {
 		return MHD_HTTP_BAD_REQUEST;
 	}
 
