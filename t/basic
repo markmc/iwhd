@@ -266,7 +266,7 @@ test "$(curl $bucket/attr_put/color)" = blue || fail=1
 
 # Add multiple attributes to an object using the POST method.
 # NB use a file which doesn't yet exist (yes, this should work too)
-curl -d key=attr_post -d shape=round -d size=big $bucket || fail=1
+curl -d _key=attr_post -d shape=round -d size=big $bucket || fail=1
 test "$(curl $bucket/attr_post/shape)" = round || fail=1
 test "$(curl $bucket/attr_post/size)" = big || fail=1
 
@@ -286,7 +286,7 @@ done
 # Ensure that an attempt to add each reserved attribute fails.
 # FIXME: keep this list in sync with the one in rest.c:
 # grep '^static.*reserved_attr' rest.c
-for attr in bucket key date etag loc; do
+for attr in _bucket _key _date _etag _loc _size; do
   printf whatever | curl -f -T - $bucket/rsvd_attr/$attr 2> bad_attr.err
   grep ' 400$' bad_attr.err || fail=1
 done

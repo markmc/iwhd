@@ -196,7 +196,7 @@ RepoMeta::DidPut (const char *bucket, const char *key, const char *loc,
 	dbl_to_str(&now,now_str);
 	cout << "now_str = " << now_str << endl;
 
-	q = QUERY("bucket"<<bucket<<"key"<<key);
+	q = QUERY("_bucket"<<bucket<<"_key"<<key);
 	curs = GetCursor(q);
 	if (!curs.get()) {
 		cerr << "DidPut failed for " << bucket << "/" << key << endl;
@@ -205,25 +205,25 @@ RepoMeta::DidPut (const char *bucket, const char *key, const char *loc,
 	if (curs->more()) {
 		/* Nice functionality, but what an ugly syntax! */
 		client.update(MAIN_TBL,q,BSON(
-			"$set"<<BSON("loc"<<BSON_ARRAY(loc))
-		<<	"$set"<<BSON("date"<<now)
-		<<	"$set"<<BSON("etag"<<now_str)
-		<<	"$set"<<BSON("size"<<(long long)size)));
+			"$set"<<BSON("_loc"<<BSON_ARRAY(loc))
+		<<	"$set"<<BSON("_date"<<now)
+		<<	"$set"<<BSON("_etag"<<now_str)
+		<<	"$set"<<BSON("_size"<<(long long)size)));
 #if 0
 		client.update(MAIN_TBL,q,
-			BSON("$set"<<BSON("loc"<<BSON_ARRAY(loc))));
+			BSON("$set"<<BSON("_loc"<<BSON_ARRAY(loc))));
 		client.update(MAIN_TBL,q,
-			BSON("$set"<<BSON("date"<<now)));
+			BSON("$set"<<BSON("_date"<<now)));
 		client.update(MAIN_TBL,q,
-			BSON("$set"<<BSON("etag"<<now_str)));
+			BSON("$set"<<BSON("_etag"<<now_str)));
 		client.update(MAIN_TBL,q,
-			BSON("$set"<<BSON("size"<<(long long)size)));
+			BSON("$set"<<BSON("_size"<<(long long)size)));
 #endif
 	}
 	else {
-		bb << "bucket" << bucket << "key" << key
-		   << "loc" << BSON_ARRAY(loc) << "date" << now
-		   << "etag" << now_str << "size" << (long long)size;
+		bb << "_bucket" << bucket << "_key" << key
+		   << "_loc" << BSON_ARRAY(loc) << "_date" << now
+		   << "_etag" << now_str << "_size" << (long long)size;
 		client.insert(MAIN_TBL,bb.obj());
 	}
 
@@ -252,7 +252,7 @@ RepoMeta::GotCopy (const char *bucket, const char *key, const char *loc)
 	auto_ptr<DBClientCursor>	curs;
 	Query				q;
 
-	q = QUERY("bucket"<<bucket<<"key"<<key);
+	q = QUERY("_bucket"<<bucket<<"_key"<<key);
 	curs = GetCursor(q);
 	if (!curs.get()) {
 		cerr << "GotCopy failed for " << bucket << "/" << key << endl;
@@ -260,7 +260,7 @@ RepoMeta::GotCopy (const char *bucket, const char *key, const char *loc)
 	}
 	if (curs->more()) {
 		/* Nice functionality, but what an ugly syntax! */
-		client.update(MAIN_TBL,q,BSON("$addToSet"<<BSON("loc"<<loc)));
+		client.update(MAIN_TBL,q,BSON("$addToSet"<<BSON("_loc"<<loc)));
 	}
 	else {
 		cerr << bucket << "/" << key << " not found in GotCopy!" << endl;
@@ -283,7 +283,7 @@ RepoMeta::HasCopy (const char *bucket, const char *key, const char *loc)
 	Query				q;
 	const char			*value;
 
-	q = QUERY("bucket"<<bucket<<"key"<<key<<"loc"<<loc);
+	q = QUERY("_bucket"<<bucket<<"_key"<<key<<"_loc"<<loc);
 	curs = GetCursor(q);
 	if (!curs.get()) {
 		cerr << "HasCopy failed for " << bucket << "/" << key << endl;
@@ -294,13 +294,13 @@ RepoMeta::HasCopy (const char *bucket, const char *key, const char *loc)
 		return (char *)"";
 	}
 
-	value = curs->next().getStringField("etag");
+	value = curs->next().getStringField("_etag");
 	if (!value || !*value) {
-		cout << bucket << "/" << key << " no etag at " << loc << endl;
+		cout << bucket << "/" << key << " no _etag at " << loc << endl;
 		return (char *)"";
 	}
 
-	cout << bucket << "/" << key << " etag = " << value << endl;
+	cout << bucket << "/" << key << " _etag = " << value << endl;
 	return strdup(value);
 }
 
@@ -320,7 +320,7 @@ int
 RepoMeta::SetValue (const char *bucket, const char *key, const char *mkey,
 		    const char * mvalue)
 {
-	Query	q	= QUERY("bucket"<<bucket<<"key"<<key);
+	Query	q	= QUERY("_bucket"<<bucket<<"_key"<<key);
 
 	try {
 		client.update(MAIN_TBL,q,BSON("$set"<<BSON(mkey<<mvalue)),1);
@@ -357,7 +357,7 @@ RepoMeta::GetValue (const char *bucket, const char *key, const char *mkey,
 	BSONObj				bo;
 	const char *			data;
 
-	q = QUERY("bucket"<<bucket<<"key"<<key);
+	q = QUERY("_bucket"<<bucket<<"_key"<<key);
 	curs = GetCursor(q);
 	if (!curs.get()) {
 		cerr << "GetValue failed for " << bucket << "/" << key << ":"
@@ -400,11 +400,11 @@ RepoQuery::RepoQuery (const char *bucket, const char *key, const char *qstr,
 
 	if (bucket) {
 		cout << "bucket is " << bucket << " and we don't care" << endl;
-		q = QUERY("bucket"<<bucket);
+		q = QUERY("_bucket"<<bucket);
 	}
 	else if (key) {
 		cout << "key is " << key << " and we don't care" << endl;
-		q = QUERY("key"<<key);
+		q = QUERY("_key"<<key);
 	}
 	else {
 		abort();
@@ -481,8 +481,8 @@ RepoQuery::Next (void)
 				continue;
 			}
 		}
-		bucket = (char *)bo.getStringField("bucket");
-		key = (char *)bo.getStringField("key");
+		bucket = (char *)bo.getStringField("_bucket");
+		key = (char *)bo.getStringField("_key");
 		return true;
 	}
 
@@ -539,7 +539,7 @@ RepoMeta::BucketList (void)
 	 */
 	BSONObj				repl;
 
-	BSONObj dist = BSON("distinct"<<"main"<<"key"<<"bucket");
+	BSONObj dist = BSON("distinct"<<"main"<<"_key"<<"_bucket");
 	if (client.runCommand("repo",dist,repl)) {
 		cout << repl.toString() << endl;
 		BSONObj elem = repl.getField("values").embeddedObject();
@@ -553,7 +553,7 @@ RepoMeta::BucketList (void)
 void
 RepoMeta::Delete (const char *bucket, const char *key)
 {
-	Query	q	= QUERY("bucket"<<bucket<<"key"<<key);
+	Query	q	= QUERY("_bucket"<<bucket<<"_key"<<key);
 
 	try {
 		client.remove(MAIN_TBL,q);
@@ -582,7 +582,7 @@ RepoMeta::GetSize (const char *bucket, const char *key)
 
 	(void)data;
 
-	q = QUERY("bucket"<<bucket<<"key"<<key);
+	q = QUERY("_bucket"<<bucket<<"_key"<<key);
 	curs = GetCursor(q);
 
 	if (!curs->more()) {
@@ -590,7 +590,7 @@ RepoMeta::GetSize (const char *bucket, const char *key)
 	}
 
 	bo = curs->next();
-	return bo.getField("size").numberLong();
+	return bo.getField("_size").numberLong();
 }
 
 extern "C"
@@ -646,7 +646,7 @@ RepoMeta::GetAttrList (const char *bucket, const char *key)
 	Query				q;
 	BSONObj				bo;
 
-	q = QUERY("bucket"<<bucket<<"key"<<key);
+	q = QUERY("_bucket"<<bucket<<"_key"<<key);
 	curs = GetCursor(q);
 
 	if (!curs->more()) {

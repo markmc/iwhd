@@ -70,7 +70,7 @@ const char			*program_name;
 char				*cfg_file	= NULL;
 
 static const char *const (reserved_name[]) = {"_default", "_new", "_policy", "_query", NULL};
-static const char *const (reserved_attr[]) = {"bucket", "date", "etag", "key", "loc", NULL};
+static const char *const (reserved_attr[]) = {"_bucket", "_date", "_etag", "_key", "_loc", "_size", NULL};
 static const char *const (reserved_bucket_name[]) = {"_new", "_providers", NULL};
 
 void
@@ -1262,10 +1262,10 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 	else {
 		rc = MHD_HTTP_BAD_REQUEST;
-		key = g_hash_table_lookup(ms->dict,"key");
+		key = g_hash_table_lookup(ms->dict,"_key");
 		if (key) {
 			strncpy(ms->key,key,MAX_FIELD_LEN-1);
-			g_hash_table_remove(ms->dict,"key");
+			g_hash_table_remove(ms->dict,"_key");
 			if (!g_hash_table_find(ms->dict,post_find,ms)) {
 				g_hash_table_foreach(ms->dict,post_foreach,ms);
 				DPRINTF("rereplicate (bucket POST)\n");
