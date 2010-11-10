@@ -14,8 +14,8 @@ include Makefile
 else
 
 all:
-       @echo There seems to be no Makefile in this directory.
-       @echo "You must run ./configure before running \`make'."
-       @exit 1
+	@echo There seems to be no Makefile in this directory.
+	@echo "You must run ./configure before running \`make'."
+	@exit 1
 
 endif
