@@ -324,14 +324,45 @@ echo bye | curl -f -T - $bucket/trunc_test || fail=1
 cat FS/b1/trunc_test
 test "$(cat FS/b1/trunc_test)" = bye || fail=1
 
+# TBD: add attribute-delete tests when that functionality is implemented
+
+# TBD: add white-box tests for attributes in mongo
+
+# Add a provider:
+p1_url=http://localhost:$port/_providers/PROVIDER-1
+curl -d type=s3 -dhost=localhost -dport=80 -dkey=u -dsecret=p \
+  $p1_url || fail=1
+
+# Ensure it was added
+curl http://localhost:$port/_providers > p || fail=1
+grep PROVIDER-1 p || fail=1
+
+# Add another provider:
+p2_url=http://localhost:$port/_providers/PROVIDER-2
+curl -dtype=http -dhost=localhost -dport=9091 $p2_url || fail=1
+# Ensure it was added.
+curl http://localhost:$port/_providers > p || fail=1
+grep PROVIDER-2 p || fail=1
+
+# Delete a provider.
+curl -f -X DELETE $p2_url 2> p || fail=1
+# Ensure it was deleted.
+curl http://localhost:$port/_providers > p || fail=1
+grep PROVIDER-2 p && { warn_ $ME_: provider deletion failed; fail=1; }
+
+# Delete a non-existent provider.
+curl -f -X DELETE http://localhost:$port/_providers/no-such
+test $? = 22 || fail=1
+# FIXME ensure it fails
+cat p
+
+curl http://localhost:$port/_providers > p || fail=1
+cat p
+
 # Test "headless" operation (no access to metadata DB).
 kill -9 $mongo_pid
 cleanup_() { kill $iwhd_pid; }
 curl $bucket/attr_put > f3copy
 test "$(cat f3copy)" = "nothing" || fail=1
-
-# TBD: add attribute-delete tests when that functionality is implemented
-
-# TBD: add white-box tests for attributes in mongo
 
 Exit $fail

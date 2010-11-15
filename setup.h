@@ -26,6 +26,7 @@ typedef struct _provider {
 	const char		*type;
 	const char		*host;
 	int			 port;
+	int			deleted;
 	const char		*username;
 	const char		*password;
 	const char		*path;
@@ -38,14 +39,17 @@ provider_t	*main_prov;
 provider_t	*master_prov;
 
 const char	 *parse_config		(char *);
-const provider_t *get_provider		(const char *name);
-void	 	  update_provider	(const char *provname,
+provider_t	 *get_provider		(const char *name);
+void		  update_provider	(const char *provname,
 					 const char *username,
 					 const char *password);
 const char	 *get_provider_value	(const provider_t *prov,
 					 const char *fname);
 void		  init_prov_iter	(GHashTableIter *iter);
 
-const char 	 *auto_config		(void);
+const char	 *auto_config		(void);
+int validate_provider (GHashTable *h);
+provider_t *find_provider (const char *name);
+int add_provider (GHashTable *h);
 
 #endif

@@ -27,6 +27,7 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include <jansson.h>
 
@@ -71,8 +72,74 @@ static GHashTable	*prov_hash	= NULL;
 provider_t	*main_prov	= NULL;
 provider_t	*master_prov	= NULL;
 
+int
+validate_provider (GHashTable *h)
+{
+    const char *name = g_hash_table_lookup (h, "name");
+    assert (name);
+    const char *type = g_hash_table_lookup (h, "type");
+    if (type == NULL) {
+	error (0, 0, "provider %s has no type", name);
+	return 0;
+    }
+
+    unsigned int needs;
+    if (!strcasecmp(type,"s3") || !strcasecmp(type,"cf")) {
+	needs = NEED_SERVER | NEED_CREDS;
+    } else if (!strcasecmp(type,"http")) {
+	needs = NEED_SERVER;
+    } else if (!strcasecmp(type,"fs")) {
+	needs = NEED_PATH;
+    } else {
+	error (0, 0, "provider %s has invalid type: %s", name, type);
+	return 0;
+    }
+
+    int ok = 1;
+    if (needs & NEED_SERVER) {
+	const char *host = g_hash_table_lookup (h, "host");
+	if (!host) {
+	    error (0, 0, "%s: %s-provider requires a host", name, type);
+	    ok = 0;
+	}
+	const char *port = g_hash_table_lookup (h, "port");
+	if (!port) {
+	    error (0, 0, "%s: %s-provider requires a port", name, type);
+	    ok = 0;
+	}
+	// ensure port is a positive integer with 5 or fewer digits
+	if (5 < strlen (port) || strcspn (port, "0123456789")) {
+	    error (0, 0, "%s: %s-provider: invalid port: %s", name, type, port);
+	    ok = 0;
+	}
+    }
+
+    if (needs & NEED_CREDS) {
+	const char *key = g_hash_table_lookup (h, "key");
+	if (!key) {
+	    error (0, 0, "%s: %s-provider requires a key", name, type);
+	    ok = 0;
+	}
+	const char *secret = g_hash_table_lookup (h, "secret");
+	if (!secret) {
+	    error (0, 0, "%s: %s-provider requires a secret", name, type);
+	    ok = 0;
+	}
+    }
+
+    if (needs & NEED_PATH) {
+	const char *path = g_hash_table_lookup (h, "path");
+	if (!path) {
+	    error (0, 0, "%s: %s-provider requires a path", name, type);
+	    ok = 0;
+	}
+    }
+
+    return ok;
+}
+
 static int
-validate_server (unsigned int i)
+json_validate_server (unsigned int i)
 {
 	json_t		*server;
 	json_t		*elem;
@@ -209,6 +276,7 @@ convert_provider (int i, provider_t *out)
 	out->username = dup_json_string(server,"key");
 	out->password = dup_json_string(server,"secret");
 	out->path = dup_json_string(server,"path");
+	/* FIXME: detect failed "dup_*" calls.  */
 
 	/* TBD: do this a cleaner way. */
 	if (!strcasecmp(out->type,"s3")) {
@@ -231,6 +299,7 @@ convert_provider (int i, provider_t *out)
 	iter = json_object_iter(server);
 	while (iter) {
 		key = json_object_iter_key(iter);
+		error(0,0,"convert-provider: ITER key: %s",key);
 		if (!is_reserved_attr(key)) {
 			value = json_string_value(json_object_iter_value(iter));
 			if (value) {
@@ -249,8 +318,98 @@ convert_provider (int i, provider_t *out)
 	}
 
 	out->token = NULL;
+	out->deleted = 0;
 
 	return 1;
+}
+
+int
+add_provider (GHashTable *h)
+{
+    char *name = g_hash_table_lookup (h, "name");
+    assert (name);
+
+    provider_t *prov = calloc (1, sizeof *prov);
+    if (prov == NULL)
+        return 0;
+
+    prov->name = strdup (name);
+    if (prov->name == NULL)
+        goto fail;
+
+    prov->type = g_hash_table_lookup(h,"type");
+    if (prov->type == NULL)
+        goto fail;
+    prov->type = strdup (prov->type);
+    if (prov->type == NULL)
+        goto fail;
+
+    prov->host = g_hash_table_lookup(h,"host");
+    prov->port = atoi(g_hash_table_lookup(h,"port"));
+    /* TBD: change key/secret field names to username/password */
+    prov->username = g_hash_table_lookup(h,"key");
+    prov->password = g_hash_table_lookup(h,"secret");
+    prov->path = g_hash_table_lookup(h,"path");
+
+    if (prov->host)
+        prov->host = strdup (prov->host);
+    if (prov->username)
+        prov->username = strdup (prov->username);
+    if (prov->password)
+        prov->password = strdup (prov->password);
+    if (prov->path)
+        prov->path = strdup (prov->path);
+
+    /* TBD: do this a cleaner way. */
+    if (!strcasecmp(prov->type,"s3"))
+        prov->func_tbl = &s3_func_tbl;
+    else if (!strcasecmp(prov->type,"http"))
+        prov->func_tbl = &curl_func_tbl;
+    else if (!strcasecmp(prov->type,"cf"))
+        prov->func_tbl = &cf_func_tbl;
+    else if (!strcasecmp(prov->type,"fs"))
+        prov->func_tbl = &fs_func_tbl;
+    else
+        prov->func_tbl = &bad_func_tbl;
+
+    prov->attrs = g_hash_table_new_full(g_str_hash,g_str_equal,free,free);
+    // FIXME: can't the above fail?
+
+    GHashTableIter iter;
+    g_hash_table_iter_init (&iter, h);
+    while (1) {
+        gpointer key;
+        gpointer val;
+        if (!g_hash_table_iter_next (&iter, &key, &val))
+            break;
+
+        if (!is_reserved_attr(key)) {
+            if (val) {
+                error(0,0,"no value for %s", (char *)key);
+                continue;
+            }
+            DPRINTF("%p.%s = %s\n",prov, (char *)key, (char *)val);
+            g_hash_table_insert(prov->attrs, strdup(key), strdup(val));
+            // FIXME: check strdup for failure
+        }
+    }
+
+    /* Note that we must strdup "name", since here it's a key, but above it's a
+       value.  Not using // strdup here would lead to a use-after-free bug.  */
+    // FIXME: check strdup for failure
+    g_hash_table_insert(prov_hash,strdup(name),prov);
+
+    return 1;
+
+   fail:
+    free ((char *) prov->name);
+    free ((char *) prov->type);
+    free ((char *) prov->host);
+    free ((char *) prov->username);
+    free ((char *) prov->password);
+    free ((char *) prov->path);
+    free (prov);
+    return 0;
 }
 
 static const char *
@@ -274,7 +433,7 @@ parse_config_inner (void)
 	}
 
 	for (i = 0; i < nservers; ++i) {
-		if (!validate_server(i)) {
+		if (!json_validate_server(i)) {
 			goto err;
 		}
 	}
@@ -402,13 +561,25 @@ auto_config(void)
 	return primary;
 }
 
-const provider_t *
+provider_t *
 get_provider (const char *name)
 {
 	if (!prov_hash || !name || (*name == '\0')) {
 		return NULL;
 	}
 	return g_hash_table_lookup(prov_hash,name);
+}
+
+provider_t *
+find_provider (const char *name)
+{
+	if (!prov_hash || !name || (*name == '\0')) {
+		return NULL;
+	}
+
+	provider_t *p = g_hash_table_lookup(prov_hash, name);
+
+	return p;
 }
 
 const char *

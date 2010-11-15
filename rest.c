@@ -34,6 +34,7 @@
 #include <curl/curl.h>
 #include <glib.h>
 
+#include "dirname.h"
 #include "iwh.h"
 #include "closeout.h"
 #include "progname.h"
@@ -57,7 +58,7 @@
 
 typedef enum {
 	URL_ROOT=0, URL_BUCKET, URL_OBJECT, URL_ATTR, URL_INVAL,
-	URL_QUERY, URL_PROVLIST
+	URL_QUERY, URL_PROVLIST, URL_PROVIDER
 } url_type;
 
 typedef struct {
@@ -931,6 +932,7 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 		free_ms(ms);
 		return MHD_NO;
 	}
+	error (0, 0, "DELETE BUCKET: rc=%d", rc);
 	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
 
@@ -1464,7 +1466,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)method;
 	(void)version;
 
-	DPRINTF("PROXY POST (%s, %zu)\n",url,*data_size);
+	DPRINTF("PROXY POST obj (%s, %zu)\n",url,*data_size);
 
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
@@ -1569,6 +1571,8 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 
 	if (g_hash_table_iter_next(&ms->prov_iter,&key,(gpointer *)&prov)) {
+		if (prov->deleted)
+			return 0;
 		len = tmpl_prov_entry(ms->gen_ctx,prov->name,prov->type,
 			prov->host, prov->port, prov->username, prov->password);
 		if (!len) {
@@ -1697,6 +1701,126 @@ proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	return MHD_YES;
 }
 
+static char *
+url_to_provider_name (const char *url)
+{
+  char *prov_name = base_name (url);
+  if (prov_name)
+    strip_trailing_slashes (prov_name);
+  /* Ensure we handle trailing slashes (i.e., remove them).  */
+  assert (prov_name == NULL
+	  || (*prov_name && prov_name[strlen(prov_name)-1] != '/'));
+  return prov_name;
+}
+
+static int
+proxy_delete_prov (void *cctx, struct MHD_Connection *conn, const char *url,
+		   const char *method, const char *version, const char *data,
+		   size_t *data_size, void **rctx)
+{
+	DPRINTF("PROXY DELETE PROVIDER %s\n",url);
+	(void)cctx;
+	(void)method;
+	(void)version;
+	(void)data;
+	(void)data_size;
+
+	my_state *ms = *rctx;
+	struct MHD_Response *resp
+	  = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
+	if (!resp) {
+		free_ms(ms);
+		return MHD_NO;
+	}
+
+	char *prov_name = url_to_provider_name (url);
+	DPRINTF("PROXY DELETE PROVIDER prov=%s\n", prov_name);
+	provider_t *prov = find_provider (prov_name);
+
+	// don't allow removal of current main_prov.
+	if (prov == main_prov)
+		prov = NULL;
+
+	int rc = prov ? MHD_HTTP_OK : MHD_HTTP_NOT_FOUND;
+	if (prov)
+		prov->deleted = 1;
+
+	error (0, 0, "DELETE PROV: rc=%d", rc);
+
+	free (prov_name);
+	MHD_queue_response(conn,rc,resp);
+	MHD_destroy_response(resp);
+
+	free_ms(ms);
+	return MHD_YES;
+}
+
+static int
+proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
+		   const char *method, const char *version, const char *data,
+		   size_t *data_size, void **rctx)
+{
+	DPRINTF("PROXY ADD PROVIDER %s\n",url);
+	struct MHD_Response	*resp;
+	my_state		*ms	= *rctx;
+
+	(void)cctx;
+	(void)method;
+	(void)version;
+
+	if (ms->state == MS_NEW) {
+		ms->state = MS_NORMAL;
+		ms->url = (char *)url;
+		ms->dict = g_hash_table_new_full(
+			g_str_hash,g_str_equal,free,free);
+		ms->cleanup |= CLEANUP_DICT;
+		ms->post = MHD_create_post_processor(conn,4096,
+			prov_iterator,ms->dict);
+		ms->cleanup |= CLEANUP_POST;
+	}
+	else if (*data_size) {
+		MHD_post_process(ms->post,data,*data_size);
+		*data_size = 0;
+	}
+	else {
+		int rc = MHD_HTTP_BAD_REQUEST;
+		char *prov_name = url_to_provider_name (url);
+		/* We're about to insert "name -> $prov_name".
+		   Ensure there is no "name" key already there.  */
+		const char *name = g_hash_table_lookup (ms->dict, "name");
+		if (name) {
+			fprintf(stderr,
+				"add_provider: do not specify name: name=%s\n",
+				name);
+			return MHD_NO;
+			// FIXME: be careful that this does not leak "ms"
+		}
+		// FIXME: unchecked strdup
+		g_hash_table_insert(ms->dict,strdup("name"),prov_name);
+
+		if (validate_provider (ms->dict)) {
+			if (!add_provider (ms->dict)) {
+			      DPRINTF("add provider failed\n");
+			} else {
+			      rc = MHD_HTTP_OK;
+			}
+		}
+		else {
+			DPRINTF("invalid provider\n");
+		}
+		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
+		if (!resp) {
+			fprintf(stderr,"MHD_crfd failed\n");
+			return MHD_NO;
+		}
+		MHD_queue_response(conn,rc,resp);
+		MHD_destroy_response(resp);
+		free_ms(ms);
+	}
+
+	return MHD_YES;
+}
+
 static int
 proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 		     const char *method, const char *version, const char *data,
@@ -1759,6 +1883,10 @@ static const rule my_rules[] = {
 	  "GET",	URL_PROVLIST,	proxy_list_provs	},
 	{ /* update a provider */
 	  "POST",	URL_PROVLIST,	proxy_update_prov	},
+	{ /* create a provider */
+	  "POST",	URL_PROVIDER,	proxy_add_prov		},
+	{ /* delete a provider */
+	  "DELETE",	URL_PROVIDER,	proxy_delete_prov	},
 	{ NULL, 0, NULL }
 };
 
@@ -1812,6 +1940,12 @@ parse_url (const char *url, my_state *ms)
 		}
 	}
 
+	if (eindex == URL_OBJECT
+	    && !strcmp (parts[URL_BUCKET], "_providers"))
+	  eindex = URL_PROVIDER;
+
+	DPRINTF("parse_url: %d: %s %s %s", eindex, parts[URL_BUCKET],
+		parts[URL_OBJECT], parts[URL_ATTR]);
 	return eindex;
 }
 
