@@ -34,7 +34,7 @@ export EC2_HOME=~/jdarcy/ec2-api-tools-1.3-53907
 export PATH=$PATH:$EC2_HOME/bin
 export JAVA_HOME=/usr
 
-tmpdir=$(mktemp -d -p $PWD/$bucket)
+tmpdir=$(mktemp -d -p $PWD/$bucket) || exit 1
 trap "rm -rf $tmpdir" EXIT
 
 bundle_args="--batch --arch x86_64 -c $cert_file -k $key_file -u $api_uid"
