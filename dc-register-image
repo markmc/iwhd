@@ -18,22 +18,61 @@
 # Uncomment for debugging.
 #ECHO=echo
 
+# $bucket is iwhd bucket (not S3 bucket, see $ami_bkt below).
 bucket=$1; shift
+# $object is iwhd's image name, which also serves as a basename in S3.
+# So, if $object=foo.img, then we end uploading foo.img.manifest.xml and
+# a bunch of foo.img.part.NN files.
+# The foo.img itself is an uncompressed root filesystem, a device image.
+# Finally, $object is in local directory $bucket/ (as fs back-end works).
 object=$1; shift
+# $api_key is "key ID" for S3.
 api_key=$1; shift
+# $api_secret is "secret" for S3.
 api_secret=$1; shift
+# $cert_file contains X.509 certificate for EC2 (cert-foo.pem).
 cert_file=$1; shift
+# $key_file contains private key for EC2 (pk-foo.pem).
 key_file=$1; shift
+# $api_uid is AWS account ID, but without dashes.
 api_uid=$1; shift
+# $ami_bkt is S3 bucket into which we upload foo.img.manifest.xml etc.
 ami_bkt=$1; shift
+# $kernel is an aki-xxxxxxxx ID (e.g. aki-99a0f1dc is pvgrub)
 kernel=$1; shift
+# $ramdisk is an ari-xxxxxxxx ID or "_default_" (most of the time for pvgrub)
 ramdisk=$1; shift
 
-# TBD: figure out what to do about these paths.
-export EC2_HOME=~/jdarcy/ec2-api-tools-1.3-53907
-export PATH=$PATH:$EC2_HOME/bin
-export JAVA_HOME=/usr
+# We do not set JAVA_HOME and EC2_HOME because they are not necessary
+# if pre-packaged versions of ec2-api-tools and ec2-ami-tools are installed
+# from RPMfusion and Amazon respectively. This also allows the user to
+# set these locations in case an alternative set of tools is desired.
+#
+# However, we look for each missing tool in commonly overlooked locations.
 
+which_it () {
+	cmd=$1
+	ret=$(/usr/bin/which $cmd 2>/dev/null)
+	if [ $? != 0 ]; then
+		if [ -x /usr/local/bin/$cmd ]; then
+			ret=/usr/local/bin/$cmd
+		elif [ -x ~/bin/$cmd ]; then
+			ret=~/bin/$cmd
+		fi
+	fi
+	if [ -z "$ret" ]; then
+		echo "ERROR missing_$cmd" >&2
+		exit 1
+	fi
+	echo $ret
+}
+
+ec2_bundle_image=$(which_it ec2-bundle-image)
+ec2_upload_bundle=$(which_it ec2-upload-bundle)
+ec2_register=$(which_it ec2-register)
+[ -z "$ec2_bundle_image" -o -z "$ec2_upload_bundle" -o -z "$ec2_register" ] && exit 1
+
+# XXX Is this safe against running 2 requests simultaneously?
 tmpdir=$(mktemp -d -p $PWD/$bucket) || exit 1
 trap "rm -rf $tmpdir" EXIT
 
@@ -44,25 +83,25 @@ fi
 if [ "$ramdisk" != "_default_" ]; then
 	bundle_args="$bundle_args --ramdisk $ramdisk"
 fi
-$ECHO ec2-bundle-image -i $bucket/$object -d $tmpdir $bundle_args
+$ECHO $ec2_bundle_image -i $bucket/$object -d $tmpdir $bundle_args
 if [ $? != 0 ]; then
 	echo "ERROR bundling_failed" >&2
-	echo ec2-bundle-image -i $bucket/$object -d $tmpdir $bundle_args >&2
+	echo $ec2_bundle_image -i $bucket/$object -d $tmpdir $bundle_args >&2
 	exit 1
 fi
 
 upload_args="--batch --retry -b $ami_bkt -a $api_key -s $api_secret"
-$ECHO ec2-upload-bundle -m $tmpdir/$object.manifest.xml $upload_args
+$ECHO $ec2_upload_bundle -m $tmpdir/$object.manifest.xml $upload_args
 if [ $? != 0 ]; then
 	echo "ERROR uploading_failed" >&2
-	echo ec2-upload-bundle -m $tmpdir/$object.manifest.xml $upload_args >&2
+	echo $ec2_upload_bundle -m $tmpdir/$object.manifest.xml $upload_args >&2
 	exit 1
 fi
 
 register_args="-C $cert_file -K $key_file"
-$ECHO ec2-register $register_args $ami_bkt/$object.manifest.xml -n $object
+$ECHO $ec2_register $register_args $ami_bkt/$object.manifest.xml -n $object
 if [ $? != 0 ]; then
 	echo "ERROR registration_failed" >&2
-	echo ec2-register $register_args $ami_bkt/$object.manifest.xml -n $object >&2
+	echo $ec2_register $register_args $ami_bkt/$object.manifest.xml -n $object >&2
 	exit 1
 fi
