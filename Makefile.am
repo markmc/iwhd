@@ -76,7 +76,6 @@ iwhd_LDADD =		\
   -lmongoclient		\
   $(BOOST_SYSTEM_LIB)	\
   $(BOOST_THREAD_LIB)	\
-  $(CRYPTO_LIB)		\
   $(CURL_LIB)		\
   $(JANSSON_LIB)	\
   $(UHTTPD_LIB)		\

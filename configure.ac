@@ -61,11 +61,6 @@ PKG_CHECK_MODULES([HAIL],[libhail >= 0.8])
 AC_SUBST([HAIL_LIBS])
 AC_SUBST([HAIL_CFLAGS])
 
-AC_CHECK_LIB([crypto], [OPENSSL_init_library],
-	[CRYPTO_LIB=-lcrypto],
-	[AC_MSG_ERROR([Missing required crypto lib])])
-AC_SUBST([CRYPTO_LIB])
-
 AC_CHECK_LIB([xml2], [xmlInitParser],
 	[XML2_LIB=-lxml2],
 	[AC_MSG_ERROR([Missing required XML2 lib])])
