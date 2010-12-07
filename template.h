@@ -45,26 +45,26 @@ typedef struct {
 #define TMPL_CTX_DONE	((tmpl_ctx_t *)(-1))
 
 tmpl_ctx_t	*tmpl_get_ctx		(const char *type);
-int		 tmpl_root_header	(tmpl_ctx_t *ctx,
+size_t		 tmpl_root_header	(tmpl_ctx_t *ctx,
 					 const char *name, const char *version);
-int		 tmpl_root_entry	(tmpl_ctx_t *ctx,
+size_t		 tmpl_root_entry	(tmpl_ctx_t *ctx,
 					 const char *rel, const char *link);
-int		 tmpl_root_footer	(tmpl_ctx_t *ctx);
-int		 tmpl_prov_header	(tmpl_ctx_t *ctx);
-int		 tmpl_prov_entry	(tmpl_ctx_t *ctx,
+size_t		 tmpl_root_footer	(tmpl_ctx_t *ctx);
+size_t		 tmpl_prov_header	(tmpl_ctx_t *ctx);
+size_t		 tmpl_prov_entry	(tmpl_ctx_t *ctx,
 					 const char *name, const char *type,
 					 const char *host, int port,
 					 const char *user, const char *pass);
-int		 tmpl_prov_footer	(tmpl_ctx_t *ctx);
-int		 tmpl_list_header	(tmpl_ctx_t *ctx);
-int		 tmpl_list_entry	(tmpl_ctx_t *ctx,
+size_t		 tmpl_prov_footer	(tmpl_ctx_t *ctx);
+size_t		 tmpl_list_header	(tmpl_ctx_t *ctx);
+size_t		 tmpl_list_entry	(tmpl_ctx_t *ctx,
 					 const char *bucket, const char *key);
-int		 tmpl_list_footer	(tmpl_ctx_t *ctx);
-int		 tmpl_obj_header	(tmpl_ctx_t *ctx,
+size_t		 tmpl_list_footer	(tmpl_ctx_t *ctx);
+size_t		 tmpl_obj_header	(tmpl_ctx_t *ctx,
 					 const char *bucket, const char *key);
-int		 tmpl_obj_entry		(tmpl_ctx_t *ctx, const char *bucket,
+size_t		 tmpl_obj_entry		(tmpl_ctx_t *ctx, const char *bucket,
 					 const char *key, const char *attr);
-int		 tmpl_obj_footer	(tmpl_ctx_t *ctx);
+size_t		 tmpl_obj_footer	(tmpl_ctx_t *ctx);
 
 
 #endif

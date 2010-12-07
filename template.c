@@ -212,7 +212,7 @@ tmpl_get_ctx (const char *type)
 	return tmp;
 }
 
-int
+size_t
 tmpl_root_header (tmpl_ctx_t *ctx, const char *name, const char *version)
 {
 	int size;
@@ -220,7 +220,7 @@ tmpl_root_header (tmpl_ctx_t *ctx, const char *name, const char *version)
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->root_header,
 		name,version);
-	if (size >= TMPL_BUF_SIZE) {
+	if (size >= TMPL_BUF_SIZE || size < 0) {
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
@@ -228,7 +228,7 @@ tmpl_root_header (tmpl_ctx_t *ctx, const char *name, const char *version)
 	return size;
 }
 
-int
+size_t
 tmpl_root_entry (tmpl_ctx_t *ctx, const char *rel, const char *link)
 {
 	int size;
@@ -236,7 +236,7 @@ tmpl_root_entry (tmpl_ctx_t *ctx, const char *rel, const char *link)
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->root_entry,
 		rel, ctx->base, link);
-	if (size >= TMPL_BUF_SIZE) {
+	if (size >= TMPL_BUF_SIZE || size < 0) {
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
@@ -250,21 +250,21 @@ tmpl_root_entry (tmpl_ctx_t *ctx, const char *rel, const char *link)
 	return size;
 }
 
-int
+size_t
 tmpl_root_footer (tmpl_ctx_t *ctx)
 {
 	ctx->buf = ctx->format->root_footer;
 	return strlen(ctx->buf);
 }
 
-int
+size_t
 tmpl_prov_header (tmpl_ctx_t *ctx)
 {
 	ctx->buf = ctx->format->prov_header;
 	return strlen(ctx->buf);
 }
 
-int
+size_t
 tmpl_prov_entry (tmpl_ctx_t *ctx,
 		 const char *name, const char *type,
 		 const char *host, int port,
@@ -281,7 +281,7 @@ tmpl_prov_entry (tmpl_ctx_t *ctx,
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->prov_entry,
 		name, type, host, port, user, pass);
-	if (size >= TMPL_BUF_SIZE) {
+	if (size >= TMPL_BUF_SIZE || size < 0) {
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
@@ -295,28 +295,28 @@ tmpl_prov_entry (tmpl_ctx_t *ctx,
 	return size;
 }
 
-int
+size_t
 tmpl_prov_footer (tmpl_ctx_t *ctx)
 {
 	ctx->buf = ctx->format->prov_footer;
 	return strlen(ctx->buf);
 }
 
-int
+size_t
 tmpl_list_header (tmpl_ctx_t *ctx)
 {
 	ctx->buf = ctx->format->list_header;
 	return strlen(ctx->buf);
 }
 
-int
+size_t
 tmpl_list_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key)
 {
 	int size;
 	const tmpl_format_t *fmt = ctx->format;
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->list_entry,bucket,key);
-	if (size >= TMPL_BUF_SIZE) {
+	if (size >= TMPL_BUF_SIZE || size < 0) {
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
@@ -330,14 +330,14 @@ tmpl_list_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key)
 	return size;
 }
 
-int
+size_t
 tmpl_list_footer (tmpl_ctx_t *ctx)
 {
 	ctx->buf = ctx->format->list_footer;
 	return strlen(ctx->buf);
 }
 
-int
+size_t
 tmpl_obj_header (tmpl_ctx_t *ctx, const char *bucket, const char *key)
 {
 	int size;
@@ -346,7 +346,7 @@ tmpl_obj_header (tmpl_ctx_t *ctx, const char *bucket, const char *key)
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->obj_header,
 		ctx->base, bucket, key,		/* once for the body... */
 		ctx->base, bucket, key);	/* ...and once for the attrs */
-	if (size >= TMPL_BUF_SIZE) {
+	if (size >= TMPL_BUF_SIZE || size < 0) {
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
@@ -355,7 +355,7 @@ tmpl_obj_header (tmpl_ctx_t *ctx, const char *bucket, const char *key)
 	return size;
 }
 
-int
+size_t
 tmpl_obj_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key,
 		const char *attr)
 {
@@ -364,7 +364,7 @@ tmpl_obj_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key,
 
 	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->obj_entry,
 		attr, ctx->base, bucket, key, attr);
-	if (size >= TMPL_BUF_SIZE) {
+	if (size >= TMPL_BUF_SIZE || size < 0) {
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
@@ -378,7 +378,7 @@ tmpl_obj_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key,
 	return size;
 }
 
-int
+size_t
 tmpl_obj_footer (tmpl_ctx_t *ctx)
 {
 	ctx->buf = ctx->format->obj_footer;

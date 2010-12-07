@@ -215,33 +215,38 @@ child_closer (void * ctx)
 }
 
 /* Invoked from MHD. */
-static int
-proxy_get_cons (void *ctx, uint64_t pos, char *buf, int max)
+static ssize_t
+proxy_get_cons (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	pipe_private	*pp	= ctx;
 	pipe_shared	*ps	= pp->shared;
 	my_state	*ms	= ps->owner;
-	int		 done;
+	ssize_t		 done;
 	void		*child_res;
 
 	(void)pos;
 
-	DPRINTF("consumer asked to read %d\n",max);
+	DPRINTF("consumer asked to read %zu\n",max);
 
 	if (pipe_cons_wait(pp)) {
 		DPRINTF("consumer offset %zu into %zu\n",
 			pp->offset, ps->data_len);
-		done = ps->data_len - pp->offset;
-		if (done > max) {
-			done = max;
-		}
-		memcpy(buf,ps->data_ptr+pp->offset,done);
-		pp->offset += done;
-		DPRINTF("consumer copied %d, new offset %zu\n",
-			done, pp->offset);
-		if (pp->offset == ps->data_len) {
-			DPRINTF("consumer finished chunk\n");
-			pipe_cons_signal(pp, 0);
+		if (ps->data_len < pp->offset)
+			// Warn about bogus offset?
+			done = -1;
+		else {
+			done = ps->data_len - pp->offset;
+			if ((size_t) done > max) {
+				done = max;
+			}
+			memcpy(buf,ps->data_ptr+pp->offset,done);
+			pp->offset += done;
+			DPRINTF("consumer copied %zu, new offset %zu\n",
+				done, pp->offset);
+			if (pp->offset == ps->data_len) {
+				DPRINTF("consumer finished chunk\n");
+				pipe_cons_signal(pp, 0);
+			}
 		}
 	}
 	else {
@@ -723,11 +728,11 @@ query_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 }
 
 /* MHD reader function during queries.  Return -1 for EOF. */
-static int
-proxy_query_func (void *ctx, uint64_t pos, char *buf, int max)
+static ssize_t
+proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state	*ms	= ctx;
-	int		 len;
+	size_t		 len;
 	const char	*accept_hdr;
 	char		*bucket;
 	char		*key;
@@ -945,12 +950,12 @@ static const fake_bucket_t fake_bucket_list[] = {
 	{ "provider_list",	"_providers" },
 };
 
-static int
-root_blob_generator (void *ctx, uint64_t pos, char *buf, int max)
+static ssize_t
+root_blob_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state	*ms	= ctx;
 	const fake_bucket_t *fb;
-	int		 len;
+	size_t		 len;
 	const char	*accept_hdr;
 	const char	*host;
 	char		*bucket;
@@ -1343,11 +1348,11 @@ register_image (my_state *ms)
 
 }
 
-static int
-parts_callback (void *ctx, uint64_t pos, char *buf, int max)
+static ssize_t
+parts_callback (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state	*ms	= ctx;
-	int		 len;
+	size_t		 len;
 	const char	*accept_hdr;
 	const char	*name;
 	const char	*value;
@@ -1519,11 +1524,11 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 }
 
 
-static int
-prov_list_generator (void *ctx, uint64_t pos, char *buf, int max)
+static ssize_t
+prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state		*ms	= ctx;
-	int			 len;
+	size_t			 len;
 	gpointer		 key;
 	const provider_t	*prov;
 	const char		*accept_hdr;
@@ -1674,6 +1679,7 @@ proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!resp) {
 			fprintf(stderr,"MHD_crfd failed\n");
 			return MHD_NO;
+			// FIXME: be careful that this does not leak "ms"
 		}
 		MHD_queue_response(conn,rc,resp);
 		MHD_destroy_response(resp);
