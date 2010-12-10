@@ -1737,7 +1737,6 @@ proxy_delete_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 
 	char *prov_name = url_to_provider_name (url);
-	DPRINTF("PROXY DELETE PROVIDER prov=%s\n", prov_name);
 	provider_t *prov = find_provider (prov_name);
 
 	// don't allow removal of current main_prov.
@@ -1745,10 +1744,17 @@ proxy_delete_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		prov = NULL;
 
 	int rc = prov ? MHD_HTTP_OK : MHD_HTTP_NOT_FOUND;
-	if (prov)
-		prov->deleted = 1;
 
-	error (0, 0, "DELETE PROV: rc=%d", rc);
+	DPRINTF("PROXY DELETE PROVIDER prov=%s rc=%d\n", prov_name, rc);
+
+	if (prov) {
+		/* Delete for real if no one is using it.
+		   Otherwise, just mark it as deleted.  */
+		if (g_atomic_int_get (&prov->refcnt) == 0)
+			delete_provider (prov);
+		else
+			prov->deleted = 1;
+	}
 
 	free (prov_name);
 	MHD_queue_response(conn,rc,resp);
