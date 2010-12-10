@@ -33,7 +33,7 @@ EOF
 port=9092
 iwhd -v -p $port -c iwhd_u.cfg -d localhost:$m_port &
 iwhd_pid=$!
-wait_for .1 30 "curl http://localhost:$port" \
+wait_for .1 50 "curl http://localhost:$port" \
 	|| framework_failure_ "iwhd upstream"
 cleanup_() { kill -9 $mongo_pid; kill $iwhd_pid; }
 
@@ -46,7 +46,7 @@ EOF
 d_port=9093
 iwhd -v -p $d_port -c iwhd_d.cfg -d localhost:$m_port -m localhost:$port &
 iwhd_d_pid=$!
-wait_for .1 30 "curl http://localhost:$d_port" \
+wait_for .1 50 "curl http://localhost:$d_port" \
 	|| framework_failure_ "iwhd downstream"
 cleanup_() { kill -9 $mongo_pid; kill $iwhd_pid $iwhd_d_pid; }
 
