@@ -344,6 +344,13 @@ curl -dtype=http -dhost=localhost -dport=9091 $p2_url || fail=1
 curl http://localhost:$port/_providers > p || fail=1
 grep PROVIDER-2 p || fail=1
 
+# Add provider using a "name" parameter (not permitted):
+p3_url=http://localhost:$port/_providers/PROVIDER-3
+curl -dtype=http -dname=X -dhost=localhost -dport=9091 $p3_url || fail=1
+# Ensure it was not added.
+curl http://localhost:$port/_providers > p || fail=1
+grep PROVIDER-3 p && { warn_ add-provider-w/name-param not rejected; fail=1; }
+
 # Delete a provider.
 curl -f -X DELETE $p2_url 2> p || fail=1
 # Ensure it was deleted.

@@ -1801,8 +1801,7 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 			fprintf(stderr,
 				"add_provider: do not specify name: name=%s\n",
 				name);
-			return MHD_NO;
-			// FIXME: be careful that this does not leak "ms"
+			goto add_fail;
 		}
 		// FIXME: unchecked strdup
 		g_hash_table_insert(ms->dict,strdup("name"),prov_name);
@@ -1817,6 +1816,8 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		else {
 			DPRINTF("invalid provider\n");
 		}
+
+	add_fail:
 		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 		if (!resp) {
 			fprintf(stderr,"MHD_crfd failed\n");
