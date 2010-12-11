@@ -452,6 +452,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			}
 			MHD_queue_response(conn,MHD_HTTP_FORBIDDEN,resp);
 			MHD_destroy_response(resp);
+			free_ms(ms);
 			return MHD_YES;
 		}
 		ms->state = MS_NORMAL;
