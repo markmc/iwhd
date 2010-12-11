@@ -1511,6 +1511,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 				MHD_NO,MHD_NO);
 			if (!resp) {
 				fprintf(stderr,"MHD_crfd failed\n");
+				free_ms(ms);
 				return MHD_NO;
 			}
 			MHD_queue_response(conn,rc,resp);
@@ -1678,8 +1679,8 @@ proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 		if (!resp) {
 			fprintf(stderr,"MHD_crfd failed\n");
+			free_ms(ms);
 			return MHD_NO;
-			// FIXME: be careful that this does not leak "ms"
 		}
 		MHD_queue_response(conn,rc,resp);
 		MHD_destroy_response(resp);
