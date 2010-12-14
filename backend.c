@@ -726,7 +726,7 @@ curl_cache_child (void * ctx)
 	curl_easy_perform(curl);
 	curl_easy_cleanup(curl);
 
-	slash = index(my_url+1,'/');
+	slash = strchr(my_url+1,'/');
 	if (slash) {
 		*slash = '\0';
 		meta_got_copy(my_url+1,slash+1,me);

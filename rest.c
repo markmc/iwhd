@@ -154,7 +154,7 @@ is_reserved (const char *cand, char const *const *resv_list)
 static int
 validate_url (const char *url)
 {
-	char	*slash	= rindex(url,'/');
+	char	*slash	= strrchr(url,'/');
 
 	if (!slash) {
 		/* There should be at least one betwixt bucket and key. */
@@ -1334,7 +1334,7 @@ register_image (my_state *ms)
 		return MHD_HTTP_BAD_REQUEST;
 	}
 
-	next = index(site,':');
+	next = strchr(site,':');
 	if (next) {
 		*(next++) = '\0';
 	}
