@@ -338,6 +338,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (!pp) {
 		return MHD_NO;
 	}
+	provider_t *main_prov = get_main_provider();
 	ms->thunk.parent = ms;
 	ms->thunk.prov = ms->from_master ? master_prov : main_prov;
 	pthread_create(&ms->backend_th,NULL,
@@ -468,6 +469,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!pp) {
 			return MHD_NO;
 		}
+		provider_t *main_prov = get_main_provider();
 		pp->prov = main_prov;
 		ms->be_flags = BACKEND_GET_SIZE;
 		pthread_create(&ms->backend_th,NULL,
@@ -913,6 +915,7 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	DPRINTF("PROXY DELETE %s\n",url);
 
+	provider_t *main_prov = get_main_provider();
 	ms->thunk.parent = ms;
 	ms->thunk.prov = main_prov;
 	rc = ms->thunk.prov->func_tbl->delete_func(main_prov,
@@ -1151,6 +1154,7 @@ create_bucket (char *name, my_state *ms)
 		return MHD_HTTP_BAD_REQUEST;
 	}
 
+	provider_t *main_prov = get_main_provider();
 	rc = main_prov->func_tbl->bcreate_func(main_prov,name);
 	if (rc == MHD_HTTP_OK) {
 		if (meta_set_value(name,"_default", "_policy","0") != 0) {
@@ -1739,8 +1743,8 @@ proxy_delete_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	char *prov_name = url_to_provider_name (url);
 	provider_t *prov = find_provider (prov_name);
 
-	// don't allow removal of current main_prov.
-	if (prov == main_prov)
+	// don't allow removal of current main provider.
+	if (prov == get_main_provider())
 		prov = NULL;
 
 	int rc = prov ? MHD_HTTP_OK : MHD_HTTP_NOT_FOUND;
@@ -2165,6 +2169,7 @@ args_done:
 	sem_init(&the_sem,0,0);
 
 	if (verbose) {
+		provider_t *main_prov = get_main_provider();
 		printf("primary store type is %s\n",main_prov->type);
 		if (master_host) {
 			printf("operating as slave to %s:%u\n",

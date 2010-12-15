@@ -36,7 +36,6 @@ typedef struct _provider {
 	char			*token;
 } provider_t;
 
-provider_t	*main_prov;
 provider_t	*master_prov;
 
 const char	 *parse_config		(char *);
@@ -53,5 +52,6 @@ int validate_provider (GHashTable *h);
 provider_t *find_provider (const char *name);
 int add_provider (GHashTable *h);
 void delete_provider (provider_t *prov);
+provider_t *get_main_provider (void);
 
 #endif

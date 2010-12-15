@@ -69,8 +69,14 @@ extern backend_func_tbl	fs_func_tbl;
 static json_t		*config		= NULL;
 static GHashTable	*prov_hash	= NULL;
 
-provider_t	*main_prov	= NULL;
+static provider_t	*main_prov	= NULL;
 provider_t	*master_prov	= NULL;
+
+provider_t *
+get_main_provider (void)
+{
+  return main_prov;
+}
 
 int
 validate_provider (GHashTable *h)

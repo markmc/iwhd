@@ -73,7 +73,7 @@ proxy_repl_prod (void *ctx)
 	void			*result;
 
 	thunk.parent = item->ms;
-	thunk.prov = main_prov;
+	thunk.prov = get_main_provider();
 
 	result = thunk.prov->func_tbl->get_child_func(&thunk);
 	return result;
