@@ -30,7 +30,8 @@ check_PROGRAMS = parser
 BUILT_SOURCES =
 BUILT_SOURCES += parser.c
 MAINTAINERCLEANFILES = $(BUILT_SOURCES)
-parser_CPPFLAGS	= -I $(top_srcdir)
+parser_CPPFLAGS	= -I$(top_srcdir) -I$(top_srcdir)/lib
+parser_LDADD = -L../lib -liwhd
 
 parser.c: Makefile.am
 	rm -f $@-t $@
