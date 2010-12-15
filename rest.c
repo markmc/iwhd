@@ -478,7 +478,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		 * this callback without an error response, Microhttpd posts
 		 * the "100 Continue" header and the client starts sending
 		 * the data. We must report errors here or forever keep
-		 * out peace.
+		 * our peace.
 		 */
 		rc = pipe_prod_wait_init(&ms->pipe);
 		if (rc != 0) {
