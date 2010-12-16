@@ -45,6 +45,10 @@ GLOBAL(const char *,    me,             "here");
 # define ATTRIBUTE_UNUSED __attribute__ ((__unused__))
 #endif
 
+#ifndef ATTRIBUTE_NORETURN
+# define ATTRIBUTE_NORETURN __attribute__ ((__noreturn__))
+#endif
+
 /*
  * Common parts of autostart
  *

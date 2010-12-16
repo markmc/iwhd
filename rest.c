@@ -1892,7 +1892,7 @@ static const struct option my_options[] = {
 	{ NULL, 0, NULL, '\0' }
 };
 
-static void
+static void ATTRIBUTE_NORETURN
 usage (int status)
 {
   if (status != EXIT_SUCCESS)
