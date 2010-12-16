@@ -358,13 +358,11 @@ curl http://localhost:$port/_providers > p || fail=1
 grep PROVIDER-2 p && { warn_ $ME_: provider deletion failed; fail=1; }
 
 # Delete a non-existent provider.
-curl -f -X DELETE http://localhost:$port/_providers/no-such
+curl -f -X DELETE http://localhost:$port/_providers/no-such 2> p
+# ensure it fails; expect exit-22 and http: 404
 test $? = 22 || fail=1
-# FIXME ensure it fails
-cat p
+grep ' 404$' p || fail=1
 
-curl http://localhost:$port/_providers > p || fail=1
-cat p
 
 # Test "headless" operation (no access to metadata DB).
 kill -9 $mongo_pid
