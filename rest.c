@@ -1935,14 +1935,14 @@ main (int argc, char **argv)
 	sem_t			 the_sem;
 	char			*stctx = NULL;
 	char			*port_tmp;
-	int			 autostart = 0;
+	bool			 autostart = false;
 
 	set_program_name (argv[0]);
 	atexit (close_stdout);
 
 	for (;;) switch (getopt_long(argc,argv,"ac:d:m:p:v",my_options,NULL)) {
 	case 'a':
-		++autostart;
+		autostart = true;
 		break;
 	case 'c':
 		cfg_file = optarg;
