@@ -24,7 +24,7 @@
 static int auto_db_port;
 static char auto_arg_port[10];
 
-static char *auto_arg_mongod[] = {
+static const char *const auto_arg_mongod[] = {
 	"mongod",
 	"--port", auto_arg_port,
 	"--dbpath", AUTO_DIR_DB,
@@ -36,7 +36,7 @@ static char *auto_arg_mongod[] = {
 };
 
 /* The --quiet option in mongod is useless, so redirect instead. */
-static char *auto_arg_mongod_quiet[] = {
+static const char *const auto_arg_mongod_quiet[] = {
 	"mongod",
 	"--port", auto_arg_port,
 	"--dbpath", AUTO_DIR_DB,
@@ -270,7 +270,9 @@ auto_start (int dbport)
 	}
 
 	DPRINTF("auto-starting mongod\n");
-	earg = verbose ? auto_arg_mongod : auto_arg_mongod_quiet;
+	earg = (verbose
+		? (char **) auto_arg_mongod
+		: (char **) auto_arg_mongod_quiet);
 	pid = auto_spawn(AUTO_BIN_MONGOD, earg);
 	if (pid < 0)
 		return -1;

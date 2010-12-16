@@ -157,7 +157,7 @@ validate_server (unsigned int i)
 }
 
 static const char *
-dup_json_string (json_t *obj, char *field)
+dup_json_string (const json_t *obj, const char *field)
 {
 	const char	*tmp;
 
