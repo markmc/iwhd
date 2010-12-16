@@ -58,18 +58,38 @@ iwhd_SOURCES = \
 
 EXTRA_iwhd_SOURCES = qlexer.l
 
+VERSION_no_hyphen = $$(echo $(VERSION)|tr - _)
+
 MOSTLYCLEANFILES += iwhd.spec
 MAINTAINERCLEANFILES += iwhd.spec
-iwhd.spec: iwhd.spec.in Makefile.am
+iwhd.spec: iwhd.spec.in Makefile
 	rm -f $@-t $@
-	sed 's/@''VERSION@/$(VERSION)/' $< > $@-t
+	v=$$(echo $(VERSION)|tr - .); \
+	sed 's/[@]VERSION@/'"$$v"/ $< > $@-t
 	chmod a=r $@-t
 	mv $@-t $@
 
+# The following rule accommodates pre-release version number strings
+# like "0.0.273-1621" that contain a "-".  Repack the tarball
+# to one with "." substituted for any - in the version string.
 .PHONY: rpm
 rpm: dist iwhd.spec
 	chmod 644 $(distdir).tar.gz
-	rpmbuild -ta $(distdir).tar.gz
+	case $(VERSION) in					\
+	  *-*)							\
+	    v=$$(echo $(VERSION)|tr - .);			\
+	    base=$(PACKAGE)-$$v;				\
+	    tgz=$$base.tar.gz;					\
+	    tar xf $(distdir).tar.gz				\
+	      && rm -rf $$base $$tgz				\
+	      && mv $(distdir) $$base				\
+	      && tar -czf - $$base > $$tgz			\
+	      && rpmbuild -ta $$tgz; e=$$?			\
+	    rm -rf $$base $$tgz;				\
+	    exit $$e						\
+	    ;;							\
+	  *) rpmbuild -ta $(distdir).tar.gz ;;			\
+	esac
 
 iwhd_CPPFLAGS	= $(HAIL_CFLAGS) -I$(top_srcdir)/lib
 iwhd_LDADD =		\
