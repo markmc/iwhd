@@ -1025,7 +1025,7 @@ cf_get_child (void * ctx)
 }
 
 /* Start a CloudFiles _consumer_. */
-void *
+static void *
 cf_put_child (void * ctx)
 {
 	pipe_private		*pp	= ctx;
