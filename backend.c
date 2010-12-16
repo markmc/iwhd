@@ -195,7 +195,7 @@ http_put_cons (void *ptr, size_t size, size_t nmemb, void *stream)
 	if (done > total) {
 		done = total;
 	}
-	memcpy(ptr,ps->data_ptr+pp->offset,done);
+	memcpy(ptr,(char *)(ps->data_ptr)+pp->offset,done);
 	pp->offset += done;
 	DPRINTF("consumer copied %zu, new offset %zu\n",
 		done, pp->offset);
@@ -1262,7 +1262,8 @@ fs_put_child (void * ctx)
 	while (pipe_cons_wait(pp)) {
 		for (offset = 0; offset < ps->data_len; offset += bytes) {
 			bytes = write(fd,
-				ps->data_ptr+offset,ps->data_len-offset);
+				      (char *)(ps->data_ptr)+offset,
+				      ps->data_len-offset);
 			if (bytes <= 0) {
 				if (bytes < 0) {
 					error (0, errno, "%s: write failed",

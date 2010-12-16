@@ -239,7 +239,7 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, size_t max)
 			if ((size_t) done > max) {
 				done = max;
 			}
-			memcpy(buf,ps->data_ptr+pp->offset,done);
+			memcpy(buf,(char *)(ps->data_ptr)+pp->offset,done);
 			pp->offset += done;
 			DPRINTF("consumer copied %zu, new offset %zu\n",
 				done, pp->offset);
