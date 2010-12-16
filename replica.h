@@ -25,4 +25,6 @@ void	 	  replicate_delete	(const char *url, my_state *ms);
 void	 	  replicate_bcreate	(const char *bucket, my_state *ms);
 int	 	  get_rep_count		(void);
 
+char *follow_link (char *object, const char *key);
+
 #endif
