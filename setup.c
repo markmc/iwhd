@@ -54,7 +54,6 @@
  */
 
 /* Bitfield for things to check in validate_server */
-#define NEED_NONE	0
 #define NEED_SERVER	0x00000001
 #define NEED_CREDS	0x00000002
 #define NEED_PATH	0x00000004

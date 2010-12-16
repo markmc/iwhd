@@ -36,11 +36,6 @@
 #include "meta.h"
 #include "replica.h"
 
-/* Sizes for internal string buffers. */
-#define ADDR_SIZE	1024
-#define SVC_ACC_SIZE	128
-#define HEADER_SIZE	64
-
 typedef enum {
 	REPL_PUT,		/* store an object */
 	REPL_ODELETE,		/* delete an object */
