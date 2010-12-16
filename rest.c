@@ -61,7 +61,7 @@ typedef enum {
 } url_type;
 
 typedef struct {
-	char				*method;
+	const char			*method;
 	url_type			 utype;
 	MHD_AccessHandlerCallback	 handler;
 } rule;
@@ -940,8 +940,8 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 
 /* TBD: get actual bucket list */
 typedef struct {
-	char *rel;
-	char *link;
+	const char *rel;
+	const char *link;
 } fake_bucket_t;
 
 /* FIXME: ensure that the RHS values here stay in sync with those
