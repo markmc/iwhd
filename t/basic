@@ -363,6 +363,22 @@ curl -f -X DELETE http://localhost:$port/_providers/no-such 2> p
 test $? = 22 || fail=1
 grep ' 404$' p || fail=1
 
+# Get the name of the current primary provider.
+curl http://localhost:$port/_providers/_primary > p || fail=1
+test "$(cat p)" = primary || fail=1
+
+# Trying to GET with anything other than "_primary" returns the empty string.
+curl http://localhost:$port/_providers/anything > p 2>/dev/null || fail=1
+test -s p && fail=1
+
+# Try to add a provider with the reserved name.  It must fail.
+p_reserved_url=http://localhost:$port/_providers/_primary
+curl -dtype=http -dhost=localhost -dport=9091 $p_reserved_url || fail=1
+# Ensure it was not added.
+curl http://localhost:$port/_primary > p || fail=1
+grep _primary p && { warn_ add-provider/reserved-name not rejected; fail=1; }
+
+
 
 # Test "headless" operation (no access to metadata DB).
 kill -9 $mongo_pid

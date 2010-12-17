@@ -1721,6 +1721,40 @@ url_to_provider_name (const char *url)
 }
 
 static int
+proxy_primary_prov (void *cctx, struct MHD_Connection *conn, const char *url,
+		    const char *method, const char *version, const char *data,
+		    size_t *data_size, void **rctx)
+{
+	(void)cctx;
+	(void)method;
+	(void)version;
+	(void)data;
+
+	DPRINTF("PROXY GET PRIMARY PROVIDER (%s)\n", url);
+
+	my_state *ms = *rctx;
+
+	// "/_providers/_primary" is the only one we accept for now.
+	bool valid = strcmp (url, "/_providers/_primary") == 0;
+	unsigned int rc = (valid ? MHD_HTTP_OK : MHD_HTTP_BAD_REQUEST);
+	if (!valid)
+		error (0, 0, "invalid request: %s", url);
+
+	const char *name = get_main_provider()->name;
+	struct MHD_Response *resp;
+	resp = MHD_create_response_from_data(valid ? strlen (name) : 0,
+					     valid ? (void *) name : NULL,
+					     MHD_NO, MHD_NO);
+	if (!resp) {
+		return MHD_NO;
+	}
+	MHD_queue_response(conn,rc,resp);
+	MHD_destroy_response(resp);
+
+	return MHD_YES;
+}
+
+static int
 proxy_delete_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		   const char *method, const char *version, const char *data,
 		   size_t *data_size, void **rctx)
@@ -1807,6 +1841,16 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 				name);
 			goto add_fail;
 		}
+
+		// another reserved word: provider name
+		// FIXME: don't hard-code it here
+		if (strcmp (prov_name, "_primary") == 0) {
+			fprintf(stderr,
+				"add_provider: %s is a reserved name\n",
+				prov_name);
+			goto add_fail;
+		}
+
 		// FIXME: unchecked strdup
 		g_hash_table_insert(ms->dict,strdup("name"),prov_name);
 
@@ -1897,6 +1941,8 @@ static const rule my_rules[] = {
 	  "GET",	URL_PROVLIST,	proxy_list_provs	},
 	{ /* update a provider */
 	  "POST",	URL_PROVLIST,	proxy_update_prov	},
+	{ /* get the primary provider */
+	  "GET",	URL_PROVIDER,	proxy_primary_prov	},
 	{ /* create a provider */
 	  "POST",	URL_PROVIDER,	proxy_add_prov		},
 	{ /* delete a provider */
