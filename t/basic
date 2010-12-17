@@ -378,6 +378,18 @@ curl -dtype=http -dhost=localhost -dport=9091 $p_reserved_url || fail=1
 curl http://localhost:$port/_primary > p || fail=1
 grep _primary p && { warn_ add-provider/reserved-name not rejected; fail=1; }
 
+# Move the "primary" attribute to a different provider.
+curl -X PUT $p1_url/_set_primary > p || fail=1
+test -s p && fail=1
+new_primary=$(curl http://localhost:$port/_providers/_primary) || fail=1
+test $new_primary = PROVIDER-1 || fail=1
+
+# Restore the primary attribute to the original.
+# FIXME: if I don't restore, the following headless test makes iwhd segfault.
+# Investigate that.
+p1_url=http://localhost:$port/_providers/primary
+curl -X PUT $p1_url/_set_primary > p || fail=1
+
 
 
 # Test "headless" operation (no access to metadata DB).

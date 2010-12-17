@@ -78,6 +78,12 @@ get_main_provider (void)
   return main_prov;
 }
 
+void
+set_main_provider (provider_t *prov)
+{
+  main_prov = prov;
+}
+
 int
 validate_provider (GHashTable *h)
 {

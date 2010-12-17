@@ -28,6 +28,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <errno.h>
 
 #include <microhttpd.h>
 #include <hstor.h>	/* only for ARRAY_SIZE at this point */
@@ -58,7 +59,7 @@
 
 typedef enum {
 	URL_ROOT=0, URL_BUCKET, URL_OBJECT, URL_ATTR, URL_INVAL,
-	URL_QUERY, URL_PROVLIST, URL_PROVIDER
+	URL_QUERY, URL_PROVLIST, URL_PROVIDER, URL_PROVIDER_SET_PRIMARY
 } url_type;
 
 typedef struct {
@@ -1755,6 +1756,62 @@ proxy_primary_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 }
 
 static int
+proxy_set_primary (void *cctx, struct MHD_Connection *conn, const char *url,
+		   const char *method, const char *version, const char *data,
+		   size_t *data_size, void **rctx)
+{
+	(void)cctx;
+	(void)method;
+	(void)version;
+	(void)data;
+
+	DPRINTF("PROXY SET PRIMARY PROVIDER (%s)\n", url);
+
+	my_state *ms = *rctx;
+	char *name = NULL;
+	unsigned int rc = MHD_HTTP_BAD_REQUEST;
+
+	/* URL is guaranteed to be of the form "/_providers/NAME/_set_primary"
+	   Extract NAME:  */
+	bool valid = memcmp (url, "/_providers/", strlen("/_providers/")) == 0;
+	if (!valid) {
+		error (0, 0, "invalid request: %s", url);
+		goto bad_set;
+	}
+	const char *start = url + strlen("/_providers/");
+	const char *slash = strchr (start, '/');
+	if (slash == NULL) {
+		error (0, 0, "invalid request: %s", url);
+		goto bad_set;
+	}
+	name = strndup (start, slash - start);
+	if (name == NULL) {
+		error (0, errno, "failed to extract provider name: %s", url);
+		goto bad_set;
+	}
+
+	/* If it's not a provider name, you lose.  */
+	provider_t *prov = find_provider (name);
+	if (prov) {
+		rc = MHD_HTTP_OK;
+		set_main_provider (prov);
+	}
+
+ bad_set:
+	free (name);
+
+	struct MHD_Response *resp;
+	resp = MHD_create_response_from_data(0, NULL, MHD_NO, MHD_NO);
+	if (!resp) {
+		return MHD_NO;
+	}
+	MHD_queue_response(conn,rc,resp);
+	MHD_destroy_response(resp);
+
+	return MHD_YES;
+}
+
+static int
 proxy_delete_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		   const char *method, const char *version, const char *data,
 		   size_t *data_size, void **rctx)
@@ -1947,6 +2004,8 @@ static const rule my_rules[] = {
 	  "POST",	URL_PROVIDER,	proxy_add_prov		},
 	{ /* delete a provider */
 	  "DELETE",	URL_PROVIDER,	proxy_delete_prov	},
+	{ /* set the primary provider */
+	  "PUT",	URL_PROVIDER_SET_PRIMARY, proxy_set_primary },
 	{ NULL, 0, NULL }
 };
 
@@ -2003,6 +2062,10 @@ parse_url (const char *url, my_state *ms)
 	if (eindex == URL_OBJECT
 	    && !strcmp (parts[URL_BUCKET], "_providers"))
 	  eindex = URL_PROVIDER;
+	else if (eindex == URL_ATTR
+		 && !strcmp (parts[URL_BUCKET], "_providers")
+		 && !strcmp (parts[URL_ATTR], "_set_primary"))
+	  eindex = URL_PROVIDER_SET_PRIMARY;
 
 	DPRINTF("parse_url: %d: %s %s %s", eindex, parts[URL_BUCKET],
 		parts[URL_OBJECT], parts[URL_ATTR]);

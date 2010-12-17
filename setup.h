@@ -53,5 +53,6 @@ provider_t *find_provider (const char *name);
 int add_provider (GHashTable *h);
 void delete_provider (provider_t *prov);
 provider_t *get_main_provider (void);
+void set_main_provider (provider_t *prov);
 
 #endif
