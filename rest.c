@@ -1771,7 +1771,7 @@ proxy_set_primary (void *cctx, struct MHD_Connection *conn, const char *url,
 	char *name = NULL;
 	unsigned int rc = MHD_HTTP_BAD_REQUEST;
 
-	/* URL is guaranteed to be of the form "/_providers/NAME/_set_primary"
+	/* URL is guaranteed to be of the form "/_providers/NAME/_primary"
 	   Extract NAME:  */
 	bool valid = memcmp (url, "/_providers/", strlen("/_providers/")) == 0;
 	if (!valid) {
@@ -2064,7 +2064,7 @@ parse_url (const char *url, my_state *ms)
 	  eindex = URL_PROVIDER;
 	else if (eindex == URL_ATTR
 		 && !strcmp (parts[URL_BUCKET], "_providers")
-		 && !strcmp (parts[URL_ATTR], "_set_primary"))
+		 && !strcmp (parts[URL_ATTR], "_primary"))
 	  eindex = URL_PROVIDER_SET_PRIMARY;
 
 	DPRINTF("parse_url: %d: %s %s %s", eindex, parts[URL_BUCKET],
