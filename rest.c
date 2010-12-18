@@ -341,7 +341,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 	provider_t *main_prov = get_main_provider();
 	ms->thunk.parent = ms;
-	ms->thunk.prov = ms->from_master ? master_prov : main_prov;
+	ms->thunk.prov = ms->from_master ? g_master_prov : main_prov;
 	pthread_create(&ms->backend_th,NULL,
 		ms->thunk.prov->func_tbl->get_child_func,&ms->thunk);
 	/* TBD: check return value */

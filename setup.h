@@ -36,7 +36,7 @@ typedef struct _provider {
 	char			*token;
 } provider_t;
 
-provider_t	*master_prov;
+provider_t	*g_master_prov;
 
 const char	 *parse_config		(char *);
 provider_t	 *get_provider		(const char *name);

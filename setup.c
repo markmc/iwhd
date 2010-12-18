@@ -69,19 +69,19 @@ extern backend_func_tbl	fs_func_tbl;
 static json_t		*config		= NULL;
 static GHashTable	*prov_hash	= NULL;
 
-static provider_t	*main_prov	= NULL;
-provider_t	*master_prov	= NULL;
+static provider_t	*g_main_prov	= NULL;
+provider_t		*g_master_prov	= NULL;
 
 provider_t *
 get_main_provider (void)
 {
-  return main_prov;
+  return g_main_prov;
 }
 
 void
 set_main_provider (provider_t *prov)
 {
-  main_prov = prov;
+  g_main_prov = prov;
 }
 
 int
@@ -482,7 +482,7 @@ parse_config_inner (void)
 		}
 		g_hash_table_insert(prov_hash,(char *)new_key,new_prov);
 		if (!i) {
-			main_prov = new_prov;
+			g_main_prov = new_prov;
 			primary = new_prov->name;
 		}
 		new_prov->func_tbl->init_func(new_prov);
@@ -511,10 +511,10 @@ parse_config (char *cfg_file)
 	 * TBD: initialize this in a separate module-init function, passing
 	 * in master_host and master_port instead of using globals.
 	 */
-	if (!master_prov) {
-		master_prov = malloc(sizeof(*master_prov));
-		if (master_prov) {
-			master_prov->func_tbl = &curl_func_tbl;
+	if (!g_master_prov) {
+		g_master_prov = malloc(sizeof(*g_master_prov));
+		if (g_master_prov) {
+			g_master_prov->func_tbl = &curl_func_tbl;
 		}
 	}
 
