@@ -69,3 +69,5 @@ GLOBAL(const char *,    me,             "here");
 #define AUTO_MONGOD_PORT 27018
 
 int	 auto_start		(int dbport);
+
+#include "gc-wrap.h"

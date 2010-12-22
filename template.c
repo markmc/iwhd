@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "template.h"
+#include "gc-wrap.h"
 
 static const char xml_root_header[] = "\
 <api service=\"%s\" version=\"%s\">\

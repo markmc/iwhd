@@ -440,9 +440,6 @@ RepoQuery::RepoQuery (const char *bucket, const char *key, const char *qstr,
 RepoQuery::~RepoQuery ()
 {
 	cout << "in " << __func__ << endl;
-	if (expr) {
-		free_value(expr);
-	}
 
 	delete curs;
 }

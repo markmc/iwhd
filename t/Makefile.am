@@ -15,9 +15,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 TESTS =						\
+  parser-test					\
   basic						\
   replication					\
-  parser-test					\
   auto
 
 EXTRA_DIST =					\
@@ -31,7 +31,7 @@ BUILT_SOURCES =
 BUILT_SOURCES += parser.c
 MAINTAINERCLEANFILES = $(BUILT_SOURCES)
 parser_CPPFLAGS	= -I$(top_srcdir) -I$(top_srcdir)/lib
-parser_LDADD = -L../lib -liwhd
+parser_LDADD = -L../lib -liwhd -lgc -lpthread
 
 parser.c: Makefile.am
 	rm -f $@-t $@

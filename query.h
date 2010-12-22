@@ -69,9 +69,9 @@ typedef struct {
 #define CALL_GETTER(g,x)	g->func(g->ctx,x)
 
 /*
- * In the normal case a caller would invoke parse once, eval multiple times,
- * and free_value once.  print_value is just for debugging/testing.
- * TBD: make parse reentrant (eval already is, free_value doesn't need to be.
+ * In the normal case a caller would invoke parse once and eval multiple times.
+ * print_value is just for debugging/testing.
+ * TBD: make parse reentrant (eval already is).
  * Unfortunately, a quick scan of generated code and information on the web
  * seems to indicate that even a "reentrant" bison parser only encapsulates
  * user state and still relies quite a bit on internal globals.  That might
@@ -79,7 +79,6 @@ typedef struct {
  */
 int	 eval		(const value_t *expr,
 			 const getter_t *oget, const getter_t *sget);
-void	 free_value	(value_t *);
 void	 print_value	(const value_t *);
 
 value_t *parse (const char *text);

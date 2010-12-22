@@ -354,9 +354,6 @@ replicate (const char *url, size_t size, const char *policy, my_state *ms)
 		sem_post(&queue_sema);
 	}
 
-	if (expr) {
-		free_value(expr);
-	}
 	free(url2);
 }
 

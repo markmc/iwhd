@@ -387,41 +387,6 @@ print_value (const value_t *v)
 	_print_value(v,0);
 }
 
-void
-free_value (value_t *v)
-{
-	if (v == NULL || v == &invalid) {
-		return;
-	}
-
-	//free((void *)v->resolved);
-
-	switch (v->type) {
-	case T_STRING:
-	case T_OFIELD:
-	case T_SFIELD:
-	case T_ID:
-		free(v->as_str);
-		free(v);
-		break;
-	case T_LINK:
-		free_value(v->as_tree.left);
-		free(v->as_tree.right);
-		free(v);
-		break;
-	case T_COMP:
-	case T_AND:
-	case T_OR:
-		free_value(v->as_tree.right);
-		/* Fall through. */
-	case T_NOT:
-		free_value(v->as_tree.left);
-		/* Fall through. */
-	default:
-		free(v);
-	}
-}
-
 #include "qlexer.c"
 
 value_t *
@@ -433,8 +398,6 @@ parse (const char *text)
   YY_BUFFER_STATE buf = yy_scan_string (text, scanner);
   value_t *result = NULL;
   value_t *r = yyparse (scanner, &result) == 0 ? result : NULL;
-  if (r == NULL)
-    free_value (result);
   yy_delete_buffer (buf, scanner);
   yylex_destroy (scanner);
   return r;
@@ -647,6 +610,7 @@ main (int argc, char **argv)
 {
   int fail = 0;
   unsigned int i;
+  GC_INIT ();
   for (i = 1; i < argc; ++i)
     {
       value_t *expr = parse (argv[i]);
@@ -654,7 +618,7 @@ main (int argc, char **argv)
 	{
 	  printf ("could not parse '%s'\n", argv[i]);
 	  fail = 1;
-	  goto next;
+	  continue;
 	}
 
       print_value (expr);
@@ -663,12 +627,9 @@ main (int argc, char **argv)
       if (str)
 	{
 	  printf ("s= %s\n", str);
-	  goto next;
+	  continue;
 	}
       printf ("d= %d\n", eval (expr, &unit_oget, &unit_sget));
-
-    next:
-      free_value (expr);
     }
 
   return fail;

@@ -17,6 +17,7 @@ BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 
 BuildRequires: boost-devel
 BuildRequires: boost-filesystem
+BuildRequires: gc-devel
 BuildRequires: glib2-devel
 BuildRequires: hail-devel
 BuildRequires: jansson-devel

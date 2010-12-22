@@ -16,17 +16,11 @@
 #if !defined(_MPIPE_H)
 #define _MPIPE_H
 
-#include <fcntl.h>
 #include <poll.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <strings.h>
-#include <unistd.h>
-#include <sys/stat.h>
 
 /*
  * This is an in-memory "pipe" construct with a twist: it lets you have

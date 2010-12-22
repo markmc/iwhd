@@ -40,6 +40,7 @@ iwhd_SOURCES = \
   auto.c	\
   backend.c	\
   backend.h	\
+  gc-wrap.h	\
   iwh.h		\
   meta.cpp	\
   meta.h	\
@@ -94,6 +95,7 @@ rpm: dist iwhd.spec
 iwhd_CPPFLAGS	= $(HAIL_CFLAGS) -I$(top_srcdir)/lib
 iwhd_LDADD =		\
   lib/libiwhd.a		\
+  -lgc -lpthread	\
   -lmongoclient		\
   $(BOOST_SYSTEM_LIB)	\
   $(BOOST_THREAD_LIB)	\

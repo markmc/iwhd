@@ -15,6 +15,7 @@
 
 #include <config.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include "iwh.h"
 #include "mpipe.h"

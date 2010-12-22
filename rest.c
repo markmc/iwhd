@@ -2202,6 +2202,7 @@ main (int argc, char **argv)
 
 	set_program_name (argv[0]);
 	atexit (close_stdout);
+	GC_INIT ();
 
 	for (;;) switch (getopt_long(argc,argv,"ac:d:m:p:v",my_options,NULL)) {
 	case 'a':
