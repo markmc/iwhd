@@ -331,7 +331,6 @@ convert_provider (int i, provider_t *out)
 
 	out->token = NULL;
 	out->deleted = 0;
-	out->refcnt = 0;
 
 	return 1;
 }
@@ -593,19 +592,6 @@ find_provider (const char *name)
 	provider_t *p = g_hash_table_lookup(prov_hash, name);
 
 	return p;
-}
-
-void
-delete_provider (provider_t *prov)
-{
-  // Remove from prov_hash, then free
-
-  g_hash_table_destroy(prov->attrs);
-  // FIXME: free other members, too?
-
-  // FIXME: unchecked strdup
-  char *name = strdup (prov->name);
-  g_hash_table_remove(prov_hash, prov->name);
 }
 
 const char *

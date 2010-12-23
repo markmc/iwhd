@@ -205,7 +205,6 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 			error(0,0,"bad repl type %d (url=%s) skipped",
 				item->type, item->path);
 		}
-		free_ms(item->ms);
 		free(item->path);
 		free(item);
 		/* No atomic dec without test?  Lame. */
@@ -338,7 +337,6 @@ replicate (const char *url, size_t size, const char *policy, my_state *ms)
 		item->server = prov;
 		item->size = size;
 		item->ms = ms;
-		g_atomic_int_inc(&ms->refcnt);
 		pthread_mutex_lock(&queue_lock);
 		if (queue_tail) {
 			item->next = queue_tail->next;
@@ -388,7 +386,6 @@ replicate_namespace_action (const char *name, repl_t action, my_state *ms)
 		}
 		item->server = (provider_t *)value;
 		item->ms = ms;
-		g_atomic_int_inc(&ms->refcnt);
 		pthread_mutex_lock(&queue_lock);
 		if (queue_tail) {
 			item->next = queue_tail->next;

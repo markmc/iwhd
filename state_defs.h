@@ -44,8 +44,6 @@ typedef struct {
 } backend_thunk_t;
 
 typedef struct _my_state {
-	volatile gint			 refcnt;
-	int				 cleanup;
 	/* for everyone */
 	MHD_AccessHandlerCallback	 handler;
 	ms_state			 state;
@@ -89,7 +87,5 @@ typedef struct _my_state {
 #define CLEANUP_AQUERY	0x80
 
 #define BACKEND_GET_SIZE	0x01	/* used in put_child_func */
-
-void free_ms (my_state *ms);
 
 #endif

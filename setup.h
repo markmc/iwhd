@@ -27,7 +27,6 @@ typedef struct _provider {
 	const char		*host;
 	int			 port;
 	int			 deleted;
-	gint			 refcnt;
 	const char		*username;
 	const char		*password;
 	const char		*path;
@@ -51,7 +50,6 @@ const char	 *auto_config		(void);
 int validate_provider (GHashTable *h);
 provider_t *find_provider (const char *name);
 int add_provider (GHashTable *h);
-void delete_provider (provider_t *prov);
 provider_t *get_main_provider (void);
 void set_main_provider (provider_t *prov);
 

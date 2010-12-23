@@ -75,44 +75,6 @@ static const char *const (reserved_name[]) = {"_default", "_new", "_policy", "_q
 static const char *const (reserved_attr[]) = {"_bucket", "_date", "_etag", "_key", "_loc", "_size", NULL};
 static const char *const (reserved_bucket_name[]) = {"_new", "_providers", NULL};
 
-void
-free_ms (my_state *ms)
-{
-	if (!g_atomic_int_dec_and_test(&ms->refcnt)) {
-		return;
-	}
-
-	if (ms->cleanup & CLEANUP_BUF_PTR) {
-		free(ms->pipe.data_ptr);
-	}
-
-	if (ms->cleanup & CLEANUP_POST) {
-		MHD_destroy_post_processor(ms->post);
-	}
-
-	if (ms->cleanup & CLEANUP_DICT) {
-		g_hash_table_destroy(ms->dict);
-	}
-
-	if (ms->cleanup & CLEANUP_QUERY) {
-		meta_query_stop(ms->query);
-	}
-
-	if (ms->cleanup & CLEANUP_TMPL) {
-		free(ms->gen_ctx);
-	}
-
-	if (ms->cleanup & CLEANUP_URL) {
-		free(ms->url);
-	}
-
-	if (ms->cleanup & CLEANUP_AQUERY) {
-		meta_attr_stop(ms->aquery);
-	}
-
-	free(ms);
-}
-
 static int
 validate_put (struct MHD_Connection *conn)
 {
@@ -203,7 +165,6 @@ simple_closer (void *ctx)
 	my_state	*ms	= ctx;
 
 	DPRINTF("%s: cleaning up\n",__func__);
-	free_ms(ms);
 }
 
 static void
@@ -266,7 +227,6 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, size_t max)
 			pthread_join(ms->cache_th,NULL);
 			/* TBD: do something about cache failure? */
 		}
-		free_ms(ms);
 	}
 
 	return done;
@@ -297,7 +257,6 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (!ms->url) {
 		return MHD_NO;
 	}
-	ms->cleanup |= CLEANUP_URL;
 
 	my_etag = meta_has_copy(ms->bucket,ms->key,me);
 	if (!my_etag) {
@@ -326,7 +285,6 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 				MHD_NO,MHD_NO);
 			MHD_queue_response(conn,MHD_HTTP_NOT_FOUND,resp);
 			MHD_destroy_response(resp);
-			free_ms(ms);
 			return MHD_YES;
 		}
 		DPRINTF("  will fetch from %s:%u\n", master_host,master_port);
@@ -448,7 +406,6 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			}
 			MHD_queue_response(conn,MHD_HTTP_FORBIDDEN,resp);
 			MHD_destroy_response(resp);
-			free_ms(ms);
 			return MHD_YES;
 		}
 		ms->state = MS_NORMAL;
@@ -456,7 +413,6 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!ms->url) {
 			return MHD_NO;
 		}
-		ms->cleanup |= CLEANUP_URL;
 		ms->size = 0;
 		pipe_init_shared(&ms->pipe,ms,1);
 		pp = pipe_init_private(&ms->pipe);
@@ -539,7 +495,6 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			recheck_replication(ms,NULL);
 			rc = MHD_HTTP_OK;
 		}
-		free_ms(ms);
 		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 		if (!resp) {
 			free(etag);
@@ -587,7 +542,6 @@ proxy_get_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
 
-	free_ms(ms);
 	return MHD_YES;
 }
 
@@ -613,7 +567,6 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!ms->url) {
 			return MHD_NO;
 		}
-		ms->cleanup |= CLEANUP_URL;
 		attrval = MHD_lookup_connection_value(conn,MHD_HEADER_KIND,
 			"X-redhat-value");
 		if (attrval) {
@@ -638,7 +591,6 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 				return MHD_NO;
 			}
 			((char *)ms->pipe.data_ptr)[0] = '\0';
-			ms->cleanup |= CLEANUP_BUF_PTR;
 		}
 		(void)strncat(ms->pipe.data_ptr,data,*data_size);
 		/* TBD: check return value */
@@ -657,22 +609,15 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 			MHD_queue_response(conn,MHD_HTTP_BAD_REQUEST,
 				resp);
 			MHD_destroy_response(resp);
-			free_ms(ms);
 			return MHD_YES;
 		}
 		meta_set_value(ms->bucket,ms->key,ms->attr,ms->pipe.data_ptr);
-		/* This might get stomped by replication. */
-		if (ms->cleanup & CLEANUP_BUF_PTR) {
-			free(ms->pipe.data_ptr);
-			ms->cleanup &= ~CLEANUP_BUF_PTR;
-		}
 		/*
 		 * We should always re-replicate, because the replication
 		 * policy might refer to this attr.
 		 */
 		DPRINTF("rereplicate (attr PUT)\n");
 		recheck_replication(ms,NULL);
-		free_ms(ms);
 		send_resp = 1;
 	}
 
@@ -744,7 +689,6 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
 		if (!ms->gen_ctx) {
 			return -1;
 		}
-		ms->cleanup |= CLEANUP_TMPL;
 		len = tmpl_list_header(ms->gen_ctx);
 		if (!len) {
 			return -1;
@@ -787,7 +731,6 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
 	free(ms->gen_ctx);
-	ms->cleanup &= ~CLEANUP_TMPL;
 	ms->gen_ctx = TMPL_CTX_DONE;
 	return len;
 }
@@ -810,7 +753,6 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->state = MS_NORMAL;
 		ms->post = MHD_create_post_processor(conn,4096,
 			query_iterator,ms);
-		ms->cleanup |= CLEANUP_POST;
 	}
 	else if (*data_size) {
 		MHD_post_process(ms->post,data,*data_size);
@@ -829,7 +771,6 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 				return MHD_NO;
 			}
 			((char *)ms->pipe.data_ptr)[0] = '\0';
-			ms->cleanup |= CLEANUP_BUF_PTR;
 		}
 		(void)strncat(ms->pipe.data_ptr,data,*data_size);
 		/* TBD: check return value */
@@ -840,7 +781,6 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 			return MHD_NO;
 		}
 		ms->query = meta_query_new(ms->bucket,NULL,ms->pipe.data_ptr);
-		ms->cleanup |= CLEANUP_QUERY;
 		resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 			65536, proxy_query_func, ms, simple_closer);
 		if (!resp) {
@@ -850,7 +790,6 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		MHD_queue_response(conn,MHD_HTTP_OK,resp);
 		MHD_destroy_response(resp);
-		//free_ms(ms);
 	}
 
 	return MHD_YES;
@@ -872,7 +811,6 @@ proxy_list_objs (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)data_size;
 
 	ms->query = meta_query_new((char *)ms->bucket,NULL,NULL);
-	ms->cleanup |= CLEANUP_QUERY;
 
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 		65536, proxy_query_func, ms, simple_closer);
@@ -925,14 +863,12 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 	if (!resp) {
-		free_ms(ms);
 		return MHD_NO;
 	}
 	error (0, 0, "DELETE BUCKET: rc=%d", rc);
 	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
 
-	free_ms(ms);
 	return MHD_YES;
 }
 
@@ -971,7 +907,6 @@ root_blob_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		if (!ms->gen_ctx) {
 			return -1;
 		}
-		ms->cleanup |= CLEANUP_TMPL;
 		ms->gen_ctx->base = host;
 		len = tmpl_root_header(ms->gen_ctx,"image_warehouse",VERSION);
 		if (!len) {
@@ -1022,7 +957,6 @@ root_blob_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
 	free(ms->gen_ctx);
-	ms->cleanup &= ~CLEANUP_TMPL;
 	ms->gen_ctx = TMPL_CTX_DONE;
 	return len;
 }
@@ -1045,11 +979,8 @@ proxy_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	ms->query = meta_query_new(NULL,"_default",NULL);
 	if (!ms->query) {
-		free_ms(ms);
 		return MHD_NO;
 	}
-	ms->cleanup |= CLEANUP_QUERY;
-
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 		65536, root_blob_generator, ms, simple_closer);
 	if (!resp) {
@@ -1194,10 +1125,8 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
 			g_str_hash,g_str_equal,NULL,NULL);
-		ms->cleanup |= CLEANUP_DICT;
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
-		ms->cleanup |= CLEANUP_POST;
 		return MHD_YES;
 	}
 
@@ -1237,7 +1166,6 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
 
-	free_ms(ms);
 	return MHD_YES;
 }
 
@@ -1262,10 +1190,8 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
 			g_str_hash,g_str_equal,NULL,NULL);
-		ms->cleanup |= CLEANUP_DICT;
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
-		ms->cleanup |= CLEANUP_POST;
 	}
 	else if (*data_size) {
 		MHD_post_process(ms->post,data,*data_size);
@@ -1300,7 +1226,6 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		MHD_queue_response(conn,rc,resp);
 		MHD_destroy_response(resp);
-		free_ms(ms);
 	}
 
 	return MHD_YES;
@@ -1375,7 +1300,6 @@ parts_callback (void *ctx, uint64_t pos, char *buf, size_t max)
 		if (!ms->gen_ctx) {
 			return -1;
 		}
-		ms->cleanup |= CLEANUP_TMPL;
 		ms->gen_ctx->base = host;
 		len = tmpl_obj_header(ms->gen_ctx,ms->bucket,ms->key);
 		if (!len) {
@@ -1421,7 +1345,6 @@ parts_callback (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
 	free(ms->gen_ctx);
-	ms->cleanup &= ~CLEANUP_TMPL;
 	ms->gen_ctx = TMPL_CTX_DONE;
 	return len;
 }
@@ -1435,7 +1358,6 @@ show_parts (struct MHD_Connection *conn, my_state *ms)
 	if (!ms->aquery) {
 		return MHD_HTTP_NOT_FOUND;
 	}
-	ms->cleanup |= CLEANUP_AQUERY;
 
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 		65536, parts_callback, ms, simple_closer);
@@ -1470,10 +1392,8 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
 			g_str_hash,g_str_equal,NULL,NULL);
-		ms->cleanup |= CLEANUP_DICT;
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
-		ms->cleanup |= CLEANUP_POST;
 	}
 	else if (*data_size) {
 		MHD_post_process(ms->post,data,*data_size);
@@ -1517,12 +1437,10 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 				MHD_NO,MHD_NO);
 			if (!resp) {
 				fprintf(stderr,"MHD_crfd failed\n");
-				free_ms(ms);
 				return MHD_NO;
 			}
 			MHD_queue_response(conn,rc,resp);
 			MHD_destroy_response(resp);
-			free_ms(ms);
 		}
 	}
 
@@ -1550,7 +1468,6 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		if (!ms->gen_ctx) {
 			return -1;
 		}
-		ms->cleanup |= CLEANUP_TMPL;
 		init_prov_iter(&ms->prov_iter);
 		len = tmpl_prov_header(ms->gen_ctx);
 		if (!len) {
@@ -1591,7 +1508,6 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
 	free(ms->gen_ctx);
-	ms->cleanup &= ~CLEANUP_TMPL;
 	ms->gen_ctx = TMPL_CTX_DONE;
 	return len;
 }
@@ -1663,10 +1579,8 @@ proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
 			g_str_hash,g_str_equal,NULL,NULL);
-		ms->cleanup |= CLEANUP_DICT;
 		ms->post = MHD_create_post_processor(conn,4096,
 			prov_iterator,ms->dict);
-		ms->cleanup |= CLEANUP_POST;
 	}
 	else if (*data_size) {
 		MHD_post_process(ms->post,data,*data_size);
@@ -1687,12 +1601,10 @@ proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 		if (!resp) {
 			fprintf(stderr,"MHD_crfd failed\n");
-			free_ms(ms);
 			return MHD_NO;
 		}
 		MHD_queue_response(conn,rc,resp);
 		MHD_destroy_response(resp);
-		free_ms(ms);
 	}
 
 	return MHD_YES;
@@ -1819,7 +1731,6 @@ proxy_delete_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response *resp
 	  = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 	if (!resp) {
-		free_ms(ms);
 		return MHD_NO;
 	}
 
@@ -1835,19 +1746,13 @@ proxy_delete_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	DPRINTF("PROXY DELETE PROVIDER prov=%s rc=%d\n", prov_name, rc);
 
 	if (prov) {
-		/* Delete for real if no one is using it.
-		   Otherwise, just mark it as deleted.  */
-		if (g_atomic_int_get (&prov->refcnt) == 0)
-			delete_provider (prov);
-		else
-			prov->deleted = 1;
+		prov->deleted = 1;
 	}
 
 	free (prov_name);
 	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
 
-	free_ms(ms);
 	return MHD_YES;
 }
 
@@ -1869,10 +1774,8 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
 			g_str_hash,g_str_equal,NULL,NULL);
-		ms->cleanup |= CLEANUP_DICT;
 		ms->post = MHD_create_post_processor(conn,4096,
 			prov_iterator,ms->dict);
-		ms->cleanup |= CLEANUP_POST;
 	}
 	else if (*data_size) {
 		MHD_post_process(ms->post,data,*data_size);
@@ -1922,7 +1825,6 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		MHD_queue_response(conn,rc,resp);
 		MHD_destroy_response(resp);
-		free_ms(ms);
 	}
 
 	return MHD_YES;
@@ -1955,7 +1857,6 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
 
-	free_ms(ms);
 	return MHD_YES;
 }
 
@@ -2083,7 +1984,6 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (!ms) {
 		return MHD_NO;
 	}
-	ms->refcnt = 1;
 
 	utype = parse_url(url,ms);
 
@@ -2106,9 +2006,6 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 		return ms->handler(cctx,conn,url,method,version,
 			data,data_size,rctx);
 	}
-
-	/* Don't need this after all.  Free before the next check. */
-	free_ms(ms);
 
 	if (!strcmp(method,"QUIT")) {
 		(void)sem_post((sem_t *)cctx);
