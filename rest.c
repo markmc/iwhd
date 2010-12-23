@@ -1704,12 +1704,15 @@ proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 static char *
 url_to_provider_name (const char *url)
 {
-  char *prov_name = base_name (url);
-  if (prov_name)
-    strip_trailing_slashes (prov_name);
+  char *p = strdup (url);
+  if (p == NULL)
+    return NULL;
+
   /* Ensure we handle trailing slashes (i.e., remove them).  */
-  assert (prov_name == NULL
-	  || (*prov_name && prov_name[strlen(prov_name)-1] != '/'));
+  strip_trailing_slashes (p);
+
+  char *prov_name = strdup (last_component (p));
+  free (p);
   return prov_name;
 }
 
