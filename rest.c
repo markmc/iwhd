@@ -316,7 +316,6 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			MHD_destroy_response(resp);
 			return MHD_YES;
 		}
-		free(my_etag);
 		ms->from_master = 0;
 	}
 	else {
@@ -384,7 +383,6 @@ static void
 recheck_replication (my_state * ms, char *policy)
 {
 	int	rc;
-	int	free_it	= FALSE;
 	char	fixed[MAX_FIELD_LEN];
 
 	if (is_reserved(ms->key,reserved_name)) {
@@ -398,8 +396,6 @@ recheck_replication (my_state * ms, char *policy)
 	}
 
 	if (!policy) {
-		/* If we get a policy here or below, we have to free it. */
-		free_it = TRUE;
 		DPRINTF("fetching policy for %s/%s\n",ms->bucket,ms->key);
 		rc = meta_get_value(ms->bucket,ms->key, "_policy", &policy);
 	}
@@ -418,9 +414,6 @@ recheck_replication (my_state * ms, char *policy)
 		 */
 		snprintf(fixed,sizeof(fixed),"%s/%s",ms->bucket,ms->key);
 		replicate(fixed,0,policy,ms);
-		if (free_it) {
-			free(policy);
-		}
 	}
 	else {
 		DPRINTF("  could not find a policy anywhere!\n");
@@ -554,7 +547,6 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		if (etag) {
 			MHD_add_response_header(resp,"ETag",etag);
-			free(etag);
 		}
 		MHD_queue_response(conn,rc,resp);
 		MHD_destroy_response(resp);
@@ -583,7 +575,7 @@ proxy_get_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	if (meta_get_value(ms->bucket,ms->key,ms->attr,&fixed) == 0) {
 		resp = MHD_create_response_from_data(strlen(fixed),fixed,
-			MHD_YES,MHD_NO);
+			MHD_NO,MHD_NO);
 		rc = MHD_HTTP_OK;
 	}
 	else {
@@ -1201,7 +1193,7 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
-			g_str_hash,g_str_equal,free,free);
+			g_str_hash,g_str_equal,NULL,NULL);
 		ms->cleanup |= CLEANUP_DICT;
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
@@ -1269,7 +1261,7 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
-			g_str_hash,g_str_equal,free,free);
+			g_str_hash,g_str_equal,NULL,NULL);
 		ms->cleanup |= CLEANUP_DICT;
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
@@ -1477,7 +1469,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
-			g_str_hash,g_str_equal,free,free);
+			g_str_hash,g_str_equal,NULL,NULL);
 		ms->cleanup |= CLEANUP_DICT;
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
@@ -1670,7 +1662,7 @@ proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
-			g_str_hash,g_str_equal,free,free);
+			g_str_hash,g_str_equal,NULL,NULL);
 		ms->cleanup |= CLEANUP_DICT;
 		ms->post = MHD_create_post_processor(conn,4096,
 			prov_iterator,ms->dict);
@@ -1876,7 +1868,7 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
 		ms->dict = g_hash_table_new_full(
-			g_str_hash,g_str_equal,free,free);
+			g_str_hash,g_str_equal,NULL,NULL);
 		ms->cleanup |= CLEANUP_DICT;
 		ms->post = MHD_create_post_processor(conn,4096,
 			prov_iterator,ms->dict);

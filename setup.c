@@ -307,7 +307,7 @@ convert_provider (int i, provider_t *out)
 		out->func_tbl = &bad_func_tbl;
 	}
 
-	out->attrs = g_hash_table_new_full(g_str_hash,g_str_equal,free,free);
+	out->attrs = g_hash_table_new_full(g_str_hash,g_str_equal,NULL,NULL);
 	iter = json_object_iter(server);
 	while (iter) {
 		key = json_object_iter_key(iter);
@@ -385,7 +385,7 @@ add_provider (GHashTable *h)
     else
         prov->func_tbl = &bad_func_tbl;
 
-    prov->attrs = g_hash_table_new_full(g_str_hash,g_str_equal,free,free);
+    prov->attrs = g_hash_table_new_full(g_str_hash,g_str_equal,NULL,NULL);
     // FIXME: can't the above fail?
 
     GHashTableIter iter;
@@ -453,7 +453,7 @@ parse_config_inner (void)
 
 	/* Everything looks OK. */
 	printf("%u replication servers defined\n",nservers-1);
-	prov_hash = g_hash_table_new_full(g_str_hash,g_str_equal,free,free);
+	prov_hash = g_hash_table_new_full(g_str_hash,g_str_equal,NULL,NULL);
 	if (!prov_hash) {
 		error(0,0,"could not allocate provider hash");
 		goto err;
