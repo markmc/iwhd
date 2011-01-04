@@ -28,8 +28,9 @@ BuildRequires: bison
 BuildRequires: flex
 BuildRequires: autoconf
 BuildRequires: automake
-BuildRequires: mongodb-server
 BuildRequires: help2man
+
+Requires: mongodb-server
 
 %description
 Deltacloud image-warehouse daemon
