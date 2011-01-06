@@ -115,7 +115,6 @@ repl_worker_del (const repl_item *item)
 	key = strchr(bucket,'/');
 	if (!key) {
 		error(0,0,"invalid path replicating delete for %s",item->path);
-		free(bucket);
 		return;
 	}
 	++key;
@@ -126,7 +125,6 @@ repl_worker_del (const repl_item *item)
 		error(0,0,"got status %d replicating delete for %s",
 			rc, item->path);
 	}
-	free(bucket);
 
 	DPRINTF("finished replicating delete for %s, rc = %d\n",item->path,rc);
 }
@@ -205,8 +203,6 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 			error(0,0,"bad repl type %d (url=%s) skipped",
 				item->type, item->path);
 		}
-		free(item->path);
-		free(item);
 		/* No atomic dec without test?  Lame. */
 		(void)g_atomic_int_dec_and_test(&rep_count);
 	}
@@ -258,7 +254,11 @@ repl_sget (void *ctx, const char *id)
 		return prov->path;
 	}
 
-	return g_hash_table_lookup(prov->attrs,id);
+	struct kv_pair kv;
+	kv.key = (char *) id;
+	struct kv_pair *p = hash_lookup (prov->attrs, &kv);
+
+	return p ? p->val : NULL;
 }
 
 void
@@ -272,10 +272,6 @@ replicate (const char *url, size_t size, const char *policy, my_state *ms)
 	query_ctx_t	 qctx;
 	getter_t	 oget;
 	getter_t	 sget;
-	GHashTableIter	 iter;
-	gpointer	 key;
-	gpointer	 value;
-	provider_t	*prov;
 
 	url2 = strdup(url);
 	if (!url2) {
@@ -303,12 +299,12 @@ replicate (const char *url, size_t size, const char *policy, my_state *ms)
 	sget.func = repl_sget;
 	sget.ctx = &qctx;
 
-	init_prov_iter(&iter);
-	while (g_hash_table_iter_next(&iter,&key,&value)) {
-		if (!strcmp(key,me)) {
+	provider_t *prov;
+	for (prov = hash_get_first_prov (); prov;
+	     prov = hash_get_next_prov (prov)) {
+		if (!strcmp(prov->name, me)) {
 			continue;
 		}
-		prov = (provider_t *)value;
 		if (expr) {
 			qctx.cur_server = prov;
 			res = eval(expr,&oget,&sget);
@@ -351,28 +347,21 @@ replicate (const char *url, size_t size, const char *policy, my_state *ms)
 		g_atomic_int_inc(&rep_count);
 		sem_post(&queue_sema);
 	}
-
-	free(url2);
 }
 
 static void
 replicate_namespace_action (const char *name, repl_t action, my_state *ms)
 {
-	repl_item	*item;
-	GHashTableIter	 iter;
-	gpointer	 key;
-	gpointer	 value;
-
-	init_prov_iter(&iter);
-	while (g_hash_table_iter_next(&iter,&key,&value)) {
-		if (!strcmp(key,me)) {
+	provider_t *prov;
+	for (prov = hash_get_first_prov (); prov;
+	     prov = hash_get_next_prov (prov)) {
+		if (!strcmp(prov->name, me)) {
 			continue;
 		}
 		DPRINTF("replicating %s(%s) on %s\n",
 			(action == REPL_ODELETE ? "delete" : "create"),
-			name,
-			((provider_t *)value)->name);
-		item = malloc(sizeof(*item));
+			name, prov->name);
+		repl_item *item = malloc(sizeof(*item));
 		if (!item) {
 			error(0,errno,"could not create repl_item for %s",
 			      name);
@@ -381,10 +370,9 @@ replicate_namespace_action (const char *name, repl_t action, my_state *ms)
 		item->type = action;
 		item->path = strdup(name);
 		if (!item->path) {
-			free(item);
 			return;
 		}
-		item->server = (provider_t *)value;
+		item->server = prov;
 		item->ms = ms;
 		pthread_mutex_lock(&queue_lock);
 		if (queue_tail) {

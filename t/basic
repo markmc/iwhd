@@ -346,7 +346,7 @@ grep _primary p && { warn_ add-provider/reserved-name not rejected; fail=1; }
 curl -X PUT $p1_url/_primary > p || fail=1
 test -s p && fail=1
 new_primary=$(curl http://localhost:$port/_providers/_primary) || fail=1
-test $new_primary = PROVIDER-1 || fail=1
+test "$new_primary" = PROVIDER-1 || fail=1
 
 # Restore the primary attribute to the original.
 # FIXME: if I don't restore, the following headless test makes iwhd segfault.

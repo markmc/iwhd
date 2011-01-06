@@ -19,7 +19,10 @@
 #include <glib.h>
 #include <curl/curl.h>	/* needed by stuff in state_defs.h (from backend.h) */
 #include <microhttpd.h>	/* ditto */
+#include <assert.h>
 #include "backend.h"
+#include "hash.h"
+#include "hash-pjw.h"
 
 typedef struct _provider {
 	const char		*name;
@@ -31,7 +34,7 @@ typedef struct _provider {
 	const char		*password;
 	const char		*path;
 	backend_func_tbl	*func_tbl;
-	GHashTable		*attrs;
+	Hash_table		*attrs;
 	char			*token;
 } provider_t;
 
@@ -44,7 +47,6 @@ void		  update_provider	(const char *provname,
 					 const char *password);
 const char	 *get_provider_value	(const provider_t *prov,
 					 const char *fname);
-void		  init_prov_iter	(GHashTableIter *iter);
 
 const char	 *auto_config		(void);
 int validate_provider (GHashTable *h);
@@ -52,5 +54,53 @@ provider_t *find_provider (const char *name);
 int add_provider (GHashTable *h);
 provider_t *get_main_provider (void);
 void set_main_provider (provider_t *prov);
+
+provider_t *hash_get_first_prov (void);
+provider_t *hash_get_next_prov (void *p);
+
+struct kv_pair
+{
+  char *key;
+  char *val;
+};
+
+#define STREQ(a, b) (strcmp (a, b) == 0)
+
+static inline size_t
+kv_hash (void const *x, size_t table_size)
+{
+  struct kv_pair const *p = x;
+  return hash_pjw (p->key, table_size);
+}
+
+static inline bool
+kv_compare (void const *x, void const *y)
+{
+  struct kv_pair const *u = x;
+  struct kv_pair const *v = y;
+  return STREQ (u->key, v->key) ? true : false;
+}
+
+static inline void
+kv_free (void *x)
+{
+  struct kv_pair *p = x;
+  free (p->key);
+  free (p->val);
+  free (p);
+}
+
+static inline int
+kv_hash_insert_new (Hash_table *ht, char *k, char *v)
+{
+  struct kv_pair *kv = malloc (sizeof *kv);
+  if (!kv)
+    return 0;
+  kv->key = k;
+  kv->val = v;
+  void *e = hash_insert (ht, kv);
+  assert (e == kv);
+  return 1;
+}
 
 #endif

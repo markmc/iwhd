@@ -27,7 +27,6 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
-#include <assert.h>
 
 #include <jansson.h>
 
@@ -35,6 +34,7 @@
 #include "setup.h"
 #include "query.h"
 #include "meta.h"
+#include "xalloc.h"
 
 /*
  * A config consists of a JSON array of objects, where each object includes:
@@ -67,7 +67,7 @@ extern backend_func_tbl	cf_func_tbl;
 extern backend_func_tbl	fs_func_tbl;
 
 static json_t		*config		= NULL;
-static GHashTable	*prov_hash	= NULL;
+static Hash_table	*prov_hash	= NULL;
 static pthread_mutex_t provider_hash_table_lock;
 
 static provider_t	*g_main_prov	= NULL;
@@ -83,6 +83,28 @@ void
 set_main_provider (provider_t *prov)
 {
   g_main_prov = prov;
+}
+
+static void
+hash_insert_new (Hash_table *ht, const void *ent)
+{
+  void *e = hash_insert (ht, ent);
+  assert (e == ent);
+}
+
+static size_t
+hash_provider (void const *x, size_t table_size)
+{
+  provider_t const *p = x;
+  return hash_pjw (p->name, table_size);
+}
+
+static bool
+compare_providers (void const *x, void const *y)
+{
+  provider_t const *u = x;
+  provider_t const *v = y;
+  return STREQ (u->name, v->name) ? true : false;
 }
 
 int
@@ -308,7 +330,7 @@ convert_provider (int i, provider_t *out)
 		out->func_tbl = &bad_func_tbl;
 	}
 
-	out->attrs = g_hash_table_new_full(g_str_hash,g_str_equal,NULL,NULL);
+	out->attrs = hash_initialize(13, NULL, kv_hash, kv_compare, kv_free);
 	iter = json_object_iter(server);
 	while (iter) {
 		key = json_object_iter_key(iter);
@@ -316,12 +338,16 @@ convert_provider (int i, provider_t *out)
 		if (!is_reserved_attr(key)) {
 			value = json_string_value(json_object_iter_value(iter));
 			if (value) {
-				value = strdup(value);
+				value = xstrdup(value);
 			}
 			if (value) {
 				DPRINTF("%p.%s = %s\n",out,key,value);
-				g_hash_table_insert(out->attrs,
-					strdup((char *)key), (char *)value);
+				if (!kv_hash_insert_new (out->attrs,
+							 xstrdup((char *)key),
+							 (char *)value)) {
+				    error (0, 0, "exhausted virtual memory");
+				    return 0;
+				}
 			}
 			else {
 				error(0,0,"could not extract %u.%s",i,key);
@@ -387,8 +413,10 @@ add_provider (GHashTable *h)
     else
         prov->func_tbl = &bad_func_tbl;
 
-    prov->attrs = g_hash_table_new_full(g_str_hash,g_str_equal,NULL,NULL);
-    // FIXME: can't the above fail?
+    prov->attrs = hash_initialize(13, NULL, kv_hash, kv_compare, kv_free);
+    if (prov->attrs == NULL) {
+      goto fail;
+    }
 
     GHashTableIter iter;
     g_hash_table_iter_init (&iter, h);
@@ -404,15 +432,13 @@ add_provider (GHashTable *h)
                 continue;
             }
             DPRINTF("%p.%s = %s\n",prov, (char *)key, (char *)val);
-            g_hash_table_insert(prov->attrs, strdup(key), strdup(val));
-            // FIXME: check strdup for failure
+            if (!kv_hash_insert_new (prov->attrs, xstrdup(key), xstrdup(val)))
+		error (0, 0, "exhausted virtual memory");
+		goto fail;
         }
     }
 
-    /* Note that we must strdup "name", since here it's a key, but above it's a
-       value.  Not using // strdup here would lead to a use-after-free bug.  */
-    // FIXME: check strdup for failure
-    g_hash_table_insert(prov_hash,strdup(name),prov);
+    hash_insert_new (prov_hash, prov);
 
     pthread_mutex_unlock (&provider_hash_table_lock);
     return 1;
@@ -451,7 +477,8 @@ parse_config_inner (void)
 	/* Everything looks OK. */
 	printf("%u replication servers defined\n",nservers-1);
 	pthread_mutex_init(&provider_hash_table_lock, NULL);
-	prov_hash = g_hash_table_new_full(g_str_hash,g_str_equal,NULL,NULL);
+	prov_hash = hash_initialize (13, NULL, hash_provider,
+				     compare_providers, NULL);
 	if (!prov_hash) {
 		error(0,0,"could not allocate provider hash");
 		goto err;
@@ -470,15 +497,13 @@ parse_config_inner (void)
 		new_prov = (provider_t  *)malloc(sizeof(*new_prov));
 		if (!new_prov) {
 			error(0,errno,"could not allocate provider %u",i);
-			free((char *)new_key);
 			goto err_free_hash;
 		}
 		if (!convert_provider(i,new_prov)) {
 			error(0,0,"could not add provider %u",i);
-			free((char *)new_key);
-			free(new_prov);
 		}
-		g_hash_table_insert(prov_hash,(char *)new_key,new_prov);
+		assert (STREQ (new_key, new_prov->name));
+		hash_insert_new(prov_hash, new_prov);
 		if (!i) {
 			g_main_prov = new_prov;
 			primary = new_prov->name;
@@ -488,7 +513,7 @@ parse_config_inner (void)
 	return primary;
 
 err_free_hash:
-	g_hash_table_destroy(prov_hash);
+	hash_free (prov_hash);
 	prov_hash = NULL;
 err:
 	return 0;
@@ -580,7 +605,9 @@ get_provider (const char *name)
 	}
 
 	pthread_mutex_lock (&provider_hash_table_lock);
-	provider_t *p = g_hash_table_lookup(prov_hash,name);
+	provider_t key;
+	key.name = name;
+	provider_t *p = hash_lookup (prov_hash, &key);
 	pthread_mutex_unlock (&provider_hash_table_lock);
 
 	return p;
@@ -594,7 +621,9 @@ find_provider (const char *name)
 	}
 
 	pthread_mutex_lock (&provider_hash_table_lock);
-	provider_t *p = g_hash_table_lookup(prov_hash, name);
+	provider_t key;
+	key.name = name;
+	provider_t *p = hash_lookup (prov_hash, &key);
 	pthread_mutex_unlock (&provider_hash_table_lock);
 
 	return p;
@@ -606,13 +635,23 @@ get_provider_value (const provider_t *prov, const char *fname)
 	if (!prov || !fname || (*fname == '\0')) {
 		return NULL;
 	}
-	return g_hash_table_lookup(prov->attrs,fname);
+	struct kv_pair kv;
+	kv.key = (char *) fname;
+	struct kv_pair *p = hash_lookup (prov->attrs, &kv);
+
+	return p ? p->val : NULL;
 }
 
-void
-init_prov_iter (GHashTableIter *iter)
+provider_t *
+hash_get_first_prov (void)
 {
-	g_hash_table_iter_init(iter,prov_hash);
+	return hash_get_first (prov_hash);
+}
+
+provider_t *
+hash_get_next_prov (void *p)
+{
+	return hash_get_next (prov_hash, p);
 }
 
 void

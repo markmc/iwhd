@@ -71,7 +71,7 @@ typedef struct _my_state {
 	pthread_t			 cache_th;
 	/* for bucket/object/provider list generators */
 	tmpl_ctx_t			*gen_ctx;
-	GHashTableIter			 prov_iter;
+	void				*prov_iter;
 	/* for back-end functions */
 	backend_thunk_t			 thunk;
 	int				 be_flags;

@@ -38,6 +38,7 @@
 #include "dirname.h"
 #include "iwh.h"
 #include "closeout.h"
+#include "hash.h"
 #include "progname.h"
 #include "meta.h"
 #include "backend.h"
@@ -1445,8 +1446,6 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state		*ms	= ctx;
 	size_t			 len;
-	gpointer		 key;
-	const provider_t	*prov;
 	const char		*accept_hdr;
 
 	(void)pos;
@@ -1459,12 +1458,14 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		if (!ms->gen_ctx) {
 			return -1;
 		}
-		init_prov_iter(&ms->prov_iter);
+		ms->prov_iter = hash_get_first_prov ();
 		len = tmpl_prov_header(ms->gen_ctx);
 		if (!len) {
 			return -1;
 		}
 		if (len > max) {
+			/* FIXME: don't truncate.  Doing that would
+			   result in syntactically invalid output.  */
 			len = max;
 		}
 		memcpy(buf,ms->gen_ctx->buf,len);
@@ -1475,7 +1476,9 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		return -1;
 	}
 
-	if (g_hash_table_iter_next(&ms->prov_iter,&key,(gpointer *)&prov)) {
+	const provider_t *prov = ms->prov_iter;
+	if (prov) {
+		ms->prov_iter = hash_get_next_prov (ms->prov_iter);
 		if (prov->deleted)
 			return 0;
 		len = tmpl_prov_entry(ms->gen_ctx,prov->name,prov->type,
