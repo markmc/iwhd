@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-# Copyright (C) 1991, 1993-2010 Red Hat, Inc.
+# Copyright (C) 1991, 1993-2011 Red Hat, Inc.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
