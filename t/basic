@@ -203,21 +203,6 @@ for i in xml json; do
 
   curl_H() { curl -H "Accept: */$i" "$@"; }
 
-  # Change username and password; ensure that is reflected in providers output.
-  curl_H -d provider="$p_name" -d username=u -d password=p \
-    http://localhost:$port/_providers || fail=1
-  curl_H http://localhost:$port/_providers > p || fail=1
-  emit_provider $i "$p_name" fs '' 0 u p > p.xml || fail=1
-  compare p.xml p || fail=1
-
-  # Attempt to modify some other attribute; should fail (but curl won't)
-  curl_H -d provider="$p_name" -d other_attr=foo \
-    http://localhost:$port/_providers || fail=1
-
-  # Attempt to modify nonexistent provider; should fail
-  curl_H -d provider=no_such -d username=v -d password=q \
-    http://localhost:$port/_providers || fail=1
-
   # List an empty bucket.
   curl_H $bucket > b || fail=1
   emit_bucket_list $i > b.exp || fail=1
