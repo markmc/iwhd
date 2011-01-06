@@ -173,8 +173,6 @@ child_closer (void * ctx)
 	pipe_private	*pp	= ctx;
 
 	DPRINTF("in %s\n",__func__);
-
-	free(pp);
 }
 
 /* Invoked from MHD. */
@@ -268,7 +266,6 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			conn, MHD_HEADER_KIND, "If-None-Match");
 		if (user_etag && !strcmp(user_etag,my_etag)) {
 			DPRINTF("ETag match!\n");
-			free(my_etag);
 			resp = MHD_create_response_from_data(0,NULL,
 				MHD_NO,MHD_NO);
 			MHD_queue_response(conn,MHD_HTTP_NOT_MODIFIED,resp);
@@ -326,7 +323,6 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		fprintf(stderr,"MHD_crfc failed\n");
 		if (pp2) {
 			/* TBD: terminate thread */
-			free(pp2);
 		}
 		child_closer(pp);
 		return MHD_NO;
@@ -497,7 +493,6 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 		if (!resp) {
-			free(etag);
 			return MHD_NO;
 		}
 		if (etag) {
@@ -730,7 +725,6 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
 		len = max;
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
-	free(ms->gen_ctx);
 	ms->gen_ctx = TMPL_CTX_DONE;
 	return len;
 }
@@ -857,7 +851,6 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 		bucket = strtok_r(copied_url,"/",&stctx);
 		key = strtok_r(NULL,"/",&stctx);
 		meta_delete(bucket,key);
-		free(copied_url);
 		replicate_delete(url,ms);
 	}
 
@@ -956,7 +949,6 @@ root_blob_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		len = max;
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
-	free(ms->gen_ctx);
 	ms->gen_ctx = TMPL_CTX_DONE;
 	return len;
 }
@@ -1344,7 +1336,6 @@ parts_callback (void *ctx, uint64_t pos, char *buf, size_t max)
 		len = max;
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
-	free(ms->gen_ctx);
 	ms->gen_ctx = TMPL_CTX_DONE;
 	return len;
 }
@@ -1507,7 +1498,6 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		len = max;
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
-	free(ms->gen_ctx);
 	ms->gen_ctx = TMPL_CTX_DONE;
 	return len;
 }
@@ -1621,7 +1611,6 @@ url_to_provider_name (const char *url)
   strip_trailing_slashes (p);
 
   char *prov_name = strdup (last_component (p));
-  free (p);
   return prov_name;
 }
 
@@ -1701,8 +1690,7 @@ proxy_set_primary (void *cctx, struct MHD_Connection *conn, const char *url,
 		set_main_provider (prov);
 	}
 
- bad_set:
-	free (name);
+ bad_set:;
 
 	struct MHD_Response *resp;
 	resp = MHD_create_response_from_data(0, NULL, MHD_NO, MHD_NO);
@@ -1749,7 +1737,6 @@ proxy_delete_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		prov->deleted = 1;
 	}
 
-	free (prov_name);
 	MHD_queue_response(conn,rc,resp);
 	MHD_destroy_response(resp);
 

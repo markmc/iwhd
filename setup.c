@@ -68,6 +68,7 @@ extern backend_func_tbl	fs_func_tbl;
 
 static json_t		*config		= NULL;
 static GHashTable	*prov_hash	= NULL;
+static pthread_mutex_t provider_hash_table_lock;
 
 static provider_t	*g_main_prov	= NULL;
 provider_t		*g_master_prov	= NULL;
@@ -345,6 +346,8 @@ add_provider (GHashTable *h)
     if (prov == NULL)
         return 0;
 
+    pthread_mutex_lock (&provider_hash_table_lock);
+
     prov->name = strdup (name);
     if (prov->name == NULL)
         goto fail;
@@ -411,16 +414,11 @@ add_provider (GHashTable *h)
     // FIXME: check strdup for failure
     g_hash_table_insert(prov_hash,strdup(name),prov);
 
+    pthread_mutex_unlock (&provider_hash_table_lock);
     return 1;
 
    fail:
-    free ((char *) prov->name);
-    free ((char *) prov->type);
-    free ((char *) prov->host);
-    free ((char *) prov->username);
-    free ((char *) prov->password);
-    free ((char *) prov->path);
-    free (prov);
+    pthread_mutex_unlock (&provider_hash_table_lock);
     return 0;
 }
 
@@ -452,6 +450,7 @@ parse_config_inner (void)
 
 	/* Everything looks OK. */
 	printf("%u replication servers defined\n",nservers-1);
+	pthread_mutex_init(&provider_hash_table_lock, NULL);
 	prov_hash = g_hash_table_new_full(g_str_hash,g_str_equal,NULL,NULL);
 	if (!prov_hash) {
 		error(0,0,"could not allocate provider hash");
@@ -579,7 +578,12 @@ get_provider (const char *name)
 	if (!prov_hash || !name || (*name == '\0')) {
 		return NULL;
 	}
-	return g_hash_table_lookup(prov_hash,name);
+
+	pthread_mutex_lock (&provider_hash_table_lock);
+	provider_t *p = g_hash_table_lookup(prov_hash,name);
+	pthread_mutex_unlock (&provider_hash_table_lock);
+
+	return p;
 }
 
 provider_t *
@@ -589,7 +593,9 @@ find_provider (const char *name)
 		return NULL;
 	}
 
+	pthread_mutex_lock (&provider_hash_table_lock);
 	provider_t *p = g_hash_table_lookup(prov_hash, name);
+	pthread_mutex_unlock (&provider_hash_table_lock);
 
 	return p;
 }

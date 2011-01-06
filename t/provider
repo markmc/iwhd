@@ -16,6 +16,7 @@ wait_for .1 50 'mongo localhost:$m_port < /dev/null' \
   || framework_failure_ mongod failed to start
 
 port=9095
+ulimit -c unlimited
 
 printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
   > iwhd.cfg || fail=1
@@ -28,12 +29,16 @@ cleanup_() { kill -9 $mongo_pid; kill $iwhd_pid; }
 wait_for .1 50 "curl -s http://localhost:$port" \
   || { echo iwhd failed to listen; Exit 1; }
 
+fail=0
 n=400
 # ===================================
 for i in $(seq $n); do
   # Add provider
   p=http://localhost:$port/_providers/p-$i
   curl -d type=s3 -dhost=localhost -dport=80 -dkey=u -dsecret=p $p || fail=1
+  curl http://localhost:$port/_providers > p-list || fail=1
+  test $(grep -c '<provider name="p-[0-9]*">' p-list) = $i || fail=1
+  test $fail = 1 && sleep 99d
 done
 
 # List providers.
