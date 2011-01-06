@@ -218,27 +218,6 @@ for i in xml json; do
   curl_H -d provider=no_such -d username=v -d password=q \
     http://localhost:$port/_providers || fail=1
 
-  # Try to change just one of username and password, not specifying the other.
-  # Ensure that the attempt fails.
-  curl_H -d provider="$p_name" -d username=u \
-    http://localhost:$port/_providers || fail=1
-  curl_H http://localhost:$port/_providers > p || fail=1
-  emit_provider $i "$p_name" fs '' 0 u p > p.exp || fail=1
-  compare p.exp p || fail=1
-
-  curl_H -d provider="$p_name" -d password=p \
-    http://localhost:$port/_providers || fail=1
-  curl_H http://localhost:$port/_providers > p || fail=1
-  emit_provider $i "$p_name" fs '' 0 u p > p.exp || fail=1
-  compare p.exp p || fail=1
-
-  # Try to change both username and password.  Now, it must succeed.
-  curl_H -d provider="$p_name" -d username=v -d password=q \
-    http://localhost:$port/_providers || fail=1
-  curl_H http://localhost:$port/_providers > p || fail=1
-  emit_provider $i "$p_name" fs '' 0 v q > p.exp || fail=1
-  compare p.exp p || fail=1
-
   # List an empty bucket.
   curl_H $bucket > b || fail=1
   emit_bucket_list $i > b.exp || fail=1

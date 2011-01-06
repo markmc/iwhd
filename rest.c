@@ -1547,59 +1547,6 @@ prov_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 	return MHD_YES;
 }
 
-
-static int
-proxy_update_prov (void *cctx, struct MHD_Connection *conn, const char *url,
-		   const char *method, const char *version, const char *data,
-		   size_t *data_size, void **rctx)
-{
-	struct MHD_Response	*resp;
-	my_state		*ms	= *rctx;
-	int			 rc;
-	char			*provider;
-	char			*username;
-	char			*password;
-
-	(void)cctx;
-	(void)method;
-	(void)version;
-
-	if (ms->state == MS_NEW) {
-		ms->state = MS_NORMAL;
-		ms->url = (char *)url;
-		ms->dict = g_hash_table_new_full(
-			g_str_hash,g_str_equal,NULL,NULL);
-		ms->post = MHD_create_post_processor(conn,4096,
-			prov_iterator,ms->dict);
-	}
-	else if (*data_size) {
-		MHD_post_process(ms->post,data,*data_size);
-		*data_size = 0;
-	}
-	else {
-		rc = MHD_HTTP_BAD_REQUEST;
-		provider = g_hash_table_lookup(ms->dict,"provider");
-		username = g_hash_table_lookup(ms->dict,"username");
-		password = g_hash_table_lookup(ms->dict,"password");
-		if (provider && username && password) {
-			update_provider(provider,username,password);
-			rc = MHD_HTTP_OK;
-		}
-		else {
-			DPRINTF("provider/username/password MISSING\n");
-		}
-		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
-		if (!resp) {
-			fprintf(stderr,"MHD_crfd failed\n");
-			return MHD_NO;
-		}
-		MHD_queue_response(conn,rc,resp);
-		MHD_destroy_response(resp);
-	}
-
-	return MHD_YES;
-}
-
 static char *
 url_to_provider_name (const char *url)
 {
@@ -1876,8 +1823,6 @@ static const rule my_rules[] = {
 	  "DELETE",	URL_ATTR,	NULL			},
 	{ /* get provider list */
 	  "GET",	URL_PROVLIST,	proxy_list_provs	},
-	{ /* update a provider */
-	  "POST",	URL_PROVLIST,	proxy_update_prov	},
 	{ /* get the primary provider */
 	  "GET",	URL_PROVIDER,	proxy_primary_prov	},
 	{ /* create a provider */
