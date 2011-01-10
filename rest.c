@@ -1103,8 +1103,14 @@ post_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 		new_val[size] = '\0';
 	}
 
-	g_hash_table_insert(ctx,strdup(key),new_val);
-	/* TBD: check return value for strdups (none avail for insert) */
+	char *k = strdup (key);
+	if (!k) {
+		free (new_val);
+		return MHD_NO;
+	}
+
+	g_hash_table_insert(ctx,k,new_val);
+
 	return MHD_YES;
 }
 
