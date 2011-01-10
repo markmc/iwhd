@@ -49,9 +49,9 @@ const char	 *get_provider_value	(const provider_t *prov,
 					 const char *fname);
 
 const char	 *auto_config		(void);
-int validate_provider (GHashTable *h);
+int validate_provider (Hash_table *h);
 provider_t *find_provider (const char *name);
-int add_provider (GHashTable *h);
+int add_provider (Hash_table *h);
 provider_t *get_main_provider (void);
 void set_main_provider (provider_t *prov);
 
@@ -101,6 +101,17 @@ kv_hash_insert_new (Hash_table *ht, char *k, char *v)
   void *e = hash_insert (ht, kv);
   assert (e == kv);
   return 1;
+}
+
+/* Given a hash table and key K, return the value
+   corresponding to K.  The caller must not free K.  */
+static char *
+kv_hash_lookup (Hash_table const *ht, char const *k)
+{
+  struct kv_pair kv;
+  kv.key = (char *) k;
+  struct kv_pair *p = hash_lookup (ht, &kv);
+  return p ? p->val : NULL;
 }
 
 #endif

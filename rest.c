@@ -347,7 +347,7 @@ recheck_replication (my_state * ms, char *policy)
 
 	if (!policy && ms->dict) {
 		DPRINTF("using new policy for %s/%s\n",ms->bucket,ms->key);
-		policy = g_hash_table_lookup(ms->dict,"_policy");
+		policy = kv_hash_lookup (ms->dict, "_policy");
 	}
 
 	if (!policy) {
@@ -1005,7 +1005,7 @@ post_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 	printf("adding %s, size=%zu\n",key,size);
 
 	// TBD: don't assume that values are null-terminated strings
-	old_val = g_hash_table_lookup(ctx,key);
+	old_val = kv_hash_lookup(ctx,key);
 	if (old_val) {
 		old_len = strlen(old_val);
 		new_val = malloc(old_len+size+1);
@@ -1116,8 +1116,8 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
-		ms->dict = g_hash_table_new_full(
-			g_str_hash,g_str_equal,NULL,NULL);
+		ms->dict = hash_initialize(13, NULL,
+					   kv_hash, kv_compare, kv_free);
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
 		return MHD_YES;
@@ -1131,7 +1131,7 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	rc = MHD_HTTP_BAD_REQUEST;
 
-	op = g_hash_table_lookup(ms->dict,"op");
+	op = kv_hash_lookup(ms->dict,"op");
 	if (op) {
 		if (!strcmp(op,"rep_status")) {
 			len = snprintf(buf,sizeof(buf),"%d requests\n",
@@ -1181,8 +1181,8 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
-		ms->dict = g_hash_table_new_full(
-			g_str_hash,g_str_equal,NULL,NULL);
+		ms->dict = hash_initialize(13, NULL,
+					   kv_hash, kv_compare, kv_free);
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
 	}
@@ -1192,10 +1192,10 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 	else {
 		rc = MHD_HTTP_BAD_REQUEST;
-		key = g_hash_table_lookup(ms->dict,"_key");
+		key = kv_hash_lookup(ms->dict,"_key");
 		if (key) {
 			strncpy(ms->key,key,MAX_FIELD_LEN-1);
-			g_hash_table_remove(ms->dict,"_key");
+			g_hash_table_remove_FIXME(ms->dict,"_key");
 			if (!g_hash_table_find(ms->dict,post_find,ms)) {
 				g_hash_table_foreach(ms->dict,post_foreach,ms);
 				DPRINTF("rereplicate (bucket POST)\n");
@@ -1204,7 +1204,7 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 			}
 		}
 		else if (!strcmp(ms->bucket,"_new")) {
-			key = g_hash_table_lookup(ms->dict,"name");
+			key = kv_hash_lookup(ms->dict,"name");
 			if (key != NULL) {
 				rc = create_bucket(key,ms);
 			}
@@ -1227,7 +1227,7 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 static int
 check_location (my_state *ms)
 {
-	char	*loc	= g_hash_table_lookup(ms->dict,"depot");
+	char	*loc	= kv_hash_lookup(ms->dict,"depot");
 
 	if (!loc) {
 		DPRINTF("missing loc on check for %s/%s\n",ms->bucket,ms->key);
@@ -1251,7 +1251,7 @@ register_image (my_state *ms)
 	const provider_t	*prov;
 	char			*next;
 
-	site = g_hash_table_lookup(ms->dict,"site");
+	site = kv_hash_lookup(ms->dict,"site");
 	if (!site) {
 		printf("site MISSING\n");
 		return MHD_HTTP_BAD_REQUEST;
@@ -1382,8 +1382,8 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
-		ms->dict = g_hash_table_new_full(
-			g_str_hash,g_str_equal,NULL,NULL);
+		ms->dict = hash_initialize(13, NULL,
+					   kv_hash, kv_compare, kv_free);
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
 	}
@@ -1394,7 +1394,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	else {
 		rc = MHD_HTTP_BAD_REQUEST;
 		if (!g_hash_table_find(ms->dict,post_find,ms)) {
-			op = g_hash_table_lookup(ms->dict,"op");
+			op = kv_hash_lookup(ms->dict,"op");
 			if (op) {
 				if (!strcmp(op,"push")) {
 					DPRINTF("rereplicate (obj POST)\n");
@@ -1723,7 +1723,7 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		char *prov_name = url_to_provider_name (url);
 		/* We're about to insert "name -> $prov_name".
 		   Ensure there is no "name" key already there.  */
-		const char *name = g_hash_table_lookup (ms->dict, "name");
+		const char *name = kv_hash_lookup (ms->dict, "name");
 		if (name) {
 			fprintf(stderr,
 				"add_provider: do not specify name: name=%s\n",

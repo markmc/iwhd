@@ -108,11 +108,11 @@ compare_providers (void const *x, void const *y)
 }
 
 int
-validate_provider (GHashTable *h)
+validate_provider (Hash_table *h)
 {
-    const char *name = g_hash_table_lookup (h, "name");
+    const char *name = kv_hash_lookup (h, "name");
     assert (name);
-    const char *type = g_hash_table_lookup (h, "type");
+    const char *type = kv_hash_lookup (h, "type");
     if (type == NULL) {
 	error (0, 0, "provider %s has no type", name);
 	return 0;
@@ -132,12 +132,12 @@ validate_provider (GHashTable *h)
 
     int ok = 1;
     if (needs & NEED_SERVER) {
-	const char *host = g_hash_table_lookup (h, "host");
+	const char *host = kv_hash_lookup (h, "host");
 	if (!host) {
 	    error (0, 0, "%s: %s-provider requires a host", name, type);
 	    ok = 0;
 	}
-	const char *port = g_hash_table_lookup (h, "port");
+	const char *port = kv_hash_lookup (h, "port");
 	if (!port) {
 	    error (0, 0, "%s: %s-provider requires a port", name, type);
 	    ok = 0;
@@ -150,12 +150,12 @@ validate_provider (GHashTable *h)
     }
 
     if (needs & NEED_CREDS) {
-	const char *key = g_hash_table_lookup (h, "key");
+	const char *key = kv_hash_lookup (h, "key");
 	if (!key) {
 	    error (0, 0, "%s: %s-provider requires a key", name, type);
 	    ok = 0;
 	}
-	const char *secret = g_hash_table_lookup (h, "secret");
+	const char *secret = kv_hash_lookup (h, "secret");
 	if (!secret) {
 	    error (0, 0, "%s: %s-provider requires a secret", name, type);
 	    ok = 0;
@@ -163,7 +163,7 @@ validate_provider (GHashTable *h)
     }
 
     if (needs & NEED_PATH) {
-	const char *path = g_hash_table_lookup (h, "path");
+	const char *path = kv_hash_lookup (h, "path");
 	if (!path) {
 	    error (0, 0, "%s: %s-provider requires a path", name, type);
 	    ok = 0;
@@ -363,9 +363,9 @@ convert_provider (int i, provider_t *out)
 }
 
 int
-add_provider (GHashTable *h)
+add_provider (Hash_table *h)
 {
-    char *name = g_hash_table_lookup (h, "name");
+    char *name = kv_hash_lookup (h, "name");
     assert (name);
 
     provider_t *prov = calloc (1, sizeof *prov);
@@ -378,19 +378,19 @@ add_provider (GHashTable *h)
     if (prov->name == NULL)
         goto fail;
 
-    prov->type = g_hash_table_lookup(h,"type");
+    prov->type = kv_hash_lookup(h,"type");
     if (prov->type == NULL)
         goto fail;
     prov->type = strdup (prov->type);
     if (prov->type == NULL)
         goto fail;
 
-    prov->host = g_hash_table_lookup(h,"host");
-    prov->port = atoi(g_hash_table_lookup(h,"port"));
+    prov->host = kv_hash_lookup(h,"host");
+    prov->port = atoi(kv_hash_lookup(h,"port"));
     /* TBD: change key/secret field names to username/password */
-    prov->username = g_hash_table_lookup(h,"key");
-    prov->password = g_hash_table_lookup(h,"secret");
-    prov->path = g_hash_table_lookup(h,"path");
+    prov->username = kv_hash_lookup(h,"key");
+    prov->password = kv_hash_lookup(h,"secret");
+    prov->path = kv_hash_lookup(h,"path");
 
     if (prov->host)
         prov->host = strdup (prov->host);

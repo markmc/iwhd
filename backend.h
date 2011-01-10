@@ -17,6 +17,7 @@
 #define _BACKEND_H
 
 #include "state_defs.h"
+#include "hash.h"
 
 typedef void	 init_func_t		(struct _provider *prov);
 /* Get provider from passed backend_thunk. */
@@ -32,7 +33,7 @@ typedef int	 bcreate_func_t		(const struct _provider *prov,
 					 const char *bucket);
 typedef int	 register_func_t	(my_state *ms,
 					 const struct _provider *prov,
-					 const char *next, GHashTable *args);
+					 const char *next, Hash_table *args);
 
 typedef struct {
 	const char		*name;

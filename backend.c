@@ -147,7 +147,7 @@ bad_bcreate (const provider_t *prov, const char *bucket)
 
 static int
 bad_register (my_state *ms, const provider_t *prov, const char *next,
-	      GHashTable *args)
+	      Hash_table *args)
 {
 	(void)ms;
 	(void)prov;
@@ -360,10 +360,10 @@ s3_init_tmpfile (const char *value)
 
 static int
 s3_register (my_state *ms, const provider_t *prov, const char *next,
-	     GHashTable *args)
+	     Hash_table *args)
 {
-	char		*kernel		= g_hash_table_lookup(args,"kernel");
-	char		*ramdisk	= g_hash_table_lookup(args,"ramdisk");
+	char		*kernel		= kv_hash_lookup(args,"kernel");
+	char		*ramdisk	= kv_hash_lookup(args,"ramdisk");
 	char		*api_key;
 	char		*api_secret;
 	const char	*ami_cert;
@@ -400,7 +400,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		DPRINTF("    (using ramdisk %s)\n",ramdisk);
 	}
 
-	api_key = g_hash_table_lookup(args,"api-key");
+	api_key = kv_hash_lookup(args,"api-key");
 	if (!api_key) {
 		api_key = (char *)prov->username;
 		if (!api_key) {
@@ -409,7 +409,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		}
 	}
 
-	api_secret = g_hash_table_lookup(args,"api-secret");
+	api_secret = kv_hash_lookup(args,"api-secret");
 	if (!api_secret) {
 		api_secret = (char *)prov->password;
 		if (!prov->password) {
@@ -418,7 +418,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		}
 	}
 
-	cval = g_hash_table_lookup(args,"ami-cert");
+	cval = kv_hash_lookup(args,"ami-cert");
 	if (cval) {
 		ami_cert = s3_init_tmpfile(cval);
 		if (!ami_cert) {
@@ -433,7 +433,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		}
 	}
 
-	kval = g_hash_table_lookup(args,"ami-key");
+	kval = kv_hash_lookup(args,"ami-key");
 	if (kval) {
 		ami_key = s3_init_tmpfile(kval);
 		if (!ami_cert) {
@@ -448,7 +448,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		}
 	}
 
-	ami_uid = g_hash_table_lookup(args,"ami-uid");
+	ami_uid = kv_hash_lookup(args,"ami-uid");
 	if (!ami_uid) {
 		ami_uid = get_provider_value(prov,"ami-uid");
 		if (!ami_uid) {
@@ -457,7 +457,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		}
 	}
 
-	ami_bkt = g_hash_table_lookup(args,"ami-bkt");
+	ami_bkt = kv_hash_lookup(args,"ami-bkt");
 	if (!ami_bkt) {
 		ami_bkt = ms->bucket;
 	}
@@ -796,14 +796,14 @@ curl_bcreate (const provider_t *prov, const char *bucket)
 
 static int
 curl_register (my_state *ms, const provider_t *prov, const char *next,
-	       GHashTable *args)
+	       Hash_table *args)
 {
 	char			 fixed[ADDR_SIZE];
 	CURL			*curl;
 	struct curl_httppost	*first	= NULL;
 	struct curl_httppost	*last	= NULL;
-	char	*kernel		= g_hash_table_lookup(args,"kernel");
-	char	*ramdisk	= g_hash_table_lookup(args,"ramdisk");
+	char	*kernel		= kv_hash_lookup(args,"kernel");
+	char	*ramdisk	= kv_hash_lookup(args,"ramdisk");
 	int	 chars;
 
 	if (!next) {

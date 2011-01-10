@@ -18,6 +18,7 @@
 
 #include <glib.h>
 #include <microhttpd.h>
+#include "hash.h"
 #include "mpipe.h"
 #include "template.h"
 
@@ -63,7 +64,7 @@ typedef struct _my_state {
 	void				*query;		/* object query */
 	void				*aquery;	/* attribute query */
 	/* for bucket-level puts */
-	GHashTable			*dict;
+	Hash_table			*dict;
 	/* for new producer/consumer model */
 	pipe_shared			 pipe;
 	int				 from_master;
