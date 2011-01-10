@@ -1031,34 +1031,36 @@ post_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 		return MHD_NO;
 	}
 
-	g_hash_table_insert(ctx,k,new_val);
+	kv_hash_insert_new (ctx, k, new_val);
 
 	return MHD_YES;
 }
 
 /* Returns TRUE if we found an *invalid* key. */
-static gboolean
-post_find (gpointer key, gpointer value, gpointer ctx)
+static bool
+post_find (void *kvv, void *ctx_v)
 {
-	(void)value;
-	(void)ctx;
-
-	if (!is_reserved(key,reserved_attr)) {
-		return FALSE;
+	struct kv_pair *kv = kvv;
+	if (!is_reserved(kv->key,reserved_attr)) {
+		return true;
 	}
 
-	DPRINTF("bad attr %s\n", (char *)key);
-	return TRUE;
+	DPRINTF("bad attr %s\n", kv->key);
+	void **ctx = ctx_v;
+	*ctx = kv;
+	return false;
 }
 
-static void
-post_foreach (gpointer key, gpointer value, gpointer ctx)
+static bool
+post_foreach (void *kvv, void *ms_v)
 {
-	my_state	*ms	= ctx;
+	struct kv_pair *kv = kvv;
+	my_state *ms = ms_v;
 
-	DPRINTF("setting %s = %s for %s/%s\n",(char *)key, (char *)value,
-		ms->bucket,ms->key);
-	meta_set_value(ms->bucket,ms->key,key,value);
+	DPRINTF("setting %s = %s for %s/%s\n", kv->key, kv->val,
+		ms->bucket, ms->key);
+	meta_set_value(ms->bucket, ms->key, kv->key, kv->val);
+	return true;
 }
 
 static int
@@ -1195,9 +1197,9 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		key = kv_hash_lookup(ms->dict,"_key");
 		if (key) {
 			strncpy(ms->key,key,MAX_FIELD_LEN-1);
-			g_hash_table_remove_FIXME(ms->dict,"_key");
-			if (!g_hash_table_find(ms->dict,post_find,ms)) {
-				g_hash_table_foreach(ms->dict,post_foreach,ms);
+			kv_hash_delete(ms->dict,"_key");
+			if (!kv_find_val(ms->dict,post_find,NULL)) {
+				hash_do_for_each (ms->dict,post_foreach,ms);
 				DPRINTF("rereplicate (bucket POST)\n");
 				recheck_replication(ms,NULL);
 				rc = MHD_HTTP_OK;
@@ -1393,7 +1395,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	}
 	else {
 		rc = MHD_HTTP_BAD_REQUEST;
-		if (!g_hash_table_find(ms->dict,post_find,ms)) {
+		if (!kv_find_val(ms->dict,post_find,NULL)) {
 			op = kv_hash_lookup(ms->dict,"op");
 			if (op) {
 				if (!strcmp(op,"push")) {
@@ -1545,7 +1547,7 @@ prov_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 	(void)transfer_encoding;
 	(void)off;
 
-	g_hash_table_insert(ctx,strdup(key),strndup(data,size));
+	kv_hash_insert_new (ctx,strdup(key),strndup(data,size));
 	/* TBD: check return value for strdups (none avail for insert) */
 	return MHD_YES;
 }
@@ -1709,8 +1711,8 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
-		ms->dict = g_hash_table_new_full(
-			g_str_hash,g_str_equal,NULL,NULL);
+		ms->dict = hash_initialize(13, NULL,
+					   kv_hash, kv_compare, kv_free);
 		ms->post = MHD_create_post_processor(conn,4096,
 			prov_iterator,ms->dict);
 	}
@@ -1741,7 +1743,7 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 
 		// FIXME: unchecked strdup
-		g_hash_table_insert(ms->dict,strdup("name"),prov_name);
+		kv_hash_insert_new (ms->dict,strdup("name"),prov_name);
 
 		if (validate_provider (ms->dict)) {
 			if (!add_provider (ms->dict)) {

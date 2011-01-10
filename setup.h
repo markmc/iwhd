@@ -114,4 +114,27 @@ kv_hash_lookup (Hash_table const *ht, char const *k)
   return p ? p->val : NULL;
 }
 
+static void
+kv_hash_delete (Hash_table *ht, char const *k)
+{
+  struct kv_pair kv;
+  kv.key = (char *) k;
+  struct kv_pair *p = hash_delete (ht, &kv);
+  if (p) {
+    free (p->key);
+    free (p->val);
+    free (p);
+  }
+}
+
+/* Determine whether a key/value pair exists for which PRED_FN returns true.
+   If so, return a pointer to that kv_pair.  Otherwise, return NULL.  */
+static struct kv_pair *
+kv_find_val (Hash_table *ht, Hash_processor pred_fn, void *ctx)
+{
+  void *found_kv = NULL;
+  hash_do_for_each (ht, pred_fn, &found_kv);
+  return found_kv;
+}
+
 #endif

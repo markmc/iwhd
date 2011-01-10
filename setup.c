@@ -418,20 +418,17 @@ add_provider (Hash_table *h)
       goto fail;
     }
 
-    GHashTableIter iter;
-    g_hash_table_iter_init (&iter, h);
-    while (1) {
-        gpointer key;
-        gpointer val;
-        if (!g_hash_table_iter_next (&iter, &key, &val))
-            break;
+    struct kv_pair *kv;
+    for (kv = hash_get_first (h); kv; kv = hash_get_next (h, kv)) {
+	char const *key = kv->key;
+	char const *val = kv->val;
 
         if (!is_reserved_attr(key)) {
             if (val) {
-                error(0,0,"no value for %s", (char *)key);
+                error(0,0,"no value for %s", key);
                 continue;
             }
-            DPRINTF("%p.%s = %s\n",prov, (char *)key, (char *)val);
+            DPRINTF("%p.%s = %s\n",prov, key, val);
             if (!kv_hash_insert_new (prov->attrs, xstrdup(key), xstrdup(val)))
 		error (0, 0, "exhausted virtual memory");
 		goto fail;
