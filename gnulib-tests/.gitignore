@@ -38,6 +38,7 @@ test-fpending.sh
 test-getopt.c
 test-getopt.h
 test-getopt_long.h
+test-ignore-value.c
 test-inttypes.c
 test-lstat.c
 test-lstat.h

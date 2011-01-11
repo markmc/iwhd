@@ -28,6 +28,7 @@ gnulib.mk
 intprops.h
 inttypes.h
 inttypes.in.h
+iswblank.c
 localcharset.c
 localcharset.h
 malloc.c
