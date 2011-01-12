@@ -1912,6 +1912,11 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
 
+	struct GC_stack_base gc_stack_base;
+	int st = GC_get_stack_base (&gc_stack_base);
+	assert (st == GC_SUCCESS);
+	GC_register_my_thread (&gc_stack_base);
+
 	if (ms) {
 		return ms->handler(cctx,conn,url,method,version,
 			data,data_size,rctx);
