@@ -730,6 +730,26 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
 	return len;
 }
 
+/* Helper used by gc_register_finalizer_ms.  */
+static void
+destroy_state_postprocessor (void *ms_v, void *client_data)
+{
+	my_state *ms = ms_v;
+	if (ms->post)
+		MHD_destroy_post_processor (ms->post);
+}
+
+/* Tell the garbage collector that when freeing MS, it must invoke
+   destroy_state_postprocessor(MS).  This is required for each ms->post
+   since they're allocated via MHD_create_post_processor, which is
+   in a separate library into which the GC has no view.  */
+static void
+gc_register_finalizer_ms(void *ms)
+{
+	if (ms)
+		GC_register_finalizer(ms, destroy_state_postprocessor, 0, 0, 0);
+}
+
 static int
 proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 	     const char *method, const char *version, const char *data,
@@ -748,6 +768,7 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->state = MS_NORMAL;
 		ms->post = MHD_create_post_processor(conn,4096,
 			query_iterator,ms);
+		gc_register_finalizer_ms(ms);
 	}
 	else if (*data_size) {
 		MHD_post_process(ms->post,data,*data_size);
@@ -1122,6 +1143,7 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 					   kv_hash, kv_compare, kv_free);
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
+		gc_register_finalizer_ms(ms);
 		return MHD_YES;
 	}
 
@@ -1187,6 +1209,7 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 					   kv_hash, kv_compare, kv_free);
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
+		gc_register_finalizer_ms(ms);
 	}
 	else if (*data_size) {
 		MHD_post_process(ms->post,data,*data_size);
@@ -1388,6 +1411,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 					   kv_hash, kv_compare, kv_free);
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
+		gc_register_finalizer_ms(ms);
 	}
 	else if (*data_size) {
 		MHD_post_process(ms->post,data,*data_size);
@@ -1715,6 +1739,7 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 					   kv_hash, kv_compare, kv_free);
 		ms->post = MHD_create_post_processor(conn,4096,
 			prov_iterator,ms->dict);
+		gc_register_finalizer_ms(ms);
 	}
 	else if (*data_size) {
 		MHD_post_process(ms->post,data,*data_size);
