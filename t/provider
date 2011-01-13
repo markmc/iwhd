@@ -39,7 +39,8 @@ for i in $(seq $n); do
   curl http://localhost:$port/_providers > p-list || fail=1
   # Ensure that there is the correct number of p-DDD entries.
   test $(grep -c '<provider name="p-[0-9]*">' p-list) = $i || fail=1
-  test $fail = 1 && sleep 99d
+  test $fail = 1 && { warn_ "$test_dir_: add $i failed; sleeping forever..."
+                      sleep 99d; }
 done
 
 # List providers.
