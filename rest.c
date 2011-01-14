@@ -671,16 +671,15 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state	*ms	= ctx;
 	size_t		 len;
-	const char	*accept_hdr;
 	char		*bucket;
 	char		*key;
 
 	(void)pos;
 
-	accept_hdr = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,
-		"Accept");
-
 	if (!ms->gen_ctx) {
+		const char *accept_hdr
+			= MHD_lookup_connection_value(ms->conn, MHD_HEADER_KIND,
+						      "Accept");
 		ms->gen_ctx = tmpl_get_ctx(accept_hdr);
 		if (!ms->gen_ctx) {
 			return -1;
@@ -908,18 +907,18 @@ root_blob_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 	my_state	*ms	= ctx;
 	const fake_bucket_t *fb;
 	size_t		 len;
-	const char	*accept_hdr;
 	const char	*host;
 	char		*bucket;
 	char		*key;
 
 	(void)pos;
 
-	accept_hdr = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,
-		"Accept");
 	host = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Host");
 
 	if (!ms->gen_ctx) {
+		const char *accept_hdr
+			= MHD_lookup_connection_value(ms->conn, MHD_HEADER_KIND,
+						      "Accept");
 		ms->gen_ctx = tmpl_get_ctx(accept_hdr);
 		if (!ms->gen_ctx) {
 			return -1;
@@ -1312,18 +1311,18 @@ parts_callback (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state	*ms	= ctx;
 	size_t		 len;
-	const char	*accept_hdr;
 	const char	*name;
 	const char	*value;
 	const char	*host;
 
 	(void)pos;
 
-	accept_hdr = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,
-		"Accept");
 	host = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,"Host");
 
 	if (!ms->gen_ctx) {
+		const char *accept_hdr
+			= MHD_lookup_connection_value(ms->conn, MHD_HEADER_KIND,
+						      "Accept");
 		ms->gen_ctx = tmpl_get_ctx(accept_hdr);
 		if (!ms->gen_ctx) {
 			return -1;
@@ -1486,14 +1485,13 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state		*ms	= ctx;
 	size_t			 len;
-	const char		*accept_hdr;
 
 	(void)pos;
 
-	accept_hdr = MHD_lookup_connection_value(ms->conn,MHD_HEADER_KIND,
-		"Accept");
-
 	if (!ms->gen_ctx) {
+		const char *accept_hdr
+			= MHD_lookup_connection_value(ms->conn, MHD_HEADER_KIND,
+						      "Accept");
 		ms->gen_ctx = tmpl_get_ctx(accept_hdr);
 		if (!ms->gen_ctx) {
 			return -1;
