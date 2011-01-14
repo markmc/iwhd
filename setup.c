@@ -651,11 +651,26 @@ hash_get_next_prov (void *p)
 	return hash_get_next (prov_hash, p);
 }
 
+/* Apply function FN to each provider.
+   If FN returns 0, stop early and return -1.
+   Otherwise, return 0 after processing the last provider.  */
+int
+prov_do_for_each (prov_iterator_fn fn, void *client_data)
+{
+	provider_t *p;
+	for (p = hash_get_first (prov_hash); p;
+	     p = hash_get_next (prov_hash, p)) {
+		if (!fn (p, client_data))
+			return -1;
+	}
+	return 0;
+}
+
 void
 update_provider (const char *provname, const char *username,
 		 const char *password)
 {
-	provider_t	*prov;
+	provider_t *prov;
 
 	DPRINTF("updating %s username=%s password=%s\n",
 		provname, username, password);

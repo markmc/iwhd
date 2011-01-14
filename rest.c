@@ -1479,13 +1479,76 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 
 }
 
+/* Derived from gnulib's x2nrealloc.  */
+static void *
+a2nrealloc (void *p, size_t *pn, size_t s)
+{
+  size_t n = *pn;
+
+  if (! p)
+    {
+      if (! n)
+        {
+          /* The approximate size to use for initial small allocation
+             requests, when the invoking code specifies an old size of
+             zero.  64 bytes is the largest "small" request for the
+             GNU C library malloc.  */
+          enum { DEFAULT_MXFAST = 64 };
+
+          n = DEFAULT_MXFAST / s;
+          n += !n;
+        }
+    }
+  else
+    {
+      /* Set N = ceil (1.5 * N) so that progress is made if N == 1.
+         Check for overflow, so that N * S stays in size_t range.
+         The check is slightly conservative, but an exact check isn't
+         worth the trouble.  */
+      if ((size_t) -1 / 3 * 2 / s <= n)
+        return NULL;
+      n += (n + 1) / 2;
+    }
+
+  *pn = n;
+  return realloc (p, n * s);
+}
+
+/* Format each provider into malloc'd/realloc'd MS->buf,
+   setting MS->buf_n_alloc and MS->buf_n_used as required.  */
+static int
+prov_fmt (provider_t *prov, void *ms_v)
+{
+	my_state *ms = ms_v;
+	if (prov->deleted)
+		return 1;
+
+	while (true) {
+		size_t n_remaining = ms->buf_n_alloc - ms->buf_n_used;
+		int len = tmpl_prov_entry (ms->buf + ms->buf_n_used,
+					   n_remaining,
+					   ms->gen_ctx->format->prov_entry,
+					   prov->name, prov->type,
+					   prov->host, prov->port,
+					   prov->username, prov->password);
+		if (len < 0)
+			return 0; // tell iterator we've failed
+
+		if (len < n_remaining) {
+			ms->buf_n_used += len;
+			return 1;
+		}
+
+		ms->buf = a2nrealloc (ms->buf, &ms->buf_n_alloc, 1);
+		if (ms->buf == NULL)
+			return 0;
+	}
+}
 
 static ssize_t
 prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 {
-	my_state		*ms	= ctx;
-	size_t			 len;
-
+	my_state *ms = ctx;
 	(void)pos;
 
 	if (!ms->gen_ctx) {
@@ -1497,15 +1560,11 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 			return -1;
 		}
 		ms->prov_iter = hash_get_first_prov ();
-		len = tmpl_prov_header(ms->gen_ctx);
+		size_t len = tmpl_prov_header(ms->gen_ctx);
 		if (!len) {
 			return -1;
 		}
-		if (len > max) {
-			/* FIXME: don't truncate.  Doing that would
-			   result in syntactically invalid output.  */
-			len = max;
-		}
+		assert (len <= max);
 		memcpy(buf,ms->gen_ctx->buf,len);
 		return len;
 	}
@@ -1514,33 +1573,32 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		return -1;
 	}
 
-	const provider_t *prov = ms->prov_iter;
-	if (prov) {
-		ms->prov_iter = hash_get_next_prov (ms->prov_iter);
-		if (prov->deleted)
-			return 0;
-		len = tmpl_prov_entry(ms->gen_ctx,prov->name,prov->type,
-			prov->host, prov->port, prov->username, prov->password);
-		if (!len) {
+	if (ms->buf == NULL) {
+		// generate/alloc all provider-related output into memory
+		if (prov_do_for_each (prov_fmt, ms) < 0)
 			return -1;
-		}
-		if (len > max) {
-			len = max;
-		}
-		memcpy(buf,ms->gen_ctx->buf,len);
-		return len;
+
+		// Abuse the ms->buf_n_alloc member to indicate current offset.
+#		define buf_offset buf_n_alloc
+		ms->buf_offset = 0;
 	}
 
-	len = tmpl_prov_footer(ms->gen_ctx);
-	if (!len) {
-		return -1;
+	if (ms->buf_offset < ms->buf_n_used) {
+		size_t n = MIN (max, ms->buf_n_used - ms->buf_offset);
+		memcpy (buf, ms->buf + ms->buf_offset, n);
+		ms->buf_offset += n;
+		return n;
+	} else {
+		free (ms->buf);
+		ms->buf = NULL;
+		size_t len = tmpl_prov_footer(ms->gen_ctx);
+		if (!len)
+			return -1;
+		assert (len <= max);
+		memcpy(buf,ms->gen_ctx->buf,len);
+		ms->gen_ctx = TMPL_CTX_DONE;
+		return len;
 	}
-	if (len > max) {
-		len = max;
-	}
-	memcpy(buf,ms->gen_ctx->buf,len);
-	ms->gen_ctx = TMPL_CTX_DONE;
-	return len;
 }
 
 static int

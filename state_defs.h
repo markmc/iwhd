@@ -73,6 +73,9 @@ typedef struct _my_state {
 	/* for bucket/object/provider list generators */
 	tmpl_ctx_t			*gen_ctx;
 	void				*prov_iter;
+	char *buf;
+	size_t buf_n_alloc;
+	size_t buf_n_used;
 	/* for back-end functions */
 	backend_thunk_t			 thunk;
 	int				 be_flags;

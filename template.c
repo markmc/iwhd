@@ -265,34 +265,22 @@ tmpl_prov_header (tmpl_ctx_t *ctx)
 	return strlen(ctx->buf);
 }
 
-size_t
-tmpl_prov_entry (tmpl_ctx_t *ctx,
+int
+tmpl_prov_entry (char *buf, size_t buf_len,
+		 const char *fmt,
 		 const char *name, const char *type,
 		 const char *host, int port,
 		 const char *user, const char *pass)
 {
-	int size;
-	const tmpl_format_t *fmt = ctx->format;
-
 	if (!name)	name = "";
 	if (!type)	type = "";
 	if (!host)	host = "";
 	if (!user)	user = "";
 	if (!pass)	pass = "";
 
-	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->prov_entry,
-		name, type, host, port, user, pass);
-	if (size >= TMPL_BUF_SIZE || size < 0) {
-		return 0;
-	}
-	ctx->buf = ctx->raw_buf;
+	int size = snprintf(buf, buf_len, fmt,
+			    name, type, host, port, user, pass);
 
-	if (size && (ctx->index == 0)) {
-		ctx->buf += fmt->z_offset;
-		size -= fmt->z_offset;
-	}
-
-	++(ctx->index);
 	return size;
 }
 

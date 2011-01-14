@@ -51,10 +51,13 @@ size_t		 tmpl_root_entry	(tmpl_ctx_t *ctx,
 					 const char *rel, const char *link);
 size_t		 tmpl_root_footer	(tmpl_ctx_t *ctx);
 size_t		 tmpl_prov_header	(tmpl_ctx_t *ctx);
-size_t		 tmpl_prov_entry	(tmpl_ctx_t *ctx,
-					 const char *name, const char *type,
-					 const char *host, int port,
-					 const char *user, const char *pass);
+
+int tmpl_prov_entry (char *buf, size_t buf_len,
+		     const char *fmt,
+		     const char *name, const char *type,
+		     const char *host, int port,
+		     const char *user, const char *pass);
+
 size_t		 tmpl_prov_footer	(tmpl_ctx_t *ctx);
 size_t		 tmpl_list_header	(tmpl_ctx_t *ctx);
 size_t		 tmpl_list_entry	(tmpl_ctx_t *ctx,
