@@ -658,12 +658,18 @@ int
 prov_do_for_each (prov_iterator_fn fn, void *client_data)
 {
 	provider_t *p;
+	int err = 0;
+	pthread_mutex_lock (&provider_hash_table_lock);
 	for (p = hash_get_first (prov_hash); p;
 	     p = hash_get_next (prov_hash, p)) {
-		if (!fn (p, client_data))
-			return -1;
+		if (!fn (p, client_data)) {
+			err = -1;
+			break;
+		}
 	}
-	return 0;
+
+	pthread_mutex_unlock (&provider_hash_table_lock);
+	return err;
 }
 
 void
