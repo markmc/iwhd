@@ -768,6 +768,8 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->state = MS_NORMAL;
 		ms->post = MHD_create_post_processor(conn,4096,
 			query_iterator,ms);
+		if (!ms->post)
+			return MHD_NO;
 		gc_register_finalizer_ms(ms);
 	}
 	else if (*data_size) {
@@ -1141,8 +1143,12 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->url = (char *)url;
 		ms->dict = hash_initialize(13, NULL,
 					   kv_hash, kv_compare, kv_free);
+		if (!ms->dict)
+			return MHD_NO;
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
+		if (!ms->post)
+			return MHD_NO;
 		gc_register_finalizer_ms(ms);
 		return MHD_YES;
 	}
@@ -1207,8 +1213,12 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->url = (char *)url;
 		ms->dict = hash_initialize(13, NULL,
 					   kv_hash, kv_compare, kv_free);
+		if (!ms->dict)
+			return MHD_NO;
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
+		if (!ms->post)
+			return MHD_NO;
 		gc_register_finalizer_ms(ms);
 	}
 	else if (*data_size) {
@@ -1409,8 +1419,12 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->url = (char *)url;
 		ms->dict = hash_initialize(13, NULL,
 					   kv_hash, kv_compare, kv_free);
+		if (!ms->dict)
+			return MHD_NO;
 		ms->post = MHD_create_post_processor(conn,4096,
 			post_iterator,ms->dict);
+		if (!ms->post)
+			return MHD_NO;
 		gc_register_finalizer_ms(ms);
 	}
 	else if (*data_size) {
@@ -1737,8 +1751,12 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->url = (char *)url;
 		ms->dict = hash_initialize(13, NULL,
 					   kv_hash, kv_compare, kv_free);
+		if (!ms->dict)
+			return MHD_NO;
 		ms->post = MHD_create_post_processor(conn,4096,
 			prov_iterator,ms->dict);
+		if (!ms->post)
+			return MHD_NO;
 		gc_register_finalizer_ms(ms);
 	}
 	else if (*data_size) {
