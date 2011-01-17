@@ -330,7 +330,7 @@ convert_provider (int i, provider_t *out)
 		out->func_tbl = &bad_func_tbl;
 	}
 
-	out->attrs = hash_initialize(13, NULL, kv_hash, kv_compare, kv_free);
+	out->attrs = hash_initialize(13, NULL, kv_hash, kv_compare, NULL);
 	iter = json_object_iter(server);
 	while (iter) {
 		key = json_object_iter_key(iter);
@@ -413,7 +413,7 @@ add_provider (Hash_table *h)
     else
         prov->func_tbl = &bad_func_tbl;
 
-    prov->attrs = hash_initialize(13, NULL, kv_hash, kv_compare, kv_free);
+    prov->attrs = hash_initialize(13, NULL, kv_hash, kv_compare, NULL);
     if (prov->attrs == NULL) {
       goto fail;
     }

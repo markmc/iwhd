@@ -84,15 +84,6 @@ kv_compare (void const *x, void const *y)
   return STREQ (u->key, v->key) ? true : false;
 }
 
-static inline void
-kv_free (void *x)
-{
-  struct kv_pair *p = x;
-  free (p->key);
-  free (p->val);
-  free (p);
-}
-
 static inline int
 kv_hash_insert_new (Hash_table *ht, char *k, char *v)
 {

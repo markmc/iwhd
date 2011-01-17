@@ -116,7 +116,7 @@ public:
 	getter_t getter;
 };
 
-RepoMeta *it;
+static RepoMeta *it;
 
 RepoMeta::RepoMeta ()
 {

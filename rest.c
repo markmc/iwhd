@@ -744,6 +744,8 @@ destroy_state_postprocessor (void *ms_v, void *client_data)
 	my_state *ms = ms_v;
 	if (ms->post)
 		MHD_destroy_post_processor (ms->post);
+	if (ms->dict)
+		hash_free (ms->dict);
 }
 
 /* Tell the garbage collector that when freeing MS, it must invoke
@@ -1148,8 +1150,7 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
-		ms->dict = hash_initialize(13, NULL,
-					   kv_hash, kv_compare, kv_free);
+		ms->dict = hash_initialize(13, NULL, kv_hash, kv_compare, NULL);
 		if (!ms->dict)
 			return MHD_NO;
 		ms->post = MHD_create_post_processor(conn,4096,
@@ -1218,8 +1219,7 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
-		ms->dict = hash_initialize(13, NULL,
-					   kv_hash, kv_compare, kv_free);
+		ms->dict = hash_initialize(13, NULL, kv_hash, kv_compare, NULL);
 		if (!ms->dict)
 			return MHD_NO;
 		ms->post = MHD_create_post_processor(conn,4096,
@@ -1424,8 +1424,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
-		ms->dict = hash_initialize(13, NULL,
-					   kv_hash, kv_compare, kv_free);
+		ms->dict = hash_initialize(13, NULL, kv_hash, kv_compare, NULL);
 		if (!ms->dict)
 			return MHD_NO;
 		ms->post = MHD_create_post_processor(conn,4096,
@@ -1858,8 +1857,7 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
 		ms->url = (char *)url;
-		ms->dict = hash_initialize(13, NULL,
-					   kv_hash, kv_compare, kv_free);
+		ms->dict = hash_initialize(13, NULL, kv_hash, kv_compare, NULL);
 		if (!ms->dict)
 			return MHD_NO;
 		ms->post = MHD_create_post_processor(conn,4096,
