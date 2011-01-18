@@ -30,11 +30,15 @@ wait_for .1 50 "curl -s http://localhost:$port" \
   || { echo iwhd failed to listen; Exit 1; }
 
 fail=0
+
+# Use at least n=300 here, since some processes typically kick in
+# around n=280.
 n=400
 # ===================================
 for i in $(seq $n); do
   # Add provider
-  p=http://localhost:$port/_providers/p-$i
+  lexico_sortable_i=$(expr 1000 + $i)
+  p=http://localhost:$port/_providers/p-$lexico_sortable_i
   curl -d type=s3 -dhost=localhost -dport=80 -dkey=u -dsecret=p $p || fail=1
   curl http://localhost:$port/_providers > p-list || fail=1
   # Ensure that there is the correct number of p-DDD entries.
@@ -47,9 +51,16 @@ done
 curl http://localhost:$port/_providers > p-list || fail=1
 
 # Ensure that each was added:
-for i in $(seq $n); do
-  grep 'name="'p-$i'"' p-list || fail=1
-done
+{
+  emit_provider_list_prefix xml
+  for i in $(seq $n); do
+    i=$(expr 1000 + $i)
+    emit_provider xml p-$i s3 localhost 80 u p || fail=1
+  done
+  emit_provider xml primary fs '' 0 '' '' || fail=1
+  emit_provider_list_suffix xml
+} > p-exp
+compare p-list p-exp || fail=1
 
 # ===================================
 for i in $(seq $n); do

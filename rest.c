@@ -1553,6 +1553,38 @@ prov_fmt (provider_t *prov, void *ms_v)
 	}
 }
 
+// Aux structure solely to accumulate and sort providers on name.
+struct plist_t
+{
+	provider_t **buf;
+	size_t n_used;
+	size_t n_allocated;
+};
+
+// Accumulate a list of provider pointers.
+static int
+prov_get (provider_t *prov, void *plist_v)
+{
+	struct plist_t *p = plist_v;
+	if (p->n_used == p->n_allocated) {
+		void *v = a2nrealloc (p->buf, &p->n_allocated, sizeof *(p->buf));
+		if (v == NULL)
+			return 0;  // tell caller we've failed
+		p->buf = v;
+	}
+	p->buf[p->n_used++] = prov;
+	return 1;
+}
+
+// Compare two providers based on their names.
+static int
+prov_name_compare (const void *av, const void *bv)
+{
+	const provider_t *const *a = av;
+	const provider_t *const *b = bv;
+	return strcmp ((*a)->name, (*b)->name);
+}
+
 static ssize_t
 prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 {
@@ -1581,11 +1613,23 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 	if (ms->gen_ctx == TMPL_CTX_DONE) {
 		return -1;
 	}
-
 	if (ms->buf == NULL) {
-		// generate/alloc all provider-related output into memory
-		if (prov_do_for_each (prov_fmt, ms) < 0)
+		struct plist_t plist = {NULL, 0, 0};
+
+		// Create list of provider_t pointers.
+		if (prov_do_for_each (prov_get, &plist) < 0)
 			return -1;
+
+		// Sort that list on provider names.
+		qsort (plist.buf, plist.n_used, sizeof *(plist.buf),
+		       prov_name_compare);
+
+		// Emit all provider-related output into memory.
+		size_t i;
+		for (i = 0; i < plist.n_used; i++) {
+		  if (prov_fmt (plist.buf[i], ms) == 0)
+		    return -1; // failed
+		}
 
 		// Abuse the ms->buf_n_alloc member to indicate current offset.
 #		define buf_offset buf_n_alloc
