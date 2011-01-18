@@ -58,6 +58,14 @@
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION
 #endif
 
+#define gc_register_thread()						\
+  {									\
+    struct GC_stack_base gc_stack_base;					\
+    int st = GC_get_stack_base (&gc_stack_base);			\
+    assert (st == GC_SUCCESS);						\
+    GC_register_my_thread (&gc_stack_base);				\
+  }
+
 typedef enum {
 	URL_ROOT=0, URL_BUCKET, URL_OBJECT, URL_ATTR, URL_INVAL,
 	URL_QUERY, URL_PROVLIST, URL_PROVIDER, URL_PROVIDER_SET_PRIMARY
@@ -1548,6 +1556,7 @@ prov_fmt (provider_t *prov, void *ms_v)
 static ssize_t
 prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 {
+	gc_register_thread();
 	my_state *ms = ctx;
 	(void)pos;
 
@@ -2011,10 +2020,7 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
 
-	struct GC_stack_base gc_stack_base;
-	int st = GC_get_stack_base (&gc_stack_base);
-	assert (st == GC_SUCCESS);
-	GC_register_my_thread (&gc_stack_base);
+	gc_register_thread();
 
 	if (ms) {
 		return ms->handler(cctx,conn,url,method,version,
