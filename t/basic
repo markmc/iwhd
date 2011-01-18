@@ -122,7 +122,7 @@ p_name=primary
 
 # Verify that default provider's information is as expected.
 curl http://localhost:$port/_providers > p || fail=1
-emit_trivial_provider_list xml "$p_name" fs '' 0 '' '' > p.exp || fail=1
+emit_trivial_provider_list xml "$p_name" fs '' 0 '' '' is-last > p.exp || fail=1
 compare p.exp p || fail=1
 
 for i in xml json; do
