@@ -56,80 +56,6 @@ cat <<EOF > root.json || framework_failure_
 }
 EOF
 
-emit_provider()
-{
-  local xml_or_json=$1
-  shift 1
-  case $xml_or_json in xml|json);;
-    *) echo "invalid xml_or_json $xml_or_json" 1>&2; exit 1;; esac
-  case $# in 6);; *) echo "emit_provider: wrong # args" 1>&2; exit 1;; esac
-
-  if test $xml_or_json = xml; then
-    printf \
-'<providers>
-\t<provider name="%s">
-\t\t<type>%s</type>
-\t\t<host>%s</host>
-\t\t<port>%s</port>
-\t\t<username>%s</username>
-\t\t<password>%s</password>
-\t</provider>
-</providers>
-' "$@"
-  else
-    printf \
-'[
-\t{
-\t\t"name": "%s",
-\t\t"type": "%s",
-\t\t"host": "%s",
-\t\t"port": %s,
-\t\t"username": "%s",
-\t\t"password": "%s"
-\t}
-]
-' "$@"
-  fi
-}
-
-emit_bucket_list()
-{
-  local xml_or_json=$1
-  case $xml_or_json in xml|json);;
-    *) echo "invalid xml_or_json $xml_or_json" 1>&2; exit 1;; esac
-  shift
-
-  local i b k
-  if test $xml_or_json = xml; then
-    printf '<objects>\n'
-    for i in "$@"; do
-      b=$(echo "$i"|sed 's/:.*//')
-      k=$(echo "$i"|sed 's/.*://')
-      printf \
-'\t<object>
-\t\t<bucket>%s</bucket>
-\t\t<key>%s</key>
-\t</object>
-' $b $k
-    done
-    printf '</objects>\n'
-  else
-    printf '[\n'
-    for i in "$@"; do
-      b=$(echo "$i"|sed 's/:.*//')
-      k=$(echo "$i"|sed 's/.*://')
-      printf \
-'\t{
-\t\t"bucket": "%s",
-\t\t"key": "%s"
-\t}
-' $b $k
-    done
-    printf ']\n'
-  fi
-
-}
-
 printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
   > iwhd.cfg || fail=1
 
@@ -194,7 +120,7 @@ grep ' 403$' role.err || fail=1
 
 p_name=primary
 
-# Verify that default providers information is as expected.
+# Verify that default provider's information is as expected.
 curl http://localhost:$port/_providers > p || fail=1
 emit_provider xml "$p_name" fs '' 0 '' '' > p.exp || fail=1
 compare p.exp p || fail=1
