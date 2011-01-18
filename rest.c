@@ -1535,7 +1535,7 @@ prov_fmt (provider_t *prov, void *ms_v)
 		size_t n_remaining = ms->buf_n_alloc - ms->buf_n_used;
 		int len = tmpl_prov_entry (ms->buf + ms->buf_n_used,
 					   n_remaining,
-					   ms->gen_ctx->format->prov_entry,
+					   ms->gen_ctx,
 					   prov->name, prov->type,
 					   prov->host, prov->port,
 					   prov->username, prov->password);

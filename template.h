@@ -53,7 +53,7 @@ size_t		 tmpl_root_footer	(tmpl_ctx_t *ctx);
 size_t		 tmpl_prov_header	(tmpl_ctx_t *ctx);
 
 int tmpl_prov_entry (char *buf, size_t buf_len,
-		     const char *fmt,
+		     tmpl_ctx_t *ctx,
 		     const char *name, const char *type,
 		     const char *host, int port,
 		     const char *user, const char *pass);

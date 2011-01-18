@@ -267,7 +267,7 @@ tmpl_prov_header (tmpl_ctx_t *ctx)
 
 int
 tmpl_prov_entry (char *buf, size_t buf_len,
-		 const char *fmt,
+		 tmpl_ctx_t *ctx,
 		 const char *name, const char *type,
 		 const char *host, int port,
 		 const char *user, const char *pass)
@@ -278,8 +278,13 @@ tmpl_prov_entry (char *buf, size_t buf_len,
 	if (!user)	user = "";
 	if (!pass)	pass = "";
 
+	const char *fmt = ctx->format->prov_entry;
+	if (ctx->index == 0)
+		fmt += ctx->format->z_offset;
 	int size = snprintf(buf, buf_len, fmt,
 			    name, type, host, port, user, pass);
+	if (0 < size && size < buf_len)
+		ctx->index++;
 
 	return size;
 }
