@@ -74,6 +74,9 @@ AC_CHECK_LIB([xml2], [xmlInitParser],
 	[AC_MSG_ERROR([Missing required XML2 lib])])
 AC_SUBST([XML2_LIB])
 
+AC_CHECK_HEADER([gc.h], ,
+  [AC_MSG_ERROR([Missing GC development library: gc-devel or libgc-dev])])
+
 # from http://www.gnu.org/software/autoconf-archive/
 AX_BOOST_BASE
 AX_BOOST_SYSTEM
