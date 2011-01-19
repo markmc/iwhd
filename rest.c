@@ -746,12 +746,17 @@ destroy_state_postprocessor (void *ms_v, void *client_data)
 		MHD_destroy_post_processor (ms->post);
 	if (ms->dict)
 		hash_free (ms->dict);
+	if (ms->query)
+		meta_query_stop (ms->query);
+	if (ms->aquery)
+		meta_query_stop (ms->aquery);
 }
 
 /* Tell the garbage collector that when freeing MS, it must invoke
    destroy_state_postprocessor(MS).  This is required for each ms->post
    since they're allocated via MHD_create_post_processor, which is
-   in a separate library into which the GC has no view.  */
+   in a separate library into which the GC has no view.
+   Likewise for ms->dict, ms->query and ms->aquery.  */
 static void
 gc_register_finalizer_ms(void *ms)
 {
