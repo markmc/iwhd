@@ -58,6 +58,13 @@
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION
 #endif
 
+/* Buffer size for MHD_create_post_processor, used to buffer and parse keys. */
+enum { POST_BUF_SIZE = 4096 };
+
+/* Upper bound on the block size used when microhttpd queries
+   the callback function (i.e., I/O buffer size).  */
+enum { CB_BLOCK_SIZE = 64 * 1024 };
+
 #define gc_register_thread()						\
   {									\
     struct GC_stack_base gc_stack_base;					\
@@ -326,8 +333,8 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	rc = pipe_cons_wait_init(&ms->pipe);
 	ms->rc = (rc == 0) ? MHD_HTTP_OK : MHD_HTTP_INTERNAL_SERVER_ERROR;
 
-	resp = MHD_create_response_from_callback(
-		MHD_SIZE_UNKNOWN, 65536, proxy_get_cons, pp, child_closer);
+	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
+		CB_BLOCK_SIZE, proxy_get_cons, pp, child_closer);
 	if (!resp) {
 		fprintf(stderr,"MHD_crfc failed\n");
 		if (pp2) {
@@ -780,7 +787,7 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	if (ms->state == MS_NEW) {
 		ms->state = MS_NORMAL;
-		ms->post = MHD_create_post_processor(conn,4096,
+		ms->post = MHD_create_post_processor(conn, POST_BUF_SIZE,
 			query_iterator,ms);
 		if (!ms->post)
 			return MHD_NO;
@@ -814,7 +821,7 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		ms->query = meta_query_new(ms->bucket,NULL,ms->pipe.data_ptr);
 		resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
-			65536, proxy_query_func, ms, simple_closer);
+			CB_BLOCK_SIZE, proxy_query_func, ms, simple_closer);
 		if (!resp) {
 			fprintf(stderr,"MHD_crfc failed\n");
 			simple_closer(ms);
@@ -845,7 +852,7 @@ proxy_list_objs (void *cctx, struct MHD_Connection *conn, const char *url,
 	ms->query = meta_query_new((char *)ms->bucket,NULL,NULL);
 
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
-		65536, proxy_query_func, ms, simple_closer);
+		CB_BLOCK_SIZE, proxy_query_func, ms, simple_closer);
 	if (!resp) {
 		fprintf(stderr,"MHD_crfc failed\n");
 		simple_closer(ms);
@@ -1012,7 +1019,7 @@ proxy_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 		return MHD_NO;
 	}
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
-		65536, root_blob_generator, ms, simple_closer);
+		CB_BLOCK_SIZE, root_blob_generator, ms, simple_closer);
 	if (!resp) {
 		return MHD_NO;
 	}
@@ -1159,7 +1166,7 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 					   kv_compare, NULL);
 		if (!ms->dict)
 			return MHD_NO;
-		ms->post = MHD_create_post_processor(conn,4096,
+		ms->post = MHD_create_post_processor(conn, POST_BUF_SIZE,
 			post_iterator,ms->dict);
 		if (!ms->post)
 			return MHD_NO;
@@ -1229,7 +1236,7 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 					   kv_compare, NULL);
 		if (!ms->dict)
 			return MHD_NO;
-		ms->post = MHD_create_post_processor(conn,4096,
+		ms->post = MHD_create_post_processor(conn, POST_BUF_SIZE,
 			post_iterator,ms->dict);
 		if (!ms->post)
 			return MHD_NO;
@@ -1401,7 +1408,7 @@ show_parts (struct MHD_Connection *conn, my_state *ms)
 	}
 
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
-		65536, parts_callback, ms, simple_closer);
+		CB_BLOCK_SIZE, parts_callback, ms, simple_closer);
 	if (!resp) {
 		fprintf(stderr,"MHD_crfc failed\n");
 		simple_closer(ms);
@@ -1435,7 +1442,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 					   kv_compare, NULL);
 		if (!ms->dict)
 			return MHD_NO;
-		ms->post = MHD_create_post_processor(conn,4096,
+		ms->post = MHD_create_post_processor(conn, POST_BUF_SIZE,
 			post_iterator,ms->dict);
 		if (!ms->post)
 			return MHD_NO;
@@ -1677,7 +1684,7 @@ proxy_list_provs (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)data_size;
 
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
-		65536, prov_list_generator, ms, simple_closer);
+		CB_BLOCK_SIZE, prov_list_generator, ms, simple_closer);
 	if (!resp) {
 		fprintf(stderr,"MHD_crfd failed\n");
 		simple_closer(ms);
@@ -1869,7 +1876,7 @@ proxy_add_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 					   kv_compare, NULL);
 		if (!ms->dict)
 			return MHD_NO;
-		ms->post = MHD_create_post_processor(conn,4096,
+		ms->post = MHD_create_post_processor(conn, POST_BUF_SIZE,
 			prov_iterator,ms->dict);
 		if (!ms->post)
 			return MHD_NO;
