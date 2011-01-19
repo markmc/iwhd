@@ -330,7 +330,8 @@ convert_provider (int i, provider_t *out)
 		out->func_tbl = &bad_func_tbl;
 	}
 
-	out->attrs = hash_initialize(13, NULL, kv_hash, kv_compare, NULL);
+	out->attrs = hash_initialize(SMALL_PRIME, NULL, kv_hash,
+				     kv_compare, NULL);
 	iter = json_object_iter(server);
 	while (iter) {
 		key = json_object_iter_key(iter);
@@ -413,7 +414,7 @@ add_provider (Hash_table *h)
     else
         prov->func_tbl = &bad_func_tbl;
 
-    prov->attrs = hash_initialize(13, NULL, kv_hash, kv_compare, NULL);
+    prov->attrs = hash_initialize(SMALL_PRIME, NULL, kv_hash, kv_compare, NULL);
     if (prov->attrs == NULL) {
       goto fail;
     }
@@ -474,7 +475,7 @@ parse_config_inner (void)
 	/* Everything looks OK. */
 	printf("%u replication servers defined\n",nservers-1);
 	pthread_mutex_init(&provider_hash_table_lock, NULL);
-	prov_hash = hash_initialize (13, NULL, hash_provider,
+	prov_hash = hash_initialize (SMALL_PRIME, NULL, hash_provider,
 				     compare_providers, NULL);
 	if (!prov_hash) {
 		error(0,0,"could not allocate provider hash");

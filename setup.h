@@ -69,6 +69,8 @@ struct kv_pair
 
 #define STREQ(a, b) (strcmp (a, b) == 0)
 
+enum { SMALL_PRIME = 13 };
+
 static inline size_t
 kv_hash (void const *x, size_t table_size)
 {
