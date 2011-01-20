@@ -640,18 +640,6 @@ get_provider_value (const provider_t *prov, const char *fname)
 	return p ? p->val : NULL;
 }
 
-provider_t *
-hash_get_first_prov (void)
-{
-	return hash_get_first (prov_hash);
-}
-
-provider_t *
-hash_get_next_prov (void *p)
-{
-	return hash_get_next (prov_hash, p);
-}
-
 /* Apply function FN to each provider.
    If FN returns 0, stop early and return -1.
    Otherwise, return 0 after processing the last provider.  */
@@ -671,6 +659,24 @@ prov_do_for_each (prov_iterator_fn fn, void *client_data)
 
 	pthread_mutex_unlock (&provider_hash_table_lock);
 	return err;
+}
+
+/* Allocate an array, P, just large enough to hold all provider pointers
+   and fill it in.  Set *N to the number of providers and return P.
+   Upon allocation failure return NULL.  */
+provider_t **
+hash_get_prov_list (size_t *n)
+{
+	pthread_mutex_lock (&provider_hash_table_lock);
+	*n = hash_get_n_entries (prov_hash);
+	provider_t **p = (xalloc_oversized (*n, sizeof *p)
+			  ? NULL : malloc (*n * sizeof *p));
+	if (p) {
+		size_t n_actual = hash_get_entries (prov_hash, (void **) p, *n);
+		assert (n_actual == *n);
+	}
+	pthread_mutex_unlock (&provider_hash_table_lock);
+	return p;
 }
 
 void

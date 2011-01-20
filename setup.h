@@ -55,11 +55,9 @@ int add_provider (Hash_table *h);
 provider_t *get_main_provider (void);
 void set_main_provider (provider_t *prov);
 
-provider_t *hash_get_first_prov (void);
-provider_t *hash_get_next_prov (void *p);
-
 typedef int (*prov_iterator_fn) (provider_t *, void *);
 int prov_do_for_each (prov_iterator_fn fn, void *client_data);
+provider_t **hash_get_prov_list (size_t *n);
 
 struct kv_pair
 {

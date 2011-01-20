@@ -299,9 +299,16 @@ replicate (const char *url, size_t size, const char *policy, my_state *ms)
 	sget.func = repl_sget;
 	sget.ctx = &qctx;
 
-	provider_t *prov;
-	for (prov = hash_get_first_prov (); prov;
-	     prov = hash_get_next_prov (prov)) {
+	size_t n_prov;
+	provider_t **prov_list = hash_get_prov_list (&n_prov);
+	if (prov_list == NULL) {
+		DPRINTF("failed to allocate space for provider list\n");
+		return;
+	}
+
+	size_t i;
+	for (i = 0; i < n_prov; i++) {
+		provider_t *prov = prov_list[i];
 		if (!strcmp(prov->name, me)) {
 			continue;
 		}
@@ -352,9 +359,16 @@ replicate (const char *url, size_t size, const char *policy, my_state *ms)
 static void
 replicate_namespace_action (const char *name, repl_t action, my_state *ms)
 {
-	provider_t *prov;
-	for (prov = hash_get_first_prov (); prov;
-	     prov = hash_get_next_prov (prov)) {
+	size_t n_prov;
+	provider_t **prov_list = hash_get_prov_list (&n_prov);
+	if (prov_list == NULL) {
+		DPRINTF("failed to allocate space for provider list\n");
+		return;
+	}
+
+	size_t i;
+	for (i = 0; i < n_prov; i++) {
+		provider_t *prov = prov_list[i];
 		if (!strcmp(prov->name, me)) {
 			continue;
 		}
