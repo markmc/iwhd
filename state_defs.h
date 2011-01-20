@@ -72,7 +72,6 @@ typedef struct _my_state {
 	pthread_t			 cache_th;
 	/* for bucket/object/provider list generators */
 	tmpl_ctx_t			*gen_ctx;
-	void				*prov_iter;
 	char *buf;
 	size_t buf_n_alloc;
 	size_t buf_n_used;

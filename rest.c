@@ -1614,7 +1614,6 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		if (!ms->gen_ctx) {
 			return -1;
 		}
-		ms->prov_iter = hash_get_first_prov ();
 		size_t len = tmpl_prov_header(ms->gen_ctx);
 		if (!len) {
 			return -1;
