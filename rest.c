@@ -1637,6 +1637,14 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		qsort (plist.buf, plist.n_used, sizeof *(plist.buf),
 		       prov_name_compare);
 
+		// Use a size that is large enough to accommodate the
+		// result of formatting a few providers.
+		// Not important, as long as it's larger than 0.
+		ms->buf_n_alloc = 1024;
+		ms->buf = malloc (ms->buf_n_alloc);
+		if (ms->buf == NULL)
+			return -1;
+
 		// Emit all provider-related output into memory.
 		size_t i;
 		for (i = 0; i < plist.n_used; i++) {
