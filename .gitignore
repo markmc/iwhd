@@ -1,7 +1,9 @@
 *.o
+*/.deps
 *~
 .\#*
 .deps
+/GNUmakefile
 /aclocal.m4
 /autom4te.cache/
 /build-aux
@@ -10,11 +12,14 @@
 /config.log
 /config.status
 /configure
+/gnulib-tests
 /iwhd
 /iwhd-*.tar.gz
 /iwhd-qparser.c
 /iwhd-qparser.h
 /iwhd.spec
+/m4/.gitignore
+/maint.mk
 /man/iwhd.8
 /qlexer.c
 /stamp-h1
@@ -25,5 +30,3 @@ ChangeLog
 Makefile
 Makefile.in
 \#*\#
-/GNUmakefile
-/gnulib-tests
