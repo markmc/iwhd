@@ -126,7 +126,7 @@ pipe_cons_siginit (pipe_shared *ps, int error)
         }
 	pthread_cond_broadcast(&ps->prod_cond);
 	DPRINTF("consumer init signal (total %u done %u error %u)\n",
-		ps->cons_total,ps->cons_done,ps->cons_error);
+		ps->cons_total,ps->cons_init_done,ps->cons_init_error);
 	pthread_mutex_unlock(&ps->lock);
 }
 
@@ -146,7 +146,7 @@ pipe_prod_wait_init (pipe_shared *ps)
 			ps->cons_total,ps->cons_init_done,ps->cons_init_error);
 	}
 	pthread_mutex_unlock(&ps->lock);
-	return ps->cons_error;
+	return ps->cons_init_error;
 }
 
 void

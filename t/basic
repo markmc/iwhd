@@ -267,6 +267,9 @@ tr -s '\t \n' ' ' < q.xml > k && mv k q.xml
 printf '[ { "bucket": "b99", "key": "my_file" } ] ' > exp.xml
 compare q.xml exp.xml || fail=1
 
+# Before 2011-02-07, this would cause iwhd to hang.
+printf hang | curl -T - http://localhost:$port/no-such/fff
+
 # Add a single attribute to an object using the PUT method.
 bucket=$bucket
 printf nothing | curl -T - $bucket/attr_put || fail=1
