@@ -854,7 +854,7 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		MHD_queue_response(conn,MHD_HTTP_OK,resp);
 		MHD_destroy_response(resp);
-		free_ms(ms);
+		//free_ms(ms);
 	}
 
 	return MHD_YES;

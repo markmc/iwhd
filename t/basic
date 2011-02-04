@@ -257,6 +257,16 @@ for i in xml json; do
 
 done
 
+# Crash reported by Steve Loranz
+curl -f -X PUT http://localhost:$port/b99
+echo hello | curl -T - http://localhost:$port/b99/my_file
+printf mock | curl -T - http://localhost:$port/b99/my_file/target
+curl -H 'Accept: */json' -d '$target=="mock"' \
+    http://localhost:$port/b99/_query > q.xml
+tr -s '\t \n' ' ' < q.xml > k && mv k q.xml
+printf '[ { "bucket": "b99", "key": "my_file" } ] ' > exp.xml
+compare q.xml exp.xml || fail=1
+
 # Add a single attribute to an object using the PUT method.
 bucket=$bucket
 printf nothing | curl -T - $bucket/attr_put || fail=1

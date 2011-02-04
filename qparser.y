@@ -394,7 +394,7 @@ free_value (value_t *v)
 		return;
 	}
 
-	free((void *)v->resolved);
+	//free((void *)v->resolved);
 
 	switch (v->type) {
 	case T_STRING:
@@ -449,6 +449,9 @@ static const char *
 string_value (value_t *v, const getter_t *oget, const getter_t *sget)
 {
 	const char	*left;
+
+	/* Disable this caching, which seems to be invalid. */
+	v->resolved = NULL;
 
 	switch (v->type) {
 	case T_STRING:
