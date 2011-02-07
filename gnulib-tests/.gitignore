@@ -46,6 +46,7 @@
 /test-lstat.c
 /test-lstat.h
 /test-malloc-gnu.c
+/test-malloca.c
 /test-mbrtowc.c
 /test-mbrtowc1.sh
 /test-mbrtowc2.sh
