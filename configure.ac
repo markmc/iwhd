@@ -31,6 +31,12 @@ AC_PROG_CXX
 AC_PROG_CC
 AM_PROG_CC_C_O
 gl_EARLY
+
+# Maintainer note - comment this line out if you plan to rerun
+# GNULIB_POSIXCHECK testing to see if M4 should be using more modules.
+# Leave it uncommented for normal releases, for faster ./configure.
+gl_ASSERT_NO_GNULIB_POSIXCHECK
+
 AC_PROG_RANLIB
 AC_TYPE_UINT64_T
 
