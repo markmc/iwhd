@@ -1,0 +1,25 @@
+iwhd NEWS                                                   -*- outline -*-
+
+* Noteworthy changes in release ?.? (????-??-??) [?]
+
+** Bug fixes
+
+  not itemized, this time
+
+** New features
+
+  new option: --autostart (-a) to automatically start back-end services
+
+** New APIs
+
+  Change the primary provider to P (an existing provider name):
+    curl -X PUT http://_providers/P/_set_primary
+
+  Get primary provider name:
+    http://host:$port/_providers/_primary
+
+** Infrastructure
+
+  use gnulib
+
+  use libgc for garbage collection
