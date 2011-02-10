@@ -23,7 +23,7 @@ AC_INIT([iwhd],
 AC_CONFIG_AUX_DIR([build-aux])
 
 AC_CONFIG_HEADERS([config.h:config.hin])
-AM_INIT_AUTOMAKE([1.11.1 color-tests parallel-tests])
+AM_INIT_AUTOMAKE([1.11.1 dist-xz color-tests parallel-tests])
 AM_SILENT_RULES([yes]) # make --enable-silent-rules the default.
 
 # Checks for programs.
