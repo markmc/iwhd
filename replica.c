@@ -49,7 +49,6 @@ typedef struct _repl_item {
 	char			*path;
 	provider_t		*server;
 	size_t			 size;
-	int			 pipes[2];
 	my_state		*ms;
 } repl_item;
 
@@ -181,17 +180,12 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 		pipe_init_shared(&ms->pipe,ms,1);
 		switch (item->type) {
 		case REPL_PUT:
-			if (pipe(item->pipes) >= 0) {
-				xpthread_create(&prod,proxy_repl_prod,item,
-					    "failed to start producer thread");
-				xpthread_create(&cons,proxy_repl_cons,item,
-					    "failed to start consumer thread");
-				pthread_join(prod,NULL);
-				pthread_join(cons,NULL);
-			}
-			else {
-				error(0, errno, "pipe failed");
-			}
+		  xpthread_create(&prod,proxy_repl_prod,item,
+				  "failed to start producer thread");
+			xpthread_create(&cons,proxy_repl_cons,item,
+					"failed to start consumer thread");
+			pthread_join(prod,NULL);
+			pthread_join(cons,NULL);
 			break;
 		case REPL_ODELETE:
 			repl_worker_del(item);
@@ -201,7 +195,7 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 			break;
 		default:
 			error(0,0,"bad repl type %d (url=%s) skipped",
-				item->type, item->path);
+			      item->type, item->path);
 		}
 		/* No atomic dec without test?  Lame. */
 		(void)g_atomic_int_dec_and_test(&rep_count);
