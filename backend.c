@@ -512,7 +512,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		(void)dup2(organ[1],STDOUT_FILENO);
 		(void)dup2(organ[1],STDERR_FILENO);
 		execvp(cmd, (char* const*)argv);
-		error (EXIT_FAILURE, errno, "failed run command %s", cmd);
+		error (EXIT_FAILURE, errno, "failed to run command %s", cmd);
 	}
 
 	DPRINTF("waiting for child...\n");

@@ -190,7 +190,7 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 				pthread_join(cons,NULL);
 			}
 			else {
-				error(0,errno,"pipe");
+				error(0, errno, "pipe failed");
 			}
 			break;
 		case REPL_ODELETE:
