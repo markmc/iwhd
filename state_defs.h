@@ -16,7 +16,6 @@
 #if !defined(_STATE_DEFS_H)
 #define _STATE_DEFS_H
 
-#include <glib.h>
 #include <microhttpd.h>
 #include "hash.h"
 #include "mpipe.h"

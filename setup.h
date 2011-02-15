@@ -16,7 +16,6 @@
 #if !defined(_SETUP_H)
 #define _SETUP_H
 
-#include <glib.h>
 #include <curl/curl.h>	/* needed by stuff in state_defs.h (from backend.h) */
 #include <microhttpd.h>	/* ditto */
 #include <assert.h>

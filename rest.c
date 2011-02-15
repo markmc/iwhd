@@ -33,7 +33,6 @@
 #include <microhttpd.h>
 #include <hstor.h>	/* only for ARRAY_SIZE at this point */
 #include <curl/curl.h>
-#include <glib.h>
 
 #include "dirname.h"
 #include "iwh.h"

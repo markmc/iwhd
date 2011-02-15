@@ -33,7 +33,6 @@
 #include <microhttpd.h>
 #include <curl/curl.h>
 #include <hstor.h>
-#include <glib.h>
 
 #define GLOBALS_IMPL
 #include "iwh.h"

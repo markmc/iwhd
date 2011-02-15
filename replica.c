@@ -36,6 +36,11 @@
 #include "meta.h"
 #include "replica.h"
 
+// FIXME-maybe: These are gcc-specific.
+#define atomic_get(p) __sync_fetch_and_add (p, 0)
+#define atomic_inc(p) __sync_fetch_and_add (p, 1)
+#define atomic_dec(p) __sync_fetch_and_sub (p, 1)
+
 typedef enum {
 	REPL_PUT,		/* store an object */
 	REPL_ODELETE,		/* delete an object */
@@ -62,7 +67,7 @@ static repl_item	*queue_head	= NULL;
 static repl_item	*queue_tail	= NULL;
 static pthread_mutex_t	 queue_lock;
 static sem_t		 queue_sema;
-static volatile gint	 rep_count	= 0;
+static volatile int	 rep_count	= 0;
 
 static void *
 proxy_repl_prod (void *ctx)
@@ -197,8 +202,8 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 			error(0,0,"bad repl type %d (url=%s) skipped",
 			      item->type, item->path);
 		}
-		/* No atomic dec without test?  Lame. */
-		(void)g_atomic_int_dec_and_test(&rep_count);
+
+		atomic_dec(&rep_count);
 	}
 }
 
@@ -345,7 +350,7 @@ replicate (const char *url, size_t size, const char *policy, my_state *ms)
 		}
 		queue_tail = item;
 		pthread_mutex_unlock(&queue_lock);
-		g_atomic_int_inc(&rep_count);
+		atomic_inc(&rep_count);
 		sem_post(&queue_sema);
 	}
 }
@@ -393,7 +398,7 @@ replicate_namespace_action (const char *name, repl_t action, my_state *ms)
 		}
 		queue_tail = item;
 		pthread_mutex_unlock(&queue_lock);
-		g_atomic_int_inc(&rep_count);
+		atomic_inc(&rep_count);
 		sem_post(&queue_sema);
 	}
 }
@@ -433,5 +438,5 @@ follow_link (char *object, const char *key)
 int
 get_rep_count (void)
 {
-	return g_atomic_int_get(&rep_count);
+	return atomic_get (&rep_count);
 }

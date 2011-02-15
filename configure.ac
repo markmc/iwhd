@@ -66,11 +66,6 @@ AC_CHECK_LIB([pthread], [pthread_create],
 	[AC_MSG_ERROR([Missing required pthread lib])])
 AC_SUBST([PTHREAD_LIB])
 
-AC_CHECK_LIB([glib-2.0], [g_hash_table_new_full],
-	[GLIB2_LIB=-lglib-2.0],
-	[AC_MSG_ERROR([Missing required glib2 lib])])
-AC_SUBST([GLIB2_LIB])
-
 PKG_CHECK_MODULES([HAIL],[libhail >= 0.8])
 AC_SUBST([HAIL_LIBS])
 AC_SUBST([HAIL_CFLAGS])

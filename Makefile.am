@@ -15,9 +15,6 @@
 
 AM_CFLAGS = $(WARN_CFLAGS) $(WERROR_CFLAGS)
 
-# FIXME: don't hard-code 2.0
-AM_CPPFLAGS	= -I/usr/include/glib-2.0 -I/usr/lib64/glib-2.0/include
-
 iwhd_YFLAGS = -d
 
 SUBDIRS = lib . gnulib-tests t man
@@ -104,7 +101,6 @@ iwhd_LDADD =		\
   $(UHTTPD_LIB)		\
   $(PTHREAD_LIB)	\
   $(XML2_LIB)		\
-  $(GLIB2_LIB)		\
   $(HAIL_LIBS)
 
 MOSTLYCLEANFILES += qlexer.c
