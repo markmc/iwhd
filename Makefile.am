@@ -89,7 +89,7 @@ rpm: dist iwhd.spec
 	  *) rpmbuild -ta $(distdir).tar.gz ;;			\
 	esac
 
-iwhd_CPPFLAGS	= $(HAIL_CFLAGS) -I$(top_srcdir)/lib
+iwhd_CPPFLAGS = $(HAIL_CFLAGS) $(LIBXML_CFLAGS) -I$(top_srcdir)/lib
 iwhd_LDADD =		\
   lib/libiwhd.a		\
   -lgc -lpthread	\
@@ -100,7 +100,7 @@ iwhd_LDADD =		\
   $(JANSSON_LIB)	\
   $(UHTTPD_LIB)		\
   $(PTHREAD_LIB)	\
-  $(XML2_LIB)		\
+  $(LIBXML_LIBS)	\
   $(HAIL_LIBS)
 
 MOSTLYCLEANFILES += qlexer.c

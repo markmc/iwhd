@@ -70,10 +70,7 @@ PKG_CHECK_MODULES([HAIL],[libhail >= 0.8])
 AC_SUBST([HAIL_LIBS])
 AC_SUBST([HAIL_CFLAGS])
 
-AC_CHECK_LIB([xml2], [xmlInitParser],
-	[XML2_LIB=-lxml2],
-	[AC_MSG_ERROR([Missing required XML2 lib])])
-AC_SUBST([XML2_LIB])
+gl_LIBXML2([2.6.0])
 
 AC_CHECK_HEADER([gc.h], ,
   [AC_MSG_ERROR([Missing GC development library: gc-devel or libgc-dev])])
