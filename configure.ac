@@ -122,6 +122,7 @@ if test "$gl_gcc_warnings" = yes; then
   nw="$nw -Wstrict-overflow"        # in bison-generated code
   nw="$nw -Wunsafe-loop-optimizations" # in bison-generated code
   nw="$nw -Wmissing-noreturn"       # yy_fatal_error in flex-generated code
+  nw="$nw -Winline"                 # setup.h's kv_hash_insert_new
 
   gl_MANYWARN_ALL_GCC([ws])
   gl_MANYWARN_COMPLEMENT([ws], [$ws], [$nw])
