@@ -172,6 +172,18 @@ curl -d _key=attr_post -d shape=round -d size=big $bucket || fail=1
 test "$(curl $bucket/attr_post/shape)" = round || fail=1
 test "$(curl $bucket/attr_post/size)" = big || fail=1
 
+# Print all attributes of an object:
+curl -d op=parts $bucket/attr_post > out-attr || fail=1
+cat <<EOF > exp-attr
+<object>
+	<object_body path="$bucket/attr_post/body"/>
+	<object_attr_list path="$bucket/attr_post/attrs"/>
+	<object_attr name="shape" path="$bucket/attr_post/attr_shape"/>
+	<object_attr name="size" path="$bucket/attr_post/attr_size"/>
+</object>
+EOF
+compare out-attr exp-attr || fail=1
+
 # Ensure that an attempt to add reserved object name fails.
 # FIXME: keep this list in sync with the one in rest.c:
 # grep '^static.*reserved_name' rest.c

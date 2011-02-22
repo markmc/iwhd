@@ -80,7 +80,7 @@ static const char xml_obj_header[] = "\
 
 static const char xml_obj_entry[] = "\
 \n\
-	<object_attr name=\"%s\" path=\"http:/%s/%s/%s/attr_%s\"/>\
+	<object_attr name=\"%s\" path=\"http://%s/%s/%s/attr_%s\"/>\
 ";
 
 static const char xml_obj_footer[] = "\
