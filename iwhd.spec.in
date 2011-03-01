@@ -62,6 +62,9 @@ rm -rf %{buildroot}
 %{_bindir}/iwhd
 %{_bindir}/dc-rhev-image
 %{_mandir}/man8/iwhd.8*
+%{_sysconfdir}/rc.d/init.d/iwhd
+%{_sysconfdir}/iwhd/conf.js
+%{_localstatedir}/lib/iwhd
 
 %changelog
 * Wed Oct  7 2010 Jim Meyering <meyering@redhat.com> - 0.90-1

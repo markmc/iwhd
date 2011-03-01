@@ -16,8 +16,10 @@
 /gnulib-tests
 /iwhd
 /iwhd-*.tar.gz
+/iwhd-conf.js
 /iwhd-qparser.c
 /iwhd-qparser.h
+/iwhd.init
 /iwhd.spec
 /m4/.gitignore
 /maint.mk

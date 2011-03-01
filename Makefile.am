@@ -24,6 +24,7 @@ ACLOCAL_AMFLAGS = -I m4
 bin_PROGRAMS = iwhd dc-rhev-image
 
 EXTRA_DIST =		\
+  iwhd.init.in		\
   iwhd-qparser.h	\
   iwhd.spec		\
   iwhd.spec.in
@@ -63,11 +64,11 @@ VERSION_no_hyphen = $$(echo $(VERSION)|tr - _)
 MOSTLYCLEANFILES += iwhd.spec
 MAINTAINERCLEANFILES += iwhd.spec
 iwhd.spec: iwhd.spec.in Makefile
-	rm -f $@-t $@
-	v=$$(echo $(VERSION)|tr - .); \
-	sed 's/[@]VERSION@/'"$$v"/ $< > $@-t
-	chmod a=r $@-t
-	mv $@-t $@
+	$(AM_V_GEN)rm -f $@-t $@
+	$(AM_V_at)v=$$(echo $(VERSION)|tr - .); \
+	  sed 's/[@]VERSION@/'"$$v"/ $< > $@-t
+	$(AM_V_at)chmod a=r $@-t
+	$(AM_V_at)mv $@-t $@
 
 # The following rule accommodates pre-release version number strings
 # like "0.0.273-1621" that contain a "-".  Repack the tarball
@@ -90,6 +91,45 @@ rpm: dist iwhd.spec
 	    ;;							\
 	  *) rpmbuild -ta $(distdir).tar.gz ;;			\
 	esac
+
+# Use this directory for the local FS-based store mentioned in the etc config.
+DEFAULT_FS_DIR = $(localstatedir)/lib/iwhd
+
+DISTCLEANFILES = iwhd.init
+iwhd.init: iwhd.init.in $(top_builddir)/config.status
+	$(AM_V_GEN)sed						\
+	    -e s!@localstatedir\@!@localstatedir@!g		\
+	    -e s!@sbindir\@!@sbindir@!g				\
+	    -e s!@sysconfdir\@!@sysconfdir@!g			\
+	  < $< > $@-t &&					\
+	chmod a+x $@-t &&					\
+	mv $@-t $@
+
+DISTCLEANFILES += iwhd-conf.js
+iwhd-conf.js: $(top_builddir)/config.status
+	$(AM_V_GEN)printf '%s\n'				\
+	    '['							\
+	    '  {'						\
+	    '    "name": "primary",'				\
+	    '    "type": "fs",'					\
+	    '    "path": "$(DEFAULT_FS_DIR)"'			\
+	    '  }'						\
+	    ']'							\
+	  > $@-t && chmod a-w $@-t && mv $@-t $@
+
+.PHONY: install-data-local
+install-data-local: iwhd.init iwhd-conf.js
+	mkdir -p $(DESTDIR)$(sysconfdir)/rc.d/init.d
+	$(INSTALL_SCRIPT) iwhd.init $(DESTDIR)$(sysconfdir)/rc.d/init.d/iwhd
+	mkdir -p $(DESTDIR)$(sysconfdir)/iwhd
+	$(INSTALL_DATA) iwhd-conf.js $(DESTDIR)$(sysconfdir)/iwhd/conf.js
+	mkdir -p $(DESTDIR)$(DEFAULT_FS_DIR)
+
+.PHONY: uninstall-local
+uninstall-local:
+	rm -f $(DESTDIR)$(sysconfdir)/rc.d/init.d/iwhd \
+	  $(DESTDIR)$(sysconfdir)/iwhd/conf.js
+	rmdir $(DESTDIR)$(DEFAULT_FS_DIR)
 
 iwhd_CPPFLAGS = $(HAIL_CFLAGS) -I$(top_srcdir)/lib
 iwhd_LDADD =		\
