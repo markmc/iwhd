@@ -89,6 +89,8 @@ static void
 hash_insert_new (Hash_table *ht, const void *ent)
 {
   void *e = hash_insert (ht, ent);
+  if (e == NULL)
+    xalloc_die ();
   assert (e == ent);
 }
 
@@ -363,6 +365,10 @@ convert_provider (int i, provider_t *out)
 	return 1;
 }
 
+/* Add provider H (defined by its key/value pairs) to PROV_HASH.
+   The new entry in PROV_HASH uses the "name" value from H, and all other
+   attributes are key/value pairs in a newly-allocated hash that makes
+   up the "value".  */
 int
 add_provider (Hash_table *h)
 {
