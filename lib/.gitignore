@@ -58,6 +58,8 @@
 /pipe.c
 /progname.c
 /progname.h
+/quote.c
+/quote.h
 /quotearg.c
 /quotearg.h
 /realloc.c

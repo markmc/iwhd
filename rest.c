@@ -42,6 +42,7 @@
 #include "meta.h"
 #include "backend.h"
 #include "setup.h"
+#include "quote.h"
 #include "replica.h"
 #include "template.h"
 #include "mpipe.h"
@@ -2248,6 +2249,11 @@ main (int argc, char **argv)
 		break;
 	}
 args_done:
+
+	if (optind < argc) {
+		error (0, 0, _("extra operand %s"), quote (argv[optind]));
+		usage (EXIT_FAILURE);
+	}
 
 	if (!db_port) {
 		db_port = autostart ? AUTO_MONGOD_PORT : 27017;
