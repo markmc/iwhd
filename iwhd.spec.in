@@ -60,6 +60,7 @@ rm -rf %{buildroot}
 %defattr(-,root,root,-)
 %doc AUTHORS COPYING README NEWS
 %{_bindir}/iwhd
+%{_bindir}/dc-rhev-image
 %{_mandir}/man8/iwhd.8*
 
 %changelog
