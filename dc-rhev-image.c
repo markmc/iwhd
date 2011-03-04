@@ -22,8 +22,9 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA  02111-1307, USA.
  */
-/* need _GNU_SOURCE for asprintf */
-#define _GNU_SOURCE
+
+#include <config.h>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -105,7 +106,7 @@ struct api_conn {
 static void Usage(void)
 {
 	fprintf(stderr, "ERROR Usage: " TAG " [" TAG ".conf]\n");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 static char **env_p;
@@ -229,7 +230,8 @@ static int path_exists(const char *path)
 }
 
 static void
-cfg_veripick(char **cfgval, const char *cfgname, json_t *jcfg, char *cfgtag)
+cfg_veripick(char **cfgval, const char *cfgname, json_t *jcfg,
+	     const char *cfgtag)
 {
 	json_t *elem;
 	const char *name;
@@ -240,18 +242,18 @@ cfg_veripick(char **cfgval, const char *cfgname, json_t *jcfg, char *cfgtag)
 		fprintf(stderr,
 		    "ERROR configuration %s: tag %s is not a string\n",
 		    cfgname, cfgtag);
-		exit(2);
+		exit(EXIT_FAILURE);
 	}
 	name = json_string_value(elem);
 	if (!name) {
 		fprintf(stderr, "ERROR configuration %s: tag %s has no value\n",
 		    cfgname, cfgtag);
-		exit(2);
+		exit(EXIT_FAILURE);
 	}
 	tmp = strdup(name);
 	if (!tmp) {
 		fprintf(stderr, "ERROR no core\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	*cfgval = tmp;
 }
@@ -311,19 +313,19 @@ static void apipaths(struct api_conn *connection, struct curl_slist *headers,
 	rcc = curl_easy_perform(curl);
 	if (rcc != CURLE_OK) {
 		fprintf(stderr, "ERROR curl failed GET url `%s'\n", url);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	doc = xmlReadMemory(apib.buf, apib.used, "rhev-api.xml", NULL, 0);
 	if (doc == NULL) {
 		fprintf(stderr, "ERROR API parse error in `%s'\n", url);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	etroot = xmlDocGetRootElement(doc);
 	if (strcmp((const char *)etroot->name, "api") != 0) {
 		fprintf(stderr, "ERROR API root is `api'\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	for (et = etroot->children; et; et = et->next) {
@@ -358,11 +360,11 @@ static void apipaths(struct api_conn *connection, struct curl_slist *headers,
 
 	if (!pathsd) {
 		fprintf(stderr, "ERROR API has no `rel=storagedomains'\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	if (!pathdc) {
 		fprintf(stderr, "ERROR API has no `rel=datacenters'\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	*psd = pathsd;
@@ -376,11 +378,11 @@ static void apipaths(struct api_conn *connection, struct curl_slist *headers,
 
  err_alloc:
 	fprintf(stderr, "ERROR No core\n");
-	exit(1);
+	exit(EXIT_FAILURE);
 
  err_href:
 	fprintf(stderr, "ERROR <link /> with no `href'\n");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 static xmlNode *xmlGetChild(xmlNode *node, const char *name)
@@ -450,13 +452,13 @@ static struct stor_dom *apistordom_1(struct config *cfg, xmlChar *uuidsd,
 
 	if (!(sd = malloc(sizeof(struct stor_dom)))) {
 		fprintf(stderr, "ERROR No core\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	memset(sd, 0, sizeof(struct stor_dom));
 	sd->uuid = strdup((char *)uuidsd);
 	if (!sd->uuid) {
 		fprintf(stderr, "ERROR No core\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	sd->address = cfg->nfshost;
 	sd->path = cfg->nfspath;
@@ -503,19 +505,19 @@ static struct stor_dom *apistordom(struct config *cfg,
 	rcc = curl_easy_perform(curl);
 	if (rcc != CURLE_OK) {
 		fprintf(stderr, "ERROR curl failed GET url `%s'\n", url);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	doc = xmlReadMemory(apib.buf, apib.used, "rhev-api.xml", NULL, 0);
 	if (doc == NULL) {
 		fprintf(stderr, "ERROR API parse error in `%s'\n", url);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	etroot = xmlDocGetRootElement(doc);
 	if (strcmp((const char *)etroot->name, "storage_domains") != 0) {
 		fprintf(stderr, "ERROR API root is `storage_domains'\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	sd = NULL;
@@ -562,7 +564,7 @@ static struct stor_dom *apistordom(struct config *cfg,
 	if (!sd) {
 		fprintf(stderr, "ERROR NFS storage domain for `%s' not found\n",
 		    url);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	xmlFreeDoc(doc);
@@ -573,8 +575,7 @@ static struct stor_dom *apistordom(struct config *cfg,
 
  err_alloc:
 	fprintf(stderr, "ERROR No core\n");
-	exit(1);
-	return NULL;
+	exit(EXIT_FAILURE);
 }
 
 static int apipoolid(struct config *cfg, struct api_conn *connection,
@@ -611,19 +612,19 @@ static int apipoolid(struct config *cfg, struct api_conn *connection,
 	rcc = curl_easy_perform(curl);
 	if (rcc != CURLE_OK) {
 		fprintf(stderr, "ERROR curl failed GET url `%s'\n", url);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	doc = xmlReadMemory(apib.buf, apib.used, "rhev-api.xml", NULL, 0);
 	if (doc == NULL) {
 		fprintf(stderr, "ERROR API parse error in `%s'\n", url);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	etroot = xmlDocGetRootElement(doc);
 	if (strcmp((const char *)etroot->name, "storage_domains") != 0) {
 		fprintf(stderr, "ERROR API root is `storage_domains'\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	for (etsd = etroot->children; etsd; etsd = etsd->next) {
@@ -656,8 +657,7 @@ ret:
 
  err_alloc:
 	fprintf(stderr, "ERROR No core\n");
-	exit(1);
-	return 0;
+	exit(EXIT_FAILURE);
 }
 
 static char *apipool(struct config *cfg, struct api_conn *connection,
@@ -697,7 +697,7 @@ static char *apipool(struct config *cfg, struct api_conn *connection,
 	rcc = curl_easy_perform(curl);
 	if (rcc != CURLE_OK) {
 		fprintf(stderr, "ERROR curl failed GET url `%s'\n", url);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	/* <--- cleanup curl connection here if needed */
@@ -705,13 +705,13 @@ static char *apipool(struct config *cfg, struct api_conn *connection,
 	doc = xmlReadMemory(apib.buf, apib.used, "rhev-api-dc.xml", NULL, 0);
 	if (doc == NULL) {
 		fprintf(stderr, "ERROR API parse error in `%s'\n", url);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	etroot = xmlDocGetRootElement(doc);
 	if (strcmp((const char *)etroot->name, "data_centers") != 0) {
 		fprintf(stderr, "ERROR API root is `data_centers'\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	for (etdc = etroot->children; etdc; etdc = etdc->next) {
@@ -768,13 +768,11 @@ static char *apipool(struct config *cfg, struct api_conn *connection,
 	}
 
 	fprintf(stderr, "ERROR pool not found for storage domain %s\n", sd_uuid);
-	exit(1);
-	return NULL;
+	exit(EXIT_FAILURE);
 
  err_alloc:
 	fprintf(stderr, "ERROR No core\n");
-	exit(1);
-	return NULL;
+	exit(EXIT_FAILURE);
 }
 
 static struct stor_dom *apistart(struct config *cfg)
@@ -797,7 +795,7 @@ static struct stor_dom *apistart(struct config *cfg)
 	if (!huri_parse(&huri, cfg->apiurl)) {
 		fprintf(stderr, "ERROR unable to parse `apiurl': `%s'\n",
 		    cfg->apiurl);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	path = strndup(huri.path, huri.path_len);
@@ -874,7 +872,7 @@ static struct stor_dom *apistart(struct config *cfg)
 
  err_alloc:
 	fprintf(stderr, "ERROR No core\n");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 static void spitovf(struct config *cfg, struct stor_dom *sd,
@@ -906,7 +904,7 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	if (mkdir(tmpovfdir, 0770) < 0) {
 		fprintf(stderr, "ERROR Failed to make directory %s: %s\n",
 		    tmpovfdir, strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	uuid_unparse_lower(img_uuid, uuidbuf);
@@ -931,13 +929,13 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	if (!writer) {
 		fprintf(stderr, "ERROR Error creating the xml driver for %s\n",
 		    tmpovf);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	rc = xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL);
 	if (rc < 0) {
 		fprintf(stderr, "ERROR Error in xmlTextWriterStartDocument\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	rc = xmlTextWriterStartElement(writer, BAD_CAST "ovf:Envelope");
@@ -1325,7 +1323,7 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	rc = xmlTextWriterEndDocument(writer);
 	if (rc < 0) {
 		fprintf(stderr, "ERROR Error in xmlTextWriterEndDocument\n");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	xmlFreeTextWriter(writer);
@@ -1333,12 +1331,12 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	if (rename(tmpimgdir, imgdir) < 0) {
 		fprintf(stderr, "ERROR Failed to rename from %s to %s: %s\n",
 		    tmpimgdir, imgdir, strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	if (rename(tmpovfdir, ovfdir) < 0) {
 		fprintf(stderr, "ERROR Failed to rename from %s to %s: %s\n",
 		    tmpovfdir, ovfdir, strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	free(domdir);
@@ -1351,11 +1349,11 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 
  err_alloc:
 	fprintf(stderr, "ERROR No core\n");
-	exit(1);
+	exit(EXIT_FAILURE);
 
  err_xml:
 	fprintf(stderr, "ERROR Failed to form XML\n");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
@@ -1378,7 +1376,7 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 		if (geteuid() != NFSUID || getegid() != NFSGID) {
 			fprintf(stderr,
 			    "ERROR Have to run with user and group 36\n");
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -1388,11 +1386,11 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 	if (stat(domdir, &statb) < 0) {
 		fprintf(stderr, "ERROR failed to stat %s: %s\n",
 		    domdir, strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	if (!S_ISDIR(statb.st_mode)) {
 		fprintf(stderr, "ERROR path %s is not a directory\n", domdir);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	uuid_generate_random(vol_uuid);
@@ -1407,7 +1405,7 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 	if (mkdir(tmpimgdir, 0770) < 0) {
 		fprintf(stderr, "ERROR Failed to make directory %s: %s\n",
 		    tmpimgdir, strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	now = time(NULL);
@@ -1424,7 +1422,7 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 	if (stat(imgdst, &statb) < 0) {
 		fprintf(stderr, "ERROR failed to stat %s: %s\n",
 		    imgdst, strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	vol_size = statb.st_size;
 
@@ -1436,7 +1434,7 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 	if (!fp) {
 		fprintf(stderr, "ERROR Failed to create %s: %s\n",
 		    imgmeta, strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	fprintf(fp, "DOMAIN=%s\n", sd->uuid);
 	/* saved template has VOLTYPE=SHARED */
@@ -1458,7 +1456,7 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 	fprintf(fp, "EOF\n");
 	if (close_stream(fp)) {
 		fprintf(stderr, "ERROR Failed to write %s\n", imgmeta);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	spitovf(cfg, sd, img_uuid, vol_uuid, vol_size, tpl_uuid);
@@ -1471,14 +1469,14 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 
  err_alloc:
 	fprintf(stderr, "ERROR No core\n");
-	exit(1);
+	exit(EXIT_FAILURE);
 }
 
 int main(int argc, char **argv, char **envp)
 {
 	uuid_t tpl_uuid;
 	json_error_t err;
-	char *cfgname;
+	const char *cfgname;
 	struct config cfg;
 	json_t *jcfg;
 	struct stor_dom *sd;
@@ -1503,21 +1501,21 @@ int main(int argc, char **argv, char **envp)
 	if (!jcfg) {
 		fprintf(stderr, "ERROR configuration JSON error %s:%d: %s\n",
 		    cfgname, err.line, err.text);
-		exit(2);
+		exit(EXIT_FAILURE);
 	}
 
 	if (json_typeof(jcfg) != JSON_OBJECT) {
 		fprintf(stderr,
 		    "ERROR configuration JSON %s: root is not a struct\n",
 		    cfgname);
-		exit(2);
+		exit(EXIT_FAILURE);
 	}
 
 	/* image: local filename with disk image */
 	cfg_veripick(&cfg.image, cfgname, jcfg, "image");
 	if (!path_exists(cfg.image)) {
 		fprintf(stderr, "ERROR image %s does not exist\n", cfg.image);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	/* apiurl: the so-called "base", usually "rhev-api" */
 	cfg_veripick(&cfg.apiurl, cfgname, jcfg, "apiurl");
@@ -1548,11 +1546,11 @@ int main(int argc, char **argv, char **envp)
 	cfg_veripick(&cfg.nfsdir, cfgname, jcfg, "nfsdir");
 	if (cfg.nfsdir[0] == 0) {
 		fprintf(stderr, "ERROR configuration: `nfsdir' is empty\n");
-		exit(2);
+		exit(EXIT_FAILURE);
 	}
 	if (cfg.nfsdir[0] != '/') {
 		fprintf(stderr, "ERROR configuration: `nfsdir' is relative\n");
-		exit(2);
+		exit(EXIT_FAILURE);
 	}
 
 	json_decref(jcfg);

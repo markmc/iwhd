@@ -589,7 +589,7 @@ auto_config(void)
 
 	config = json_loads(auto_json,&err);
 	if (!config) {
-		fprintf(stderr,"JSON error on line %d: %s\n",err.line,err.text);
+		error(0, 0, "JSON error on line %d: %s", err.line, err.text);
 		return NULL;
 	}
 

@@ -55,6 +55,7 @@
 /hash-pjw.h
 /hash.c
 /hash.h
+/ignore-value.h
 /intprops.h
 /inttypes.h
 /inttypes.in.h

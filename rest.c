@@ -1746,8 +1746,6 @@ proxy_primary_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	DPRINTF("PROXY GET PRIMARY PROVIDER (%s)\n", url);
 
-	my_state *ms = *rctx;
-
 	// "/_providers/_primary" is the only one we accept for now.
 	bool valid = strcmp (url, "/_providers/_primary") == 0;
 	unsigned int rc = (valid ? MHD_HTTP_OK : MHD_HTTP_BAD_REQUEST);
@@ -1780,7 +1778,6 @@ proxy_set_primary (void *cctx, struct MHD_Connection *conn, const char *url,
 
 	DPRINTF("PROXY SET PRIMARY PROVIDER (%s)\n", url);
 
-	my_state *ms = *rctx;
 	char *name = NULL;
 	unsigned int rc = MHD_HTTP_BAD_REQUEST;
 
@@ -1835,7 +1832,6 @@ proxy_delete_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)data;
 	(void)data_size;
 
-	my_state *ms = *rctx;
 	struct MHD_Response *resp
 	  = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 	if (!resp) {

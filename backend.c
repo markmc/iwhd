@@ -42,6 +42,7 @@
 #include "mpipe.h"
 #include "backend.h"
 #include "state_defs.h"
+#include "ignore-value.h"
 
 #define NFSGID 36
 
@@ -1332,7 +1333,7 @@ fs_bcreate (const provider_t *prov, const char *bucket)
 	 * dc-rhev-image cannot do setregid either, so no harm done:
 	 * probably this is not a RHEV back-end to begin with.
 	 */
-	chown(bucket,-1,NFSGID);
+	ignore_value(chown(bucket,-1,NFSGID));
 
 	return MHD_HTTP_OK;
 }
