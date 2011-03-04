@@ -375,8 +375,10 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	int	 	 argc = 0;
 	pid_t	 	 pid;
 	int		 organ[2];
+	int		 wstat;
 	FILE		*fp;
 	char		 buf[LINE_SIZE];
+	char		*s;
 	char		*cval	= NULL;
 	char		*kval	= NULL;
 	int		 rc	= MHD_HTTP_BAD_REQUEST;
@@ -517,22 +519,16 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		error (EXIT_FAILURE, errno, "failed to run command %s", cmd);
 	}
 
-	DPRINTF("waiting for child...\n");
-	if (waitpid(pid,NULL,0) < 0) {
-		error (0, errno, "waitpid failed");
-	}
-	/* TBD: check identity/status from waitpid */
-	DPRINTF("...child exited\n");
-
 	close(organ[1]);
 	fp = fdopen(organ[0],"r");
 	if (!fp) {
-		DPRINTF("could not open parent pipe\n");
+		error (0, 0, "could not open parent pipe stream");
 		close(organ[0]);
 		goto cleanup;
 	}
 	while (fgets(buf,sizeof(buf)-1,fp)) {
-		buf[sizeof(buf)-1] = '\0';
+		if ((s = strchr(buf, '\n')) != NULL)
+			*s = '\0';
 		if (regexec(&s3_success_pat,buf,2,match,0) == 0) {
 			buf[match[1].rm_eo] = '\0';
 			DPRINTF("found AMI ID: %s\n",buf+match[1].rm_so);
@@ -550,6 +546,22 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		}
 	}
 	fclose(fp);
+
+	DPRINTF("waiting for child...\n");
+	if (waitpid(pid,&wstat,0) < 0) {
+		error (0, errno, "waitpid failed");
+		goto cleanup;
+	}
+	if (!WIFEXITED(wstat)) {
+		error (0, 0, "%s is killed (status 0x%x)", cmd, wstat);
+		goto cleanup;
+	}
+	if (WEXITSTATUS(wstat)) {
+		error (0, 0, "%s exited with code %d",
+		       cmd, WEXITSTATUS(wstat));
+		goto cleanup;
+	}
+	DPRINTF("...child exited\n");
 
 cleanup:
 	/*
@@ -1350,9 +1362,6 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	char		 ami_id_buf[64];
 	regmatch_t	 match[2];
 
-	organ[0] = -1;
-	organ[1] = -1;
-
 	if (!regex_ok) {
 		return MHD_HTTP_BAD_REQUEST;
 	}
@@ -1507,10 +1516,10 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	}
 
 	close(organ[1]);
-	organ[1] = -1;
 	fp = fdopen(organ[0],"r");
 	if (!fp) {
-		error (0, 0, "could not open parent pipe stream\n");
+		error (0, 0, "could not open parent pipe stream");
+		close(organ[0]);
 		goto cleanup;
 	}
 	while (fgets(buf,sizeof(buf)-1,fp)) {
@@ -1532,7 +1541,6 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 		}
 	}
 	fclose(fp);
-	organ[0] = -1;
 
 	DPRINTF("waiting for child...\n");
 	if (waitpid(pid,&wstat,0) < 0) {
@@ -1551,10 +1559,6 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	DPRINTF("...child exited\n");
 
 cleanup:
-	if (organ[0] != -1)
-		close(organ[0]);
-	if (organ[1] != -1)
-		close(organ[1]);
 	/*
 	 * Unfortunately we cannot collect zombies indiscriminately here
 	 * in case another thread forks. TBD: make main loop collect zombies.
