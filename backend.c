@@ -43,6 +43,8 @@
 #include "backend.h"
 #include "state_defs.h"
 
+#define NFSGID 36
+
 struct hstor_client	*hstor;
 
 /***** Generic module stuff, not specific to one back end *****/
@@ -54,6 +56,7 @@ struct hstor_client	*hstor;
  * enough to hold the header name plus a CF token (32 bytes).
  */
 #define ADDR_SIZE	256
+#define LINE_SIZE	500
 #define HEADER_SIZE	64
 
 #define S3_IMAGE_PATTERN "^IMAGE[[:blank:]]+([^[:space:]]+)"
@@ -373,7 +376,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	pid_t	 	 pid;
 	int		 organ[2];
 	FILE		*fp;
-	char		 buf[ADDR_SIZE];
+	char		 buf[LINE_SIZE];
 	char		*cval	= NULL;
 	char		*kval	= NULL;
 	int		 rc	= MHD_HTTP_BAD_REQUEST;
@@ -1308,12 +1311,262 @@ fs_bcreate (const provider_t *prov, const char *bucket)
 
 	DPRINTF("creating bucket %s\n",bucket);
 
-	if (mkdir(bucket,0700) < 0) {
+	if (mkdir(bucket,0750) < 0) {
 		error (0, errno, "%s: failed to create directory", bucket);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
+	/*
+	 * The chown fails if iwhd does not run as root, but in that case
+	 * dc-rhev-image cannot do setregid either, so no harm done:
+	 * probably this is not a RHEV back-end to begin with.
+	 */
+	chown(bucket,-1,NFSGID);
 
 	return MHD_HTTP_OK;
+}
+
+static int
+fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
+		   Hash_table *args)
+{
+	char		*api_url;
+	char		*api_user;
+	char		*api_secret;
+	char		*nfs_host;
+	char		*nfs_path;
+	char		*nfs_dir;
+	const char	*conf_name = NULL;
+	char		*conf_text = NULL;
+	int		 ret	= MHD_HTTP_BAD_REQUEST;
+	int		 rc;
+	const char	*argv[12];
+	int	 	 argc = 0;
+	pid_t	 	 pid;
+	int		 organ[2];
+	int		 wstat;
+	FILE		*fp;
+	char		 buf[LINE_SIZE];
+	char		*s;
+	char		 ami_id_buf[64];
+	regmatch_t	 match[2];
+
+	organ[0] = -1;
+	organ[1] = -1;
+
+	if (!regex_ok) {
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	DPRINTF("*** RHEV-M register %s/%s via %s (%s:%d)\n",
+		ms->bucket, ms->key, prov->name, prov->host, prov->port);
+	if (next) {
+		DPRINTF("RHEV-M register with next!=NULL\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	/*
+	 * This may be a good time to check if kernel is set.
+	 * Saving the code for later. Use partitioned, bootable images for now.
+	 */
+#if 0
+	char		*kernel		= kv_hash_lookup(args,"kernel");
+	if (kernel) {
+		DPRINTF("    (using kernel %s)\n",kernel);
+	}
+#endif
+
+	/*
+	 * This is always "http://xxxxxx.xxxx.xxx/rhevm-api".
+	 * SSL does not work yet, sorry.
+	 */
+	api_url = kv_hash_lookup(args,"api-url");
+	if (!api_url) {
+		/* TBD: This has to have a defined field in provider, too. */
+		error (0, 0, "missing RHEV-M API URL (api-url)");
+		goto cleanup;
+	}
+
+	api_user = kv_hash_lookup(args,"api-key");
+	if (!api_user) {
+		api_user = (char *)prov->username;
+		if (!api_user) {
+			error (0, 0, "missing RHEV-M API username (api-key)");
+			goto cleanup;
+		}
+	}
+
+	api_secret = kv_hash_lookup(args,"api-secret");
+	if (!api_secret) {
+		api_secret = (char *)prov->password;
+		if (!prov->password) {
+			error (0, 0, "missing RHEV-M API secret (api-secret)");
+			goto cleanup;
+		}
+	}
+
+	/*
+	 * We need to document how this all works.
+	 * - NFS host and NFS path are matched against the list of storage
+	 *   domains in RHEV-M (we fetch the list using RESTful API).
+	 *   This way we find the UUIDs that we have to write out.
+	 * - "NFS directory" is the place where write the image and metadata.
+	 * It is up to the user to make sure that nfs-dir points to
+	 * nfs-host:nfs-path. We do not have a way to verify it is so.
+	 */
+	nfs_host = kv_hash_lookup(args,"nfs-host");
+	nfs_path = kv_hash_lookup(args,"nfs-path");
+	nfs_dir = kv_hash_lookup(args,"nfs-dir");
+	if (!nfs_host) {
+		error (0, 0, "missing export domain's host (nfs-host)");
+		goto cleanup;
+	}
+	if (!nfs_path) {
+		error (0, 0, "missing export domain's path (nfs-path)");
+		goto cleanup;
+	}
+	if (!nfs_dir) {
+		error (0, 0, "missing target directory (nfs-dir)");
+		goto cleanup;
+	}
+
+#if 0 /* The GC library crashes on free() in this case. */
+	rc = asprintf(&conf_text,
+		    "{\n"
+		    "  \"image\"   : \"%s/%s\",\n"
+		    "  \"apiurl\"  : \"%s\",\n"
+		    "  \"apiuser\" : \"%s\",\n"
+		    "  \"apipass\" : \"%s\",\n"
+		    "  \"nfshost\" : \"%s\",\n"
+		    "  \"nfspath\" : \"%s\",\n"
+		    "  \"nfsdir\" :  \"%s\"\n"
+		    "}\n",
+			ms->bucket, ms->key,
+			api_url, api_user, api_secret,
+			nfs_host, nfs_path, nfs_dir
+	    );
+	if (rc < 0) {
+		conf_text = NULL;
+		error (0, 0, "no core");
+		goto cleanup;
+	}
+#else
+	conf_text = malloc(1000);
+	if (!conf_text) {
+		error (0, 0, "no core");
+		goto cleanup;
+	}
+	snprintf(conf_text, 1000,
+		    "{\n"
+		    "  \"image\"   : \"%s/%s\",\n"
+		    "  \"apiurl\"  : \"%s\",\n"
+		    "  \"apiuser\" : \"%s\",\n"
+		    "  \"apipass\" : \"%s\",\n"
+		    "  \"nfshost\" : \"%s\",\n"
+		    "  \"nfspath\" : \"%s\",\n"
+		    "  \"nfsdir\" :  \"%s\"\n"
+		    "}\n",
+			ms->bucket, ms->key,
+			api_url, api_user, api_secret,
+			nfs_host, nfs_path, nfs_dir
+	    );
+#endif
+	conf_name = s3_init_tmpfile(conf_text);
+	if (!conf_name) {
+		error (0, 0, "cannot create a temporary file");
+		goto cleanup;
+	}
+
+	sprintf(ami_id_buf,"pending %lld",(long long)time(NULL));
+	DPRINTF("temporary ami-id = \"%s\"\n",ami_id_buf);
+	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
+	rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+
+	const char *cmd = "dc-rhev-image";
+	argv[argc++] = cmd;
+	argv[argc++] = conf_name;
+	argv[argc] = NULL;
+
+	if (pipe(organ) < 0) {
+		error (0, errno, "pipe creation failed");
+		goto cleanup;
+	}
+
+	pid = fork();
+	if (pid < 0) {
+		error (0, errno, "fork failed");
+		close(organ[0]);
+		close(organ[1]);
+		goto cleanup;
+	}
+
+	if (pid == 0) {
+		(void)dup2(organ[1],STDOUT_FILENO);
+		(void)dup2(organ[1],STDERR_FILENO);
+		execvp(cmd, (char* const*)argv);
+		error (EXIT_FAILURE, errno, "failed to run command %s", cmd);
+	}
+
+	close(organ[1]);
+	organ[1] = -1;
+	fp = fdopen(organ[0],"r");
+	if (!fp) {
+		error (0, 0, "could not open parent pipe stream\n");
+		goto cleanup;
+	}
+	while (fgets(buf,sizeof(buf)-1,fp)) {
+		if ((s = strchr(buf, '\n')) != NULL)
+			*s = '\0';
+		if (regexec(&s3_success_pat,buf,2,match,0) == 0) {
+			buf[match[1].rm_eo] = '\0';
+			DPRINTF("found image UUID: %s\n",buf+match[1].rm_so);
+			sprintf(ami_id_buf,"OK %.60s",buf+match[1].rm_so);
+			rc = MHD_HTTP_OK;
+		}
+		else if (strcmp(buf,"ERROR") == 0) {
+			DPRINTF("found err marker: %s\n",buf+sizeof("ERROR"));
+			sprintf(ami_id_buf,"failed %.56s",buf+sizeof("ERROR"));
+			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+		}
+		else {
+			DPRINTF("ignoring line: <%s>\n",buf);
+		}
+	}
+	fclose(fp);
+	organ[0] = -1;
+
+	DPRINTF("waiting for child...\n");
+	if (waitpid(pid,&wstat,0) < 0) {
+		error (0, errno, "waitpid failed");
+		goto cleanup;
+	}
+	if (!WIFEXITED(wstat)) {
+		error (0, 0, "%s is killed (status 0x%x)", cmd, wstat);
+		goto cleanup;
+	}
+	if (WEXITSTATUS(wstat)) {
+		error (0, 0, "%s exited with code %d",
+		       cmd, WEXITSTATUS(wstat));
+		goto cleanup;
+	}
+	DPRINTF("...child exited\n");
+
+cleanup:
+	if (organ[0] != -1)
+		close(organ[0]);
+	if (organ[1] != -1)
+		close(organ[1]);
+	/*
+	 * Unfortunately we cannot collect zombies indiscriminately here
+	 * in case another thread forks. TBD: make main loop collect zombies.
+	 */
+	// while(waitpid(-1,&wstat,WNOHANG) >= 0) {}
+	if (conf_name)
+		unlink(conf_name);
+	free((char *)conf_name);
+	free(conf_text);
+
+	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
+	return ret;
 }
 
 /***** Function tables. ****/
@@ -1371,4 +1624,15 @@ backend_func_tbl fs_func_tbl = {
 	fs_delete,
 	fs_bcreate,
 	bad_register,
+};
+
+backend_func_tbl fs_rhevm_func_tbl = {
+	"FS-RHEV-M",
+	fs_init,
+	fs_get_child,
+	fs_put_child,
+	bad_cache_child,
+	fs_delete,
+	fs_bcreate,
+	fs_rhevm_register,
 };

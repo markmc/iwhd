@@ -12,6 +12,7 @@
 /config.log
 /config.status
 /configure
+/dc-rhev-image
 /gnulib-tests
 /iwhd
 /iwhd-*.tar.gz

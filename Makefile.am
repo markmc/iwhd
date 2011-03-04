@@ -21,7 +21,7 @@ SUBDIRS = lib . gnulib-tests t man
 ACLOCAL_AMFLAGS = -I m4
 
 # iwhd is short for Image WareHouse Daemon.
-bin_PROGRAMS = iwhd
+bin_PROGRAMS = iwhd dc-rhev-image
 
 EXTRA_DIST =		\
   iwhd-qparser.h	\
@@ -55,6 +55,8 @@ iwhd_SOURCES = \
   template.h
 
 EXTRA_iwhd_SOURCES = qlexer.l
+
+dc_rhev_image_SOURCES = dc-rhev-image.c
 
 VERSION_no_hyphen = $$(echo $(VERSION)|tr - _)
 
@@ -101,6 +103,15 @@ iwhd_LDADD =		\
   $(UHTTPD_LIB)		\
   $(PTHREAD_LIB)	\
   $(HAIL_LIBS)
+
+dc_rhev_image_CPPFLAGS = $(LIBXML_CFLAGS) -I$(top_srcdir)/lib
+dc_rhev_image_LDADD =	\
+  lib/libiwhd.a		\
+  $(LIB_ACL)		\
+  $(CURL_LIB)		\
+  $(JANSSON_LIB)	\
+  $(LIBXML_LIBS)	\
+  $(UUID_LIB)
 
 MOSTLYCLEANFILES += qlexer.c
 MAINTAINERCLEANFILES += qlexer.c

@@ -66,6 +66,11 @@ AC_CHECK_LIB([pthread], [pthread_create],
 	[AC_MSG_ERROR([Missing required pthread lib])])
 AC_SUBST([PTHREAD_LIB])
 
+AC_CHECK_LIB([uuid], [uuid_generate_random],
+	[UUID_LIB=-luuid],
+	[AC_MSG_ERROR([Missing required uuid lib])])
+AC_SUBST([UUID_LIB])
+
 PKG_CHECK_MODULES([HAIL],[libhail >= 0.8])
 AC_SUBST([HAIL_LIBS])
 AC_SUBST([HAIL_CFLAGS])

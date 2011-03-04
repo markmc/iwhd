@@ -23,6 +23,7 @@ BuildRequires: jansson-devel
 BuildRequires: libcurl-devel
 BuildRequires: libmicrohttpd-devel
 BuildRequires: libxml2-devel
+BuildRequires: libuuid-devel
 BuildRequires: mongodb-devel
 BuildRequires: bison
 BuildRequires: flex

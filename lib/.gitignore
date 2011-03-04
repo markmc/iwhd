@@ -1,6 +1,12 @@
+/acl-internal.h
+/acl.h
+/acl_entries.c
 /arg-nonnull.h
+/base64.c
+/base64.h
 /basename-lgpl.c
 /basename.c
+/binary-io.h
 /bitrotate.h
 /c++defs.h
 /c-ctype.c
@@ -16,6 +22,9 @@
 /closeout.h
 /config.charset
 /configmake.h
+/copy-acl.c
+/copy-file.c
+/copy-file.h
 /dirname-lgpl.c
 /dirname.c
 /dirname.h
@@ -27,8 +36,13 @@
 /exitfail.c
 /exitfail.h
 /fclose.c
+/fcntl.h
+/fcntl.in.h
+/file-has-acl.c
 /fpending.c
 /fpending.h
+/full-write.c
+/full-write.h
 /getopt.c
 /getopt.h
 /getopt.in.h
@@ -55,6 +69,7 @@
 /memchr.c
 /memchr.valgrind
 /mkstemp.c
+/open.c
 /pipe.c
 /progname.c
 /progname.h
@@ -67,6 +82,11 @@
 /ref-add.sin
 /ref-del.sed
 /ref-del.sin
+/safe-read.c
+/safe-read.h
+/safe-write.c
+/safe-write.h
+/set-mode-acl.c
 /stat.c
 /stdarg.h
 /stdarg.in.h
@@ -121,6 +141,7 @@
 /wchar.in.h
 /wctype.h
 /wctype.in.h
+/write.c
 /xalloc-die.c
 /xalloc.h
 /xmalloc.c
