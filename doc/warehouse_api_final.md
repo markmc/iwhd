@@ -157,7 +157,8 @@ can be used to fetch or set multiple attributes - including values
 
 To set both of these attributes at once:
 
-		$ curl -d color="blue" -d flavor="lemon" http://fserver-1:9090/my_bucket/file1/attrs
+		$ curl -d color="blue" -d flavor="lemon" \
+		http://fserver-1:9090/my_bucket/file1/attrs
 
 Single-attribute operations are also supported. To fetch a
 single attribute:
@@ -282,7 +283,8 @@ object body except that there's no data transfer from the client).
 The second control operation is used to determine whether replication
 to a specific remote warehouse has finished.
 
-		$ curl -d op=check loc=backup http://fserver-1:9090/my_bucket/file1
+		$ curl -d op=check -d loc=backup \
+		http://fserver-1:9090/my_bucket/file1
 
 This will return a 404 (Not Found) if the object has not been replicated
 to that location, or a 200 (OK) if it has.
@@ -291,8 +293,8 @@ Appendix 2: JSON Configuration Format
 -------------------------------------
 
 The initial configuration for the image warehouse is pulled
-from a JSON configuration file, repo.json in the current directory
-by default. This defines a set of required attributes plus any
+from a JSON configuration file (set with -c option).
+This defines a set of required attributes plus any
 others that the user might want to use in replication policies.
 Here's an example:
 
