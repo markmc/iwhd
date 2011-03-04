@@ -1,0 +1,33 @@
+From 5d96323f5cf9b4b4b52ae0b40d5c6ce7a4dfcd29 Mon Sep 17 00:00:00 2001
+From: Jim Meyering <meyering@redhat.com>
+Date: Tue, 1 Mar 2011 15:20:33 +0100
+Subject: [PATCH] copy-file: ignore warning about chown's unused return value
+
+* lib/copy-file.c: Include "ignore-value.h".
+(copy_file_preserving): Ignore chown failure.
+---
+ ChangeLog         |    7 +++++++
+ lib/copy-file.c   |    3 ++-
+ 3 files changed, 10 insertions(+), 1 deletions(-)
+
+diff --git a/lib/copy-file.c b/lib/copy-file.c
+index f9cd9c0..27a35c2 100644
+--- a/lib/copy-file.c
++++ b/lib/copy-file.c
+@@ -42,6 +42,7 @@
+ #include "acl.h"
+ #include "binary-io.h"
+ #include "gettext.h"
++#include "ignore-value.h"
+ #include "xalloc.h"
+
+ #define _(str) gettext (str)
+@@ -117,7 +118,7 @@ copy_file_preserving (const char *src_filename, const char *dest_filename)
+
+ #if HAVE_CHOWN
+   /* Preserve the owner and group.  */
+-  chown (dest_filename, statbuf.st_uid, statbuf.st_gid);
++  ignore_value (chown (dest_filename, statbuf.st_uid, statbuf.st_gid));
+ #endif
+
+   /* Preserve the access permissions.  */
