@@ -75,7 +75,8 @@ enum { CB_BLOCK_SIZE = 64 * 1024 };
 
 typedef enum {
 	URL_ROOT=0, URL_BUCKET, URL_OBJECT, URL_ATTR, URL_INVAL,
-	URL_QUERY, URL_PROVLIST, URL_PROVIDER, URL_PROVIDER_SET_PRIMARY
+	URL_QUERY, URL_PROVLIST, URL_PROVIDER, URL_PROVIDER_SET_PRIMARY,
+	URL_LIST_ATTRS
 } url_type;
 
 typedef struct {
@@ -88,7 +89,7 @@ static unsigned short		 my_port	= MY_PORT;
 char				*cfg_file	= NULL;
 
 static const char *const (reserved_name[]) = {"_default", "_new", "_policy", "_query", NULL};
-static const char *const (reserved_attr[]) = {"_bucket", "_date", "_etag", "_key", "_loc", "_size", NULL};
+static const char *const (reserved_attr[]) = {"_attrs", "_bucket", "_date", "_etag", "_key", "_loc", "_size", NULL};
 static const char *const (reserved_bucket_name[]) = {"_new", "_providers", NULL};
 
 static int
@@ -516,6 +517,47 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		MHD_queue_response(conn,rc,resp);
 		MHD_destroy_response(resp);
+	}
+
+	return MHD_YES;
+}
+
+static int show_parts (struct MHD_Connection *conn, my_state *ms);
+
+static int
+proxy_list_attrs (void *cctx, struct MHD_Connection *conn, const char *url,
+		  const char *method, const char *version, const char *data,
+		  size_t *data_size, void **rctx)
+{
+	(void)cctx;
+	(void)method;
+	(void)version;
+
+	my_state *ms = *rctx;
+	if (ms->state == MS_NEW) {
+		ms->state = MS_NORMAL;
+	}
+	else if (*data_size) {
+		MHD_post_process(ms->post,data,*data_size);
+		*data_size = 0;
+	}
+	else {
+		int rc = show_parts(conn,ms);
+		if (rc != MHD_HTTP_PROCESSING) {
+			/*
+			 * MHD_HTTP_PROCESSING is a special response that
+			 * means a request-specific routine (e.g. show_parts)
+			 * created its own response.  Therefore we shouldn't.
+			 */
+			struct MHD_Response *resp
+			  = MHD_create_response_from_data(0,NULL, MHD_NO,MHD_NO);
+			if (!resp) {
+				fprintf(stderr,"MHD_crfd failed\n");
+				return MHD_NO;
+			}
+			MHD_queue_response(conn,rc,resp);
+			MHD_destroy_response(resp);
+		}
 	}
 
 	return MHD_YES;
@@ -1400,13 +1442,13 @@ parts_callback (void *ctx, uint64_t pos, char *buf, size_t max)
 static int
 show_parts (struct MHD_Connection *conn, my_state *ms)
 {
-	struct MHD_Response	*resp;
 
 	ms->aquery = meta_get_attrs(ms->bucket,ms->key);
 	if (!ms->aquery) {
 		return MHD_HTTP_NOT_FOUND;
 	}
 
+	struct MHD_Response *resp;
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 		CB_BLOCK_SIZE, parts_callback, ms, simple_closer);
 	if (!resp) {
@@ -1981,6 +2023,8 @@ static const rule my_rules[] = {
 	  "GET",	URL_OBJECT,	proxy_get_data		},
 	{ /* get attribute data */
 	  "GET",	URL_ATTR,	proxy_get_attr		},
+	{ /* list an object's attributes */
+	  "GET",	URL_LIST_ATTRS,	proxy_list_attrs	},
 	{ /* put object data */
 	  "PUT",	URL_OBJECT,	proxy_put_data		},
 	{ /* put attribute data */
@@ -2065,6 +2109,8 @@ parse_url (const char *url, my_state *ms)
 		 && !strcmp (parts[URL_BUCKET], "_providers")
 		 && !strcmp (parts[URL_ATTR], "_primary"))
 	  eindex = URL_PROVIDER_SET_PRIMARY;
+	else if (eindex == URL_ATTR && !strcmp (parts[URL_ATTR], "_attrs"))
+	  eindex = URL_LIST_ATTRS;
 
 	DPRINTF("parse_url: %d: %s %s %s", eindex, parts[URL_BUCKET],
 		parts[URL_OBJECT], parts[URL_ATTR]);
