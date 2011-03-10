@@ -75,7 +75,7 @@ static const char xml_list_footer[] = "\
 static const char xml_obj_header[] = "\
 <object>\n\
 	<object_body path=\"http://%s/%s/%s/body\"/>\n\
-	<object_attr_list path=\"http://%s/%s/%s/attrs\"/>\
+	<object_attr_list path=\"http://%s/%s/%s/_attrs\"/>\
 ";
 
 static const char xml_obj_entry[] = "\
@@ -166,7 +166,7 @@ static const char json_list_footer[] = "\
 static char json_obj_header[] = "\
 {\n\
 	\"object_body\": \"http://%s/%s/%s/body\"\n\
-	\"object_attr_list\": \"http://%s/%s/%s/attrs\"\
+	\"object_attr_list\": \"http://%s/%s/%s/_attrs\"\
 ";
 
 static char json_obj_entry[] = "\

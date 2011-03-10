@@ -140,7 +140,7 @@ elements as shown here:
 		$ curl http://fserver-1:9090/my_bucket/file1
 		<object>
 			<object_body path="http://fserver-1:9090/my_bucket/file1/body"/>
-			<object_attr_list path="http://fserver-1:9090/my_bucket/file1/attrs"/>
+			<object_attr_list path="http://fserver-1:9090/my_bucket/file1/_attrs"/>
 			<object_attr name="xyz" path="http://fserver-1:9090/my_bucket/file1/attr_xyz"/>
 		</object>
 
@@ -149,7 +149,7 @@ and can have any HTTP/MIME type. The attribute-list element
 can be used to fetch or set multiple attributes - including values
 - at once. To fetch:
 
-		$ curl http://fserver-1:9090/my_bucket/file1/attrs
+		$ curl http://fserver-1:9090/my_bucket/file1/_attrs
 		<attributes>
 			<attribute name="color">blue</attribute>
 			<attribute name="flavor">lemon</attribute>
@@ -158,7 +158,7 @@ can be used to fetch or set multiple attributes - including values
 To set both of these attributes at once:
 
 		$ curl -d color="blue" -d flavor="lemon" \
-		http://fserver-1:9090/my_bucket/file1/attrs
+		http://fserver-1:9090/my_bucket/file1/_attrs
 
 Single-attribute operations are also supported. To fetch a
 single attribute:

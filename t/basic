@@ -175,7 +175,7 @@ test "$(curl $bucket/attr_post/size)" = big || fail=1
 cat <<EOF > exp-attr
 <object>
 	<object_body path="$bucket/attr_post/body"/>
-	<object_attr_list path="$bucket/attr_post/attrs"/>
+	<object_attr_list path="$bucket/attr_post/_attrs"/>
 	<object_attr name="shape" path="$bucket/attr_post/attr_shape"/>
 	<object_attr name="size" path="$bucket/attr_post/attr_size"/>
 </object>
