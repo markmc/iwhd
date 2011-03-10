@@ -39,7 +39,8 @@ typedef struct {
 	const char	*base;
 	unsigned int	 index;
 	char		 raw_buf[TMPL_BUF_SIZE];
-	const char		*buf;
+	const char	*buf;
+	int		 len;
 } tmpl_ctx_t;
 
 #define TMPL_CTX_DONE	((tmpl_ctx_t *)(-1))

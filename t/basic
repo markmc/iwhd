@@ -88,6 +88,9 @@ test "$(cat FS/b1/obj_test)" = foo || fail=1
 curl $bucket/obj_test > f1copy
 test "$(cat f1copy)" = foo || fail=1
 
+# Test that non-existing bucket gives 404 and not 500 or even 200 as before.
+curl -f http://localhost:$port/no_bucket 2> no_bucket.err
+grep ' 404$' no_bucket.err || fail=1
 
 # Get root; default, then Accept: XML & JSON:
 curl http://localhost:$port > root || fail=1

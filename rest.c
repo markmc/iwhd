@@ -722,6 +722,49 @@ query_iterator (void *ctx, enum MHD_ValueKind kind, const char *key,
 	return MHD_YES;
 }
 
+static int
+proxy_query_init (my_state *ms, const char *expr)
+{
+	size_t		 len;
+	char		*bucket;
+	char		*key;
+
+	ms->query = meta_query_new(ms->bucket,NULL,expr);
+	if (!ms->query) {
+		DPRINTF("failed query\n");
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+
+	if (!ms->gen_ctx) {
+		const char *accept_hdr
+			= MHD_lookup_connection_value(ms->conn, MHD_HEADER_KIND,
+						      "Accept");
+		ms->gen_ctx = tmpl_get_ctx(accept_hdr);
+		if (!ms->gen_ctx) {
+			DPRINTF("failed context\n");
+			return MHD_HTTP_INTERNAL_SERVER_ERROR;
+		}
+		len = tmpl_list_header(ms->gen_ctx);
+		if (!len) {
+			DPRINTF("failed header\n");
+			return MHD_HTTP_INTERNAL_SERVER_ERROR;
+		}
+	}
+
+	if (!meta_query_next(ms->query,&bucket,&key)) {
+		return MHD_HTTP_NOT_FOUND;
+	}
+	if (is_reserved(key,reserved_name)) {
+		return MHD_HTTP_OK;
+	}
+	len = tmpl_list_entry(ms->gen_ctx,bucket,key);
+	if (!len) {
+		DPRINTF("failed key save\n");
+		return MHD_HTTP_INTERNAL_SERVER_ERROR;
+	}
+	return MHD_HTTP_OK;
+}
+
 /* MHD reader function during queries.  Return -1 for EOF. */
 static ssize_t
 proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
@@ -733,27 +776,18 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
 
 	(void)pos;
 
-	if (!ms->gen_ctx) {
-		const char *accept_hdr
-			= MHD_lookup_connection_value(ms->conn, MHD_HEADER_KIND,
-						      "Accept");
-		ms->gen_ctx = tmpl_get_ctx(accept_hdr);
-		if (!ms->gen_ctx) {
-			return -1;
-		}
-		len = tmpl_list_header(ms->gen_ctx);
-		if (!len) {
-			return -1;
-		}
+	if (ms->gen_ctx == TMPL_CTX_DONE) {
+		return -1;
+	}
+	if (ms->gen_ctx->len) {
+		len = ms->gen_ctx->len;
 		if (len > max) {
 			len = max;
 		}
 		memcpy(buf,ms->gen_ctx->buf,len);
+		ms->gen_ctx->buf += len;
+		ms->gen_ctx->len -= len;
 		return len;
-	}
-
-	if (ms->gen_ctx == TMPL_CTX_DONE) {
-		return -1;
 	}
 
 	for(;;) {
@@ -771,6 +805,8 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
 			len = max;
 		}
 		memcpy(buf,ms->gen_ctx->buf,len);
+		ms->gen_ctx->buf += len;
+		ms->gen_ctx->len -= len;
 		return len;
 	}
 
@@ -820,6 +856,7 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
+	int			 rc;
 
 	(void)cctx;
 	(void)method;
@@ -861,7 +898,14 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!ms->pipe.data_ptr) {
 			return MHD_NO;
 		}
-		ms->query = meta_query_new(ms->bucket,NULL,ms->pipe.data_ptr);
+		rc = proxy_query_init(ms, ms->pipe.data_ptr);
+		if (rc != MHD_HTTP_OK) {
+			resp = MHD_create_response_from_data(0,NULL,
+				MHD_NO,MHD_NO);
+			MHD_queue_response(conn,rc,resp);
+			MHD_destroy_response(resp);
+			return MHD_YES;
+		}
 		resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 			CB_BLOCK_SIZE, proxy_query_func, ms, simple_closer);
 		if (!resp) {
@@ -883,6 +927,7 @@ proxy_list_objs (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	my_state	*ms	= *rctx;
 	struct MHD_Response	*resp;
+	int			 rc;
 
 	(void)cctx;
 	(void)url;
@@ -891,8 +936,13 @@ proxy_list_objs (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)data;
 	(void)data_size;
 
-	ms->query = meta_query_new((char *)ms->bucket,NULL,NULL);
-
+	rc = proxy_query_init(ms, NULL);
+	if (rc != MHD_HTTP_OK) {
+		resp = MHD_create_response_from_data(0,NULL, MHD_NO,MHD_NO);
+		MHD_queue_response(conn,rc,resp);
+		MHD_destroy_response(resp);
+		return MHD_YES;
+	}
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
 		CB_BLOCK_SIZE, proxy_query_func, ms, simple_closer);
 	if (!resp) {

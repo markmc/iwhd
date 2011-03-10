@@ -209,6 +209,7 @@ tmpl_get_ctx (const char *type)
 			tmp->format = &xml_format;
 		}
 		tmp->index = 0;
+		tmp->len = 0;
 	}
 	return tmp;
 }
@@ -225,6 +226,7 @@ tmpl_root_header (tmpl_ctx_t *ctx, const char *name, const char *version)
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
+	ctx->len = size;
 
 	return size;
 }
@@ -241,14 +243,15 @@ tmpl_root_entry (tmpl_ctx_t *ctx, const char *rel, const char *link)
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
+	ctx->len = size;
 
 	if (size && (ctx->index == 0)) {
 		ctx->buf += fmt->z_offset;
-		size -= fmt->z_offset;
+		ctx->len -= fmt->z_offset;
 	}
 
 	++(ctx->index);
-	return size;
+	return ctx->len;
 }
 
 size_t
@@ -299,8 +302,10 @@ tmpl_prov_footer (tmpl_ctx_t *ctx)
 size_t
 tmpl_list_header (tmpl_ctx_t *ctx)
 {
-	ctx->buf = ctx->format->list_header;
-	return strlen(ctx->buf);
+	strcpy(ctx->raw_buf, ctx->format->list_header);
+	ctx->buf = ctx->raw_buf;
+	ctx->len = strlen(ctx->buf);
+	return ctx->len;
 }
 
 size_t
@@ -308,20 +313,26 @@ tmpl_list_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key)
 {
 	int size;
 	const tmpl_format_t *fmt = ctx->format;
+	char *ptr;
+	const char *fmtstr;
+	int max;
 
-	size = snprintf(ctx->raw_buf,TMPL_BUF_SIZE,fmt->list_entry,bucket,key);
-	if (size >= TMPL_BUF_SIZE || size < 0) {
+	/* tmpl_list_entry is the only thing maybe called on non-empty buf */
+	ptr = ctx->raw_buf + ctx->len;
+	max = TMPL_BUF_SIZE - ctx->len;
+	if (max <= 0) {
+		return 0;
+	}
+	fmtstr = fmt->list_entry + (ctx->index == 0)*fmt->z_offset;
+	size = snprintf(ptr,max,fmtstr,bucket,key);
+	if (size >= max || size < 0) {
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
-
-	if (size && (ctx->index == 0)) {
-		ctx->buf += fmt->z_offset;
-		size -= fmt->z_offset;
-	}
+	ctx->len += size;
 
 	++(ctx->index);
-	return size;
+	return ctx->len;
 }
 
 size_t
@@ -344,9 +355,10 @@ tmpl_obj_header (tmpl_ctx_t *ctx, const char *bucket, const char *key)
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
+	ctx->len = size;
 
 	++(ctx->index);
-	return size;
+	return ctx->len;
 }
 
 size_t
@@ -362,14 +374,15 @@ tmpl_obj_entry (tmpl_ctx_t *ctx, const char *bucket, const char *key,
 		return 0;
 	}
 	ctx->buf = ctx->raw_buf;
+	ctx->len = size;
 
 	if (size && (ctx->index == 0)) {
 		ctx->buf += fmt->z_offset;
-		size -= fmt->z_offset;
+		ctx->len -= fmt->z_offset;
 	}
 
 	++(ctx->index);
-	return size;
+	return ctx->len;
 }
 
 size_t
