@@ -200,7 +200,6 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, size_t max)
 	pipe_shared	*ps	= pp->shared;
 	my_state	*ms	= ps->owner;
 	ssize_t		 done;
-	void		*child_res;
 
 	(void)pos;
 
@@ -232,7 +231,7 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 
 	if (done == (-1)) {
-		child_res = NULL;
+		void *child_res = NULL;
 		pthread_join(ms->backend_th,&child_res);
 		if (child_res == THREAD_FAILED) {
 			DPRINTF("GET producer failed\n");
@@ -258,7 +257,6 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 	pipe_private		*pp2;
 	char			*my_etag;
 	const char		*user_etag;
-	int                      rc;
 
 	(void)cctx;
 	(void)method;
@@ -331,7 +329,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		pp2 = NULL;
 	}
 
-	rc = pipe_cons_wait_init(&ms->pipe);
+	int rc = pipe_cons_wait_init(&ms->pipe);
 	ms->rc = (rc == 0) ? MHD_HTTP_OK : MHD_HTTP_INTERNAL_SERVER_ERROR;
 
 	resp = MHD_create_response_from_callback(MHD_SIZE_UNKNOWN,
@@ -353,8 +351,7 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 static void
 recheck_replication (my_state * ms, char *policy)
 {
-	int	rc;
-	char	fixed[MAX_FIELD_LEN];
+	int	rc;  /* FIXME: set but never used */
 
 	if (is_reserved(ms->key,reserved_name)) {
 		DPRINTF("declining to replicate reserved object %s\n",ms->key);
@@ -378,6 +375,7 @@ recheck_replication (my_state * ms, char *policy)
 	}
 
 	if (policy) {
+		char fixed[MAX_FIELD_LEN];
 		DPRINTF("  implementing policy %s\n",policy);
 		/*
 		 * Can't use ms->url here because it might be a bucket POST
@@ -398,10 +396,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	pipe_private		*pp;
 	int			 rc;
-	char			*etag	= NULL;
-	void			*child_res;
 
 	(void)cctx;
 	(void)method;
@@ -428,7 +423,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 		ms->size = 0;
 		pipe_init_shared(&ms->pipe,ms,1);
-		pp = pipe_init_private(&ms->pipe);
+		pipe_private *pp = pipe_init_private(&ms->pipe);
 		if (!pp) {
 			return MHD_NO;
 		}
@@ -484,6 +479,8 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		*data_size = 0;
 	}
 	else {
+		char *etag = NULL;
+		void *child_res;
 		pipe_prod_finish(&ms->pipe);
 		pthread_join(ms->backend_th,&child_res);
 		if (child_res == THREAD_FAILED) {
@@ -502,7 +499,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			}
 			else {
 				etag = meta_did_put(ms->bucket,ms->key,me,
-					ms->size);
+						    ms->size);
 			}
 			DPRINTF("rereplicate (obj PUT)\n");
 			recheck_replication(ms,NULL);
@@ -856,7 +853,6 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	int			 rc;
 
 	(void)cctx;
 	(void)method;
@@ -898,7 +894,7 @@ proxy_query (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!ms->pipe.data_ptr) {
 			return MHD_NO;
 		}
-		rc = proxy_query_init(ms, ms->pipe.data_ptr);
+		int rc = proxy_query_init(ms, ms->pipe.data_ptr);
 		if (rc != MHD_HTTP_OK) {
 			resp = MHD_create_response_from_data(0,NULL,
 				MHD_NO,MHD_NO);
@@ -927,7 +923,6 @@ proxy_list_objs (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	my_state	*ms	= *rctx;
 	struct MHD_Response	*resp;
-	int			 rc;
 
 	(void)cctx;
 	(void)url;
@@ -936,7 +931,7 @@ proxy_list_objs (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)data;
 	(void)data_size;
 
-	rc = proxy_query_init(ms, NULL);
+	int rc = proxy_query_init(ms, NULL);
 	if (rc != MHD_HTTP_OK) {
 		resp = MHD_create_response_from_data(0,NULL, MHD_NO,MHD_NO);
 		MHD_queue_response(conn,rc,resp);
@@ -967,7 +962,6 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	char			*bucket;
 	char			*key;
 	char			*stctx = NULL;
-	int			 rc;
 
 	(void)cctx;
 	(void)method;
@@ -980,8 +974,8 @@ proxy_delete (void *cctx, struct MHD_Connection *conn, const char *url,
 	provider_t *main_prov = get_main_provider();
 	ms->thunk.parent = ms;
 	ms->thunk.prov = main_prov;
-	rc = ms->thunk.prov->func_tbl->delete_func(main_prov,
-		ms->bucket,ms->key,url);
+	int rc = ms->thunk.prov->func_tbl->delete_func(main_prov,
+						       ms->bucket,ms->key,url);
 	if (rc == MHD_HTTP_OK) {
 		copied_url = strdup(url);
 		assert (copied_url);
@@ -1202,7 +1196,6 @@ post_foreach (void *kvv, void *ms_v)
 static int
 create_bucket (char *name, my_state *ms)
 {
-	int	rc;
 
 	if (is_reserved(name, reserved_name)
 	    || is_reserved(name, reserved_bucket_name)) {
@@ -1210,7 +1203,7 @@ create_bucket (char *name, my_state *ms)
 	}
 
 	provider_t *main_prov = get_main_provider();
-	rc = main_prov->func_tbl->bcreate_func(main_prov,name);
+	int rc = main_prov->func_tbl->bcreate_func(main_prov,name);
 	if (rc == MHD_HTTP_OK) {
 		if (meta_set_value(name,"_default", "_policy","0") != 0) {
 			DPRINTF("default-policy " "create failed\n");
@@ -1240,7 +1233,6 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	int			 rc;
 	char			*op;
 	char			 buf[80];
 	int			 len;
@@ -1272,7 +1264,7 @@ control_api_root (void *cctx, struct MHD_Connection *conn, const char *url,
 		return MHD_YES;
 	}
 
-	rc = MHD_HTTP_BAD_REQUEST;
+	int rc = MHD_HTTP_BAD_REQUEST;
 
 	op = kv_hash_lookup(ms->dict,"op");
 	if (op) {
@@ -1312,7 +1304,6 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	int			 rc;
 	char			*key;
 
 	(void)cctx;
@@ -1339,7 +1330,7 @@ proxy_bucket_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		*data_size = 0;
 	}
 	else {
-		rc = MHD_HTTP_BAD_REQUEST;
+		int rc = MHD_HTTP_BAD_REQUEST;
 		key = kv_hash_lookup(ms->dict,"_key");
 		if (key) {
 			strncpy(ms->key,key,MAX_FIELD_LEN-1);
@@ -1518,7 +1509,6 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	int			 rc;
 	char			*op;
 
 	(void)cctx;
@@ -1545,7 +1535,7 @@ proxy_object_post (void *cctx, struct MHD_Connection *conn, const char *url,
 		*data_size = 0;
 	}
 	else {
-		rc = MHD_HTTP_BAD_REQUEST;
+		int rc = MHD_HTTP_BAD_REQUEST;
 		if (!kv_find_val(ms->dict,post_find,NULL)) {
 			op = kv_hash_lookup(ms->dict,"op");
 			if (op) {
@@ -2035,9 +2025,7 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 		     const char *method, const char *version, const char *data,
 		     size_t *data_size, void **rctx)
 {
-	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	int			 rc;
 
 	(void)cctx;
 	(void)method;
@@ -2047,9 +2035,10 @@ proxy_create_bucket (void *cctx, struct MHD_Connection *conn, const char *url,
 	(void)url;
 
 	/* curl -T moo.empty http://localhost:9090/_new   by accident */
-	rc = create_bucket(ms->bucket,ms);
+	int rc = create_bucket(ms->bucket,ms);
 
-	resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
+	struct MHD_Response *resp
+	  = MHD_create_response_from_data(0,NULL, MHD_NO,MHD_NO);
 	if (!resp) {
 		fprintf(stderr,"MHD_crfd failed\n");
 		return MHD_NO;
