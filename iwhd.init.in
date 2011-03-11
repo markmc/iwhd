@@ -68,15 +68,15 @@ start() {
     # This is a bit kludgey.  We'll use the standard daemon
     # framework once iwhd knows how to daemonize itself.
     test -f $PIDFILE && kill -0 $(cat $PIDFILE) 2>/dev/null \
-        && { echo -n $"$PROCESS appears to already be running"
+        && { printf %s $"$PROCESS appears to already be running"
              echo_failure; echo; return 1; }
     mkdir -p @localstatedir@/cache/iwhd
     rm -rf @localstatedir@/cache/iwhd/*
-    echo -n $"waiting for mongod to listen on $MONGOD_SERVER_SPEC"
+    printf %s $"waiting for mongod to listen on $MONGOD_SERVER_SPEC"
     wait_for_mongod $MONGOD_N_SECONDS && echo_success || echo_failure
     echo
 
-    echo -n $"Starting $SERVICE daemon: "
+    printf %s $"Starting $SERVICE daemon: "
     $PROCESS -c "$CONFIG_JS" $IWHD_ARGS > /var/log/iwhd.log 2>&1 &
     pid=$!
     RETVAL=$?
@@ -106,7 +106,7 @@ restart() {
 }
 
 reload() {
-    echo -n $"Reloading $SERVICE configuration: "
+    printf %s $"Reloading $SERVICE configuration: "
 
     killproc -p $PIDFILE $PROCESS -HUP
     RETVAL=$?
