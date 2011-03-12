@@ -2,6 +2,26 @@ iwhd NEWS                                                   -*- outline -*-
 
 * Noteworthy changes in release ?.? (????-??-??) [?]
 
+** New features
+
+  RHEV-M back-end
+
+** Bug fixes
+
+  attempting to delete a nonexistent bucket now elicits a 404 response
+  Before, it was not possible to distinguish empty and nonexistent buckets.
+
+  attribute lists are more useful (XML syntax fixes, URL fixes)
+
+** New APIs
+
+  GET http://host/B/O/_attrs now lists attributes of object O in bucket B.
+  Before, you would have had to use another, undocumented technique.
+
+** Infrastructure
+
+  include a fedora-style init script
+
 
 * Noteworthy changes in release 0.91 (2011-02-10) [stable]
 
