@@ -139,9 +139,9 @@ elements as shown here:
 
 		$ curl http://fserver-1:9090/my_bucket/file1
 		<object>
-			<object_body path="http://fserver-1:9090/my_bucket/file1/body"/>
+			<object_body path="http://fserver-1:9090/my_bucket/file1"/>
 			<object_attr_list path="http://fserver-1:9090/my_bucket/file1/_attrs"/>
-			<object_attr name="xyz" path="http://fserver-1:9090/my_bucket/file1/attr_xyz"/>
+			<object_attr name="xyz" path="http://fserver-1:9090/my_bucket/file1/xyz"/>
 		</object>
 
 The object body can be stored and retrieved using PUT and GET respectively,
@@ -163,7 +163,7 @@ To set both of these attributes at once:
 Single-attribute operations are also supported. To fetch a
 single attribute:
 
-		$ curl http://fserver-1:9090/my_bucket/file1/attr_color
+		$ curl http://fserver-1:9090/my_bucket/file1/color
 		<attribute name="color">blue</attribute>
 
 The attribute can also be set with a PUT to the same URL.

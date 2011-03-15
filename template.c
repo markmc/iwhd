@@ -74,13 +74,13 @@ static const char xml_list_footer[] = "\
 
 static const char xml_obj_header[] = "\
 <object>\n\
-	<object_body path=\"http://%s/%s/%s/body\"/>\n\
+	<object_body path=\"http://%s/%s/%s\"/>\n\
 	<object_attr_list path=\"http://%s/%s/%s/_attrs\"/>\
 ";
 
 static const char xml_obj_entry[] = "\
 \n\
-	<object_attr name=\"%s\" path=\"http://%s/%s/%s/attr_%s\"/>\
+	<object_attr name=\"%s\" path=\"http://%s/%s/%s/%s\"/>\
 ";
 
 static const char xml_obj_footer[] = "\
