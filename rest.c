@@ -179,16 +179,14 @@ validate_url (const char *url)
 static void
 simple_closer (void *ctx)
 {
-	my_state	*ms	= ctx;
-
+	// my_state *ms = ctx;
 	DPRINTF("%s: cleaning up\n",__func__);
 }
 
 static void
 child_closer (void * ctx)
 {
-	pipe_private	*pp	= ctx;
-
+	// pipe_private *pp = ctx;
 	DPRINTF("in %s\n",__func__);
 }
 
