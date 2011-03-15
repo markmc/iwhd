@@ -16,6 +16,7 @@
 /gnulib-tests
 /iwhd
 /iwhd-*.tar.gz
+/iwhd-*.tar.xz
 /iwhd-conf.js
 /iwhd-qparser.c
 /iwhd-qparser.h
@@ -30,6 +31,9 @@
 /t/parser
 /t/parser.c
 ChangeLog
+ID
+INSTALL
 Makefile
 Makefile.in
+TAGS
 \#*\#
