@@ -37,7 +37,7 @@ parser_LDADD = -L../lib -liwhd -lgc -lpthread
 parser.c: Makefile.am
 	rm -f $@-t $@
 	printf '#define PARSER_UNIT_TEST 1\n' > $@-t
-	printf '#include "iwhd-qparser.c"\n' >> $@-t
+	printf '#include "qparser.c"\n' >> $@-t
 	chmod a=r $@-t
 	mv $@-t $@
 

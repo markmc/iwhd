@@ -15,7 +15,7 @@
 
 AM_CFLAGS = $(WARN_CFLAGS) $(WERROR_CFLAGS)
 
-iwhd_YFLAGS = -d
+AM_YFLAGS = -d
 
 SUBDIRS = lib . gnulib-tests t man
 ACLOCAL_AMFLAGS = -I m4
@@ -131,7 +131,7 @@ uninstall-local:
 	  $(DESTDIR)$(sysconfdir)/iwhd/conf.js
 	rmdir $(DESTDIR)$(DEFAULT_FS_DIR)
 
-iwhd_CPPFLAGS = $(HAIL_CFLAGS) -I$(top_srcdir)/lib
+AM_CPPFLAGS = $(HAIL_CFLAGS) -I$(top_srcdir)/lib
 iwhd_LDADD =		\
   lib/libiwhd.a		\
   -lgc -lpthread	\
