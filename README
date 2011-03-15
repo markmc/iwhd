@@ -1,0 +1,6 @@
+The image warehouse daemon is part of Aeolus (http://www.aeolusproject.org/).
+iwhd is the component responsible for storing and moving
+virtual-machine images -- and potentially other large objects --
+in a federated-cloud environment.
+
+See doc/image_repo.odt for more details.
