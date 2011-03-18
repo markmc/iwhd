@@ -259,9 +259,10 @@ paren_expr:
 
 static const struct { char *name; char *value; } hacked_obj_fields[] = {
         /* Fake object fields for generic unit testing. */
-	{ "a", "2" }, { "b", "7" }, { "c", "11" },
+	{ (char*) "a", (char*) "2" }, { (char*) "b", (char*) "7" },
+	{ (char*) "c", (char*) "11" },
         /* This one's here to test links (e.g. $template.owner.name). */
-	{ "template", "templates/the_tmpl" },
+	{ (char*) "template", (char*) "templates/the_tmpl" },
 	{ NULL }
 };
 
@@ -294,8 +295,9 @@ static const getter_t unit_sget = { unit_sget_func };
 
 /* Fake links from an object/key tuple to an object/key string. */
 static const struct { char *obj; char *key; char *value; } hacked_links[] = {
-	{ "templates/the_tmpl", "owner", "users/the_user" },
-	{ "users/the_user", "name", "Jeff Darcy" },
+	{ (char*) "templates/the_tmpl", (char*) "owner",
+	  (char*) "users/the_user" },
+	{ (char*) "users/the_user", (char*) "name", (char*) "Jeff Darcy" },
 	{ NULL }
 };
 
