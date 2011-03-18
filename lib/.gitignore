@@ -28,6 +28,7 @@
 /dirname-lgpl.c
 /dirname.c
 /dirname.h
+/dosname.h
 /dup2.c
 /errno.h
 /errno.in.h
