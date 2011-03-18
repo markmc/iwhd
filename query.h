@@ -20,7 +20,7 @@
 extern "C" {
 #endif
 
-#include "iwhd-qparser.h"
+#include "qparser.h"
 
 /*
  * Comparisons are all the same type to the parser, but when it comes to

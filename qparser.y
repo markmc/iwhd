@@ -4,7 +4,7 @@
 %{
 #include <config.h>
 #include "query.h"
-#include "iwhd-qparser.h"
+#include "qparser.h"
 %}
 
 %union {

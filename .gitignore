@@ -22,8 +22,8 @@
 /iwhd-*.tar.gz.sig
 /iwhd-*.tar.xz.sig
 /iwhd-conf.js
-/iwhd-qparser.c
-/iwhd-qparser.h
+/qparser.c
+/qparser.h
 /iwhd.init
 /iwhd.spec
 /m4/.gitignore

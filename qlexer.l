@@ -6,7 +6,7 @@
 # error This scanner must be made using flex, not lex.
 #endif
 
-#include "iwhd-qparser.h"
+#include "qparser.h"
 #undef YY_DECL
 #define YY_DECL extern int yylex (YYSTYPE *yylval_param, yyscan_t yyscanner)
 %}

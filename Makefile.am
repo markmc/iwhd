@@ -25,11 +25,11 @@ bin_PROGRAMS = iwhd dc-rhev-image
 
 EXTRA_DIST =		\
   iwhd.init.in		\
-  iwhd-qparser.h	\
+  qparser.h		\
   iwhd.spec		\
   iwhd.spec.in
 
-BUILT_SOURCES = iwhd-qparser.h qlexer.c
+BUILT_SOURCES = qparser.h qlexer.c
 
 MOSTLYCLEANFILES =
 MAINTAINERCLEANFILES =
@@ -160,7 +160,7 @@ EXTRA_DIST += qlexer.c
 noinst_PROGRAMS = parser-test
 BUILT_SOURCES += parser-test.c
 MAINTAINERCLEANFILES += $(BUILT_SOURCES)
-parser_test_CPPFLAGS	= -I$(top_srcdir)/lib
+parser_test_CPPFLAGS	= -I. -I$(top_srcdir)/lib
 parser_test_LDADD = lib/libiwhd.a -lgc -lpthread
 
 parser-test.c: Makefile.am
