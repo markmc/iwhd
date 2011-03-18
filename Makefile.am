@@ -156,3 +156,16 @@ dc_rhev_image_LDADD =	\
 MOSTLYCLEANFILES += qlexer.c
 MAINTAINERCLEANFILES += qlexer.c
 EXTRA_DIST += qlexer.c
+
+noinst_PROGRAMS = parser-test
+BUILT_SOURCES += parser-test.c
+MAINTAINERCLEANFILES += $(BUILT_SOURCES)
+parser_test_CPPFLAGS	= -I$(top_srcdir)/lib
+parser_test_LDADD = lib/libiwhd.a -lgc -lpthread
+
+parser-test.c: Makefile.am
+	rm -f $@-t $@
+	printf '#define PARSER_UNIT_TEST 1\n' > $@-t
+	printf '#include "qparser.c"\n' >> $@-t
+	chmod a=r $@-t
+	mv $@-t $@

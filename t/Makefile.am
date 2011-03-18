@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 TESTS =						\
-  parser-test					\
+  parse-test					\
   basic						\
   provider					\
   replication					\
@@ -25,21 +25,6 @@ EXTRA_DIST =					\
   $(TESTS)					\
   init.cfg					\
   init.sh
-
-check_PROGRAMS = parser
-
-BUILT_SOURCES =
-BUILT_SOURCES += parser.c
-MAINTAINERCLEANFILES = $(BUILT_SOURCES)
-parser_CPPFLAGS	= -I$(top_srcdir) -I$(top_srcdir)/lib
-parser_LDADD = -L../lib -liwhd -lgc -lpthread
-
-parser.c: Makefile.am
-	rm -f $@-t $@
-	printf '#define PARSER_UNIT_TEST 1\n' > $@-t
-	printf '#include "qparser.c"\n' >> $@-t
-	chmod a=r $@-t
-	mv $@-t $@
 
 TESTS_ENVIRONMENT =				\
   tmp__=$$TMPDIR; test -d "$$tmp__" || tmp__=.; \

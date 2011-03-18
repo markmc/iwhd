@@ -1,3 +1,5 @@
+*.gcda
+*.gcno
 *.o
 */.deps
 *~
@@ -17,6 +19,8 @@
 /iwhd
 /iwhd-*.tar.gz
 /iwhd-*.tar.xz
+/iwhd-*.tar.gz.sig
+/iwhd-*.tar.xz.sig
 /iwhd-conf.js
 /iwhd-qparser.c
 /iwhd-qparser.h
@@ -25,11 +29,11 @@
 /m4/.gitignore
 /maint.mk
 /man/iwhd.8
+/parser-test
+/parser-test.c
 /qlexer.c
 /stamp-h1
 /t/*.log
-/t/parser
-/t/parser.c
 ChangeLog
 ID
 INSTALL
