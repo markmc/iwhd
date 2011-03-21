@@ -34,6 +34,7 @@
 #include <hstor.h>	/* only for ARRAY_SIZE at this point */
 #include <curl/curl.h>
 
+#include "configmake.h" /* for LOCALEDIR */
 #include "dirname.h"
 #include "iwh.h"
 #include "closeout.h"
@@ -47,9 +48,6 @@
 #include "template.h"
 #include "mpipe.h"
 #include "state_defs.h"
-
-/* Define-away for now.  Eventually, define to gettext.  */
-#define _(msgid) (msgid)
 
 #if defined(DEBUG)
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION | MHD_USE_DEBUG
@@ -1830,7 +1828,7 @@ proxy_primary_prov (void *cctx, struct MHD_Connection *conn, const char *url,
 	bool valid = strcmp (url, "/_providers/_primary") == 0;
 	unsigned int rc = (valid ? MHD_HTTP_OK : MHD_HTTP_BAD_REQUEST);
 	if (!valid)
-		error (0, 0, "invalid request: %s", url);
+		error (0, 0, _("invalid request: %s"), url);
 
 	const char *name = get_main_provider()->name;
 	struct MHD_Response *resp;
@@ -1865,18 +1863,18 @@ proxy_set_primary (void *cctx, struct MHD_Connection *conn, const char *url,
 	   Extract NAME:  */
 	bool valid = memcmp (url, "/_providers/", strlen("/_providers/")) == 0;
 	if (!valid) {
-		error (0, 0, "invalid request: %s", url);
+		error (0, 0, _("invalid request: %s"), url);
 		goto bad_set;
 	}
 	const char *start = url + strlen("/_providers/");
 	const char *slash = strchr (start, '/');
 	if (slash == NULL) {
-		error (0, 0, "invalid request: %s", url);
+		error (0, 0, _("invalid request: %s"), url);
 		goto bad_set;
 	}
 	name = strndup (start, slash - start);
 	if (name == NULL) {
-		error (0, errno, "failed to extract provider name: %s", url);
+		error (0, errno, _("failed to extract provider name: %s"), url);
 		goto bad_set;
 	}
 
@@ -2281,7 +2279,12 @@ main (int argc, char **argv)
 	bool			 autostart = false;
 
 	set_program_name (argv[0]);
+	setlocale (LC_ALL, "");
+	bindtextdomain (PACKAGE, LOCALEDIR);
+	textdomain (PACKAGE);
+
 	atexit (close_stdout);
+
 	GC_INIT ();
 
 	for (;;) switch (getopt_long(argc,argv,"ac:d:m:p:v",my_options,NULL)) {
@@ -2339,7 +2342,7 @@ args_done:
 	}
 
 	if (autostart && cfg_file) {
-		error(0,0,"do not use -c and -a simultaneously");
+		error(0,0,_("do not use -c and -a simultaneously"));
 		return !0;
 	}
 	else if (autostart && !cfg_file) {
@@ -2352,12 +2355,12 @@ args_done:
 	else if (!autostart && cfg_file) {
 		me = parse_config(cfg_file);
 		if (!me) {
-			error(0,0,"could not parse %s",cfg_file);
+			error(0,0,_("could not parse %s"),cfg_file);
 			return !0;
 		}
 	}
 	else {
-		error(0,0,"specify at least -c or -a");
+		error(0,0,_("specify at least -c or -a"));
 		usage (EXIT_FAILURE);
 	}
 
@@ -2374,7 +2377,7 @@ args_done:
 		printf("will listen on port %u\n",my_port);
 		printf("my location is \"%s\"\n",me);
 		if (fflush(stdout) || ferror(stdout))
-			error(EXIT_FAILURE, 0, "write failed");
+			error(EXIT_FAILURE, 0, _("write failed"));
 	}
 
 	backend_init();

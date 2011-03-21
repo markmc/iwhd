@@ -1,0 +1,16 @@
+auto.c
+backend.c
+lib/closeout.c
+lib/copy-acl.c
+lib/copy-file.c
+lib/error.c
+lib/getopt.c
+lib/quotearg.c
+lib/set-mode-acl.c
+lib/version-etc.c
+lib/xalloc-die.c
+lib/xstrtol-error.c
+qparser.y
+replica.c
+rest.c
+setup.c

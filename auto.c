@@ -55,16 +55,16 @@ auto_mkdir (const char *name)
 	if (mkdir(name, 0777) < 0) {
 		if (errno == EEXIST) {
 			if (stat(name, &statb) < 0) {
-				error (0, errno, "stat %s failed", name);
+				error (0, errno, _("stat %s failed"), name);
 				return -1;
 			}
 			if (!S_ISDIR(statb.st_mode)) {
-				error (0, 0, "path %s is not a directory",name);
+				error (0, 0, _("path %s is not a directory"),name);
 				return -1;
 			}
 			return 0;
 		}
-		error(0, errno, "Cannot create %s", name);
+		error(0, errno, _("Cannot create %s"), name);
 		return -1;
 	}
 	return 0;
@@ -103,23 +103,23 @@ auto_spawn (const char *prog, char *argv[])
 	 * This serves no security purpose but only makes stderr more tidy.
 	 */
 	if (stat(prog, &statb) < 0) {
-		error (0, errno, "stat %s failed", prog);
+		error (0, errno, _("stat %s failed"), prog);
 		return -1;
 	}
 	if (!S_ISREG(statb.st_mode)) {
-		error (0, 0, "path %s is not a regular file", prog);
+		error (0, 0, _("path %s is not a regular file"), prog);
 		return -1;
 	}
 
 	pid = fork();
 	if (pid < 0) {
-		error (0, errno, "fork failed");
+		error (0, errno, _("fork failed"));
 		return -1;
 	}
 
 	if (pid == 0) {
 		execvp(prog, argv);
-		error (EXIT_FAILURE, errno, "failed to run command %s", prog);
+		error (EXIT_FAILURE, errno, _("failed to run command %s"), prog);
 	}
 
 	/*
@@ -156,7 +156,7 @@ auto_test_mongod(void)
 
 	sfd = socket(addr.a.sa_family, SOCK_STREAM, 0);
 	if (sfd < 0) {
-		error(0, errno, "socket");
+		error(0, errno, _("socket"));
 		return -1;
 	}
 
@@ -184,7 +184,7 @@ auto_wait_mongod(void)
 		if (rc == 0)
 			break;
 		if (time(NULL) >= start_time + 20) {
-			error(0, 0, "failed to verify mongod using port %s",
+			error(0, 0, _("failed to verify mongod using port %s"),
 			      auto_arg_port);
 			return -1;
 		}
@@ -228,7 +228,7 @@ auto_set_sig (void)
 	    sigaction(SIGFPE, &actb, NULL) ||
 	    sigaction(SIGBUS, &actb, NULL) ||
 	    sigaction(SIGABRT, &actb, NULL)) {
-		error(0, errno, "sigaction");
+		error(0, errno, _("sigaction"));
 		return -1;
 	}
 	return 0;
@@ -264,8 +264,8 @@ auto_start (int dbport)
 	 * We abort because we do not want anyone listening there.
 	 */
 	if (rc == 0) {
-		error (0, 0, "something is listening on port %s,"
-		       " not auto-starting Mongo", auto_arg_port);
+		error (0, 0, _("something is listening on port %s,"
+			       " not auto-starting Mongo"), auto_arg_port);
 		return -1;
 	}
 
@@ -287,7 +287,7 @@ auto_start (int dbport)
 		return -1;
 	}
 	if (atexit(auto_stop) != 0) {
-		error (0, 0, "atexit failed for auto_stop");
+		error (0, 0, _("atexit failed for auto_stop"));
 		auto_kill_mongod(SIGTERM);
 		return -1;
 	}

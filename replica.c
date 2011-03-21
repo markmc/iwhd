@@ -111,14 +111,14 @@ repl_worker_del (const repl_item *item)
 
 	bucket = strdup(item->path);
 	if (!bucket) {
-		error(0,errno,"ran out of memory replicating delete for %s",
+		error(0,errno,_("ran out of memory replicating delete for %s"),
 			item->path);
 		return;
 	}
 
 	key = strchr(bucket,'/');
 	if (!key) {
-		error(0,0,"invalid path replicating delete for %s",item->path);
+		error(0,0,_("invalid path replicating delete for %s"),item->path);
 		return;
 	}
 	++key;
@@ -126,7 +126,7 @@ repl_worker_del (const repl_item *item)
 	rc = item->server->func_tbl->delete_func(item->server,
 		bucket, key, item->path);
 	if (rc != MHD_HTTP_OK) {
-		error(0,0,"got status %d replicating delete for %s",
+		error(0,0,_("got status %d replicating delete for %s"),
 			rc, item->path);
 	}
 
@@ -140,7 +140,7 @@ repl_worker_bcreate (repl_item *item)
 
 	rc = item->server->func_tbl->bcreate_func(item->server,item->path);
 	if (rc != MHD_HTTP_OK) {
-		error(0,0,"got status %d replicating bcreate for %s",
+		error(0,0,_("got status %d replicating bcreate for %s"),
 			rc, item->path);
 	}
 
@@ -199,7 +199,7 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 			repl_worker_bcreate(item);
 			break;
 		default:
-			error(0,0,"bad repl type %d (url=%s) skipped",
+			error(0,0,_("bad repl type %d (url=%s) skipped"),
 			      item->type, item->path);
 		}
 
@@ -274,7 +274,7 @@ replicate (const char *url, size_t size, const char *policy, my_state *ms)
 
 	url2 = strdup(url);
 	if (!url2) {
-		error(0,0,"could not parse url %s",url);
+		error(0,0,_("could not parse url %s"),url);
 		return;
 	}
 	qctx.cur_bucket = strtok_r(url2,"/",&stctx);
@@ -325,14 +325,14 @@ replicate (const char *url, size_t size, const char *policy, my_state *ms)
 		DPRINTF("REPLICATING %s to %s\n",url,prov->name);
 		item = malloc(sizeof(*item));
 		if (!item) {
-			error(0,errno,"could not create repl_item for %s",
+			error(0,errno,_("could not create repl_item for %s"),
 			      url);
 			break;
 		}
 		item->type = REPL_PUT;
 		item->path = strdup(url);
 		if (!item->path) {
-			error(0,errno,"could not create repl_item for %s",
+			error(0,errno,_("could not create repl_item for %s"),
 			      url);
 			break;
 		}
@@ -376,7 +376,7 @@ replicate_namespace_action (const char *name, repl_t action, my_state *ms)
 			name, prov->name);
 		repl_item *item = malloc(sizeof(*item));
 		if (!item) {
-			error(0,errno,"could not create repl_item for %s",
+			error(0,errno,_("could not create repl_item for %s"),
 			      name);
 			return;
 		}

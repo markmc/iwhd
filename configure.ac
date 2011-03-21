@@ -170,11 +170,15 @@ if test "$gl_gcc_warnings" = yes; then
   AC_SUBST([GNULIB_TEST_WARN_CFLAGS])
 fi
 
+AM_GNU_GETTEXT([external], [need-ngettext])
+AM_GNU_GETTEXT_VERSION([0.17])
+
 AC_CONFIG_FILES([
 Makefile
 gnulib-tests/Makefile
 lib/Makefile
 man/Makefile
 t/Makefile
+po/Makefile.in
 ])
 AC_OUTPUT

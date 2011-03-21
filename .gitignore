@@ -5,6 +5,7 @@
 *~
 .\#*
 .deps
+/ABOUT-NLS
 /GNUmakefile
 /aclocal.m4
 /autom4te.cache/
@@ -18,12 +19,10 @@
 /gnulib-tests
 /iwhd
 /iwhd-*.tar.gz
-/iwhd-*.tar.xz
 /iwhd-*.tar.gz.sig
+/iwhd-*.tar.xz
 /iwhd-*.tar.xz.sig
 /iwhd-conf.js
-/qparser.c
-/qparser.h
 /iwhd.init
 /iwhd.spec
 /m4/.gitignore
@@ -32,6 +31,8 @@
 /parser-test
 /parser-test.c
 /qlexer.c
+/qparser.c
+/qparser.h
 /stamp-h1
 /t/*.log
 ChangeLog

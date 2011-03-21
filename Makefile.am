@@ -17,7 +17,7 @@ AM_CFLAGS = $(WARN_CFLAGS) $(WERROR_CFLAGS)
 
 AM_YFLAGS = -d
 
-SUBDIRS = lib . gnulib-tests t man
+SUBDIRS = lib . gnulib-tests t man po
 ACLOCAL_AMFLAGS = -I m4
 
 # iwhd is short for Image WareHouse Daemon.
@@ -131,7 +131,7 @@ uninstall-local:
 	  $(DESTDIR)$(sysconfdir)/iwhd/conf.js
 	rmdir $(DESTDIR)$(DEFAULT_FS_DIR)
 
-AM_CPPFLAGS = $(HAIL_CFLAGS) -I$(top_srcdir)/lib
+AM_CPPFLAGS = $(HAIL_CFLAGS) -Ilib -I$(top_srcdir)/lib
 iwhd_LDADD =		\
   lib/libiwhd.a		\
   -lgc -lpthread	\

@@ -70,4 +70,16 @@ GLOBAL(const char *,    me,             "here");
 
 int	 auto_start		(int dbport);
 
+#include <locale.h>
+#include "gettext.h"
+#if ! ENABLE_NLS
+# undef textdomain
+# define textdomain(Domainname) /* empty */
+# undef bindtextdomain
+# define bindtextdomain(Domainname, Dirname) /* empty */
+#endif
+
+#define _(msgid) gettext (msgid)
+#define N_(msgid) msgid
+
 #include "gc-wrap.h"

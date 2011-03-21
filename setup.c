@@ -117,7 +117,7 @@ validate_provider (Hash_table *h)
     assert (name);
     const char *type = kv_hash_lookup (h, "type");
     if (type == NULL) {
-	error (0, 0, "provider %s has no type", name);
+	error (0, 0, _("provider %s has no type"), name);
 	return 0;
     }
 
@@ -129,7 +129,7 @@ validate_provider (Hash_table *h)
     } else if (!strcasecmp(type,"fs")) {
 	needs = NEED_PATH;
     } else {
-	error (0, 0, "provider %s has invalid type: %s", name, type);
+	error (0, 0, _("provider %s has invalid type: %s"), name, type);
 	return 0;
     }
 
@@ -137,17 +137,18 @@ validate_provider (Hash_table *h)
     if (needs & NEED_SERVER) {
 	const char *host = kv_hash_lookup (h, "host");
 	if (!host) {
-	    error (0, 0, "%s: %s-provider requires a host", name, type);
+	    error (0, 0, _("%s: %s-provider requires a host"), name, type);
 	    ok = 0;
 	}
 	const char *port = kv_hash_lookup (h, "port");
 	if (!port) {
-	    error (0, 0, "%s: %s-provider requires a port", name, type);
+	    error (0, 0, _("%s: %s-provider requires a port"), name, type);
 	    ok = 0;
 	}
 	// ensure port is a positive integer with 5 or fewer digits
 	if (5 < strlen (port) || strcspn (port, "0123456789")) {
-	    error (0, 0, "%s: %s-provider: invalid port: %s", name, type, port);
+	    error (0, 0, _("%s: %s-provider: invalid port: %s"),
+		   name, type, port);
 	    ok = 0;
 	}
     }
@@ -155,12 +156,12 @@ validate_provider (Hash_table *h)
     if (needs & NEED_CREDS) {
 	const char *key = kv_hash_lookup (h, "key");
 	if (!key) {
-	    error (0, 0, "%s: %s-provider requires a key", name, type);
+	    error (0, 0, _("%s: %s-provider requires a key"), name, type);
 	    ok = 0;
 	}
 	const char *secret = kv_hash_lookup (h, "secret");
 	if (!secret) {
-	    error (0, 0, "%s: %s-provider requires a secret", name, type);
+	    error (0, 0, _("%s: %s-provider requires a secret"), name, type);
 	    ok = 0;
 	}
     }
@@ -168,7 +169,7 @@ validate_provider (Hash_table *h)
     if (needs & NEED_PATH) {
 	const char *path = kv_hash_lookup (h, "path");
 	if (!path) {
-	    error (0, 0, "%s: %s-provider requires a path", name, type);
+	    error (0, 0, _("%s: %s-provider requires a path"), name, type);
 	    ok = 0;
 	}
     }
@@ -187,20 +188,20 @@ json_validate_server (unsigned int i)
 
 	server = json_array_get(config,i);
 	if (!json_is_object(server)) {
-		error(0,0,"config elem %u: missing object",i);
+		error(0,0,_("config elem %u: missing object"),i);
 		return 0;
 	}
 
 	elem = json_object_get(server,"name");
 	if (!json_is_string(elem)) {
-		error(0,0,"config elem %u: missing name",i);
+		error(0,0,_("config elem %u: missing name"),i);
 		return 0;
 	}
 	name = json_string_value(elem);
 
 	elem = json_object_get(server,"type");
 	if (!json_is_string(elem)) {
-		error(0,0,"config elem %u (%s): missing type",i,name);
+		error(0,0,_("config elem %u (%s): missing type"),i,name);
 		return 0;
 	}
 	type = json_string_value(elem);
@@ -215,20 +216,20 @@ json_validate_server (unsigned int i)
 		needs = NEED_PATH;
 	}
 	else {
-		error(0,0,"config elem %u (%s): bad type",i,name);
+		error(0,0,_("config elem %u (%s): bad type"),i,name);
 		return 0;
 	}
 
 	if (needs & NEED_SERVER) {
 		elem = json_object_get(server,"host");
 		if (!json_is_string(elem)) {
-			error(0,0,"config elem %u (%s): missing host",
+			error(0,0,_("config elem %u (%s): missing host"),
 				i,name);
 			return 0;
 		}
 		elem = json_object_get(server,"port");
 		if (!json_is_integer(elem)) {
-			error(0,0,"config elem %u (%s): missing port",
+			error(0,0,_("config elem %u (%s): missing port"),
 				i,name);
 			return 0;
 		}
@@ -237,13 +238,13 @@ json_validate_server (unsigned int i)
 	if (needs & NEED_CREDS) {
 		elem = json_object_get(server,"key");
 		if (!json_is_string(elem)) {
-			error(0,0,"config elem %u (%s): missing key",
+			error(0,0,_("config elem %u (%s): missing key"),
 			      i, name);
 			return 0;
 		}
 		elem = json_object_get(server,"secret");
 		if (!json_is_string(elem)) {
-			error(0,0, "config elem %u (%s): missing secret",
+			error(0,0, _("config elem %u (%s): missing secret"),
 			      i, name);
 			return 0;
 		}
@@ -252,7 +253,7 @@ json_validate_server (unsigned int i)
 	if (needs & NEED_PATH) {
 		elem = json_object_get(server,"path");
 		if (!json_is_string(elem)) {
-			error(0,0,"config elem %u (%s): missing path",
+			error(0,0,_("config elem %u (%s): missing path"),
 			      i, name);
 			return 0;
 		}
@@ -341,7 +342,7 @@ convert_provider (int i, provider_t *out)
 	iter = json_object_iter(server);
 	while (iter) {
 		key = json_object_iter_key(iter);
-		error(0,0,"convert-provider: ITER key: %s",key);
+		error(0,0,_("convert-provider: ITER key: %s"),key);
 		if (!is_reserved_attr(key)) {
 			value = json_string_value(json_object_iter_value(iter));
 			if (value) {
@@ -352,12 +353,12 @@ convert_provider (int i, provider_t *out)
 				if (!kv_hash_insert_new (out->attrs,
 							 xstrdup((char *)key),
 							 (char *)value)) {
-				    error (0, 0, "exhausted virtual memory");
+				    error (0, 0, _("exhausted virtual memory"));
 				    return 0;
 				}
 			}
 			else {
-				error(0,0,"could not extract %u.%s",i,key);
+				error(0,0,_("could not extract %u.%s"),i,key);
 			}
 		}
 		iter = json_object_iter_next(server,iter);
@@ -438,12 +439,12 @@ add_provider (Hash_table *h)
 
         if (!is_reserved_attr(key)) {
             if (val) {
-                error(0,0,"no value for %s", key);
+                error(0,0,_("no value for %s"), key);
                 continue;
             }
             DPRINTF("%p.%s = %s\n",prov, key, val);
             if (!kv_hash_insert_new (prov->attrs, xstrdup(key), xstrdup(val)))
-		error (0, 0, "exhausted virtual memory");
+		error (0, 0, _("exhausted virtual memory"));
 		goto fail;
         }
     }
@@ -469,7 +470,7 @@ parse_config_inner (void)
 	const char	*primary	= NULL;
 
 	if (json_typeof(config) != JSON_ARRAY) {
-		error(0,0,"config should be a JSON array");
+		error(0,0,_("config should be a JSON array"));
 		goto err;
 	}
 
@@ -490,27 +491,27 @@ parse_config_inner (void)
 	prov_hash = hash_initialize (SMALL_PRIME, NULL, hash_provider,
 				     compare_providers, NULL);
 	if (!prov_hash) {
-		error(0,0,"could not allocate provider hash");
+		error(0,0,_("could not allocate provider hash"));
 		goto err;
 	}
 	for (i = 0; i < nservers; ++i) {
 		server = json_array_get(config,i);
 		if (!server) {
-			error(0,0,"could not get pointer to provider %u",i);
+			error(0,0,_("could not get pointer to provider %u"),i);
 			goto err_free_hash;
 		}
 		new_key = dup_json_string(server,"name");
 		if (!new_key) {
-			error(0,errno,"could not copy key %u",i);
+			error(0,errno,_("could not copy key %u"),i);
 			goto err_free_hash;
 		}
 		new_prov = (provider_t  *)malloc(sizeof(*new_prov));
 		if (!new_prov) {
-			error(0,errno,"could not allocate provider %u",i);
+			error(0,errno,_("could not allocate provider %u"),i);
 			goto err_free_hash;
 		}
 		if (!convert_provider(i,new_prov)) {
-			error(0,0,"could not add provider %u",i);
+			error(0,0,_("could not add provider %u"),i);
 		}
 		assert (STREQ (new_key, new_prov->name));
 		hash_insert_new(prov_hash, new_prov);
@@ -552,13 +553,13 @@ parse_config (char *cfg_file)
 	}
 
 	if (access(cfg_file,R_OK) < 0) {
-		error(0,errno,"failed to open %s for reading", cfg_file);
+		error(0,errno,_("failed to open %s for reading"), cfg_file);
 		return NULL;
 	}
 
 	config = json_load_file(cfg_file,&err);
 	if (!config) {
-		error(0,0,"JSON error on line %d: %s",err.line,err.text);
+		error(0,0,_("JSON error on line %d: %s"),err.line,err.text);
 		return NULL;
 	}
 
@@ -589,7 +590,7 @@ auto_config(void)
 
 	config = json_loads(auto_json,&err);
 	if (!config) {
-		error(0, 0, "JSON error on line %d: %s", err.line, err.text);
+		error(0, 0, _("JSON error on line %d: %s"), err.line, err.text);
 		return NULL;
 	}
 
@@ -598,7 +599,8 @@ auto_config(void)
 		printf("auto-start in effect\n");
 	}
 	else {
-		error(0, 0, "invalid autostart configuration (internal error)");
+		error(0, 0,
+		      _("invalid autostart configuration (internal error)"));
 	}
 
 	json_decref(config);

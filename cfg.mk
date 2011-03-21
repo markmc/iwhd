@@ -24,7 +24,6 @@ skip_low_priority =			\
   sc_prohibit_atoi_atof			\
   sc_prohibit_tab_based_indentation	\
   sc_prohibit_strcmp			\
-  sc_unmarked_diagnostics		\
   sc_error_message_uppercase		\
   sc_cast_of_argument_to_free		\
   sc_file_system

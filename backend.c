@@ -220,7 +220,7 @@ s3_init (provider_t *prov)
 
 	chars = snprintf(svc_acc,sizeof(svc_acc),"%s:%u",prov->host,prov->port);
 	if (chars >= (int)sizeof(svc_acc)) {
-		error(0,0,"hostname %s too long in %s",prov->host,__func__);
+		error(0,0,_("hostname %s too long in %s"),prov->host,__func__);
 		return;
 	}
 	hstor = hstor_new(svc_acc,prov->host,prov->username,prov->password);
@@ -272,7 +272,7 @@ s3_put_child (void * ctx)
 			llen = strtoll(clen,NULL,10);
 		}
 		else {
-			error (0, 0, "missing Content-Length");
+			error (0, 0, _("missing Content-Length"));
 		}
 	}
 
@@ -334,7 +334,7 @@ s3_init_tmpfile (const char *value)
 
 	fd = mkstemp(path);
 	if (fd < 0) {
-		error (0, errno, "%s: failed to create file from template", path);
+		error (0, errno, _("%s: failed to create file from template"), path);
 		free(path);
 		return NULL;
 	}
@@ -345,7 +345,7 @@ s3_init_tmpfile (const char *value)
 		close(fd);
 		if (written != (ssize_t)len) {
 			if (written < 0) {
-				error (0, errno, "failed to write to %s", path);
+				error (0, errno, _("failed to write to %s"), path);
 			}
 			else {
 				error (0, errno,
@@ -409,7 +409,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!api_key) {
 		api_key = (char *)prov->username;
 		if (!api_key) {
-			error (0, 0, "missing EC2 API key");
+			error (0, 0, _("missing EC2 API key"));
 			goto cleanup;
 		}
 	}
@@ -418,7 +418,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!api_secret) {
 		api_secret = (char *)prov->password;
 		if (!prov->password) {
-			error (0, 0, "missing EC2 API secret");
+			error (0, 0, _("missing EC2 API secret"));
 			goto cleanup;
 		}
 	}
@@ -433,7 +433,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	else {
 		ami_cert = get_provider_value(prov,"ami-cert");
 		if (!ami_cert) {
-			error (0, 0, "missing EC2 AMI cert");
+			error (0, 0, _("missing EC2 AMI cert"));
 			goto cleanup;
 		}
 	}
@@ -448,7 +448,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	else {
 		ami_key = get_provider_value(prov,"ami-key");
 		if (!ami_key) {
-			error (0, 0, "missing EC2 AMI key");
+			error (0, 0, _("missing EC2 AMI key"));
 			goto cleanup;
 		}
 	}
@@ -457,7 +457,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!ami_uid) {
 		ami_uid = get_provider_value(prov,"ami-uid");
 		if (!ami_uid) {
-			error (0, 0, "missing EC2 AMI uid");
+			error (0, 0, _("missing EC2 AMI uid"));
 			goto cleanup;
 		}
 	}
@@ -501,13 +501,13 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	DPRINTF("ami-bkt = %s\n",ami_bkt);
 
 	if (pipe(organ) < 0) {
-		error (0, errno, "pipe creation failed");
+		error (0, errno, _("pipe creation failed"));
 		goto cleanup;
 	}
 
 	pid = fork();
 	if (pid < 0) {
-		error (0, errno, "fork failed");
+		error (0, errno, _("fork failed"));
 		close(organ[0]);
 		close(organ[1]);
 		goto cleanup;
@@ -517,13 +517,13 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 		(void)dup2(organ[1],STDOUT_FILENO);
 		(void)dup2(organ[1],STDERR_FILENO);
 		execvp(cmd, (char* const*)argv);
-		error (EXIT_FAILURE, errno, "failed to run command %s", cmd);
+		error (EXIT_FAILURE, errno, _("failed to run command %s"), cmd);
 	}
 
 	close(organ[1]);
 	fp = fdopen(organ[0],"r");
 	if (!fp) {
-		error (0, 0, "could not open parent pipe stream");
+		error (0, 0, _("could not open parent pipe stream"));
 		close(organ[0]);
 		goto cleanup;
 	}
@@ -550,15 +550,15 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 
 	DPRINTF("waiting for child...\n");
 	if (waitpid(pid,&wstat,0) < 0) {
-		error (0, errno, "waitpid failed");
+		error (0, errno, _("waitpid failed"));
 		goto cleanup;
 	}
 	if (!WIFEXITED(wstat)) {
-		error (0, 0, "%s is killed (status 0x%x)", cmd, wstat);
+		error (0, 0, _("%s is killed (status 0x%x)"), cmd, wstat);
 		goto cleanup;
 	}
 	if (WEXITSTATUS(wstat)) {
-		error (0, 0, "%s exited with code %d",
+		error (0, 0, _("%s exited with code %d"),
 		       cmd, WEXITSTATUS(wstat));
 		goto cleanup;
 	}
@@ -620,7 +620,7 @@ curl_get_child (void * ctx)
 			prov->host, prov->port, ms->url);
 	}
 	if (chars >= (int)sizeof(fixed)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return NULL;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
@@ -660,7 +660,7 @@ curl_put_child (void * ctx)
 			llen = strtoll(clen,NULL,10);
 		}
 		else {
-			error (0, 0, "missing Content-Length");
+			error (0, 0, _("missing Content-Length"));
 		}
 	}
 
@@ -680,7 +680,7 @@ curl_put_child (void * ctx)
 	chars = snprintf(fixed,sizeof(fixed),
 		"http://%s:%u/%s/%s",prov->host,prov->port,ms->bucket,ms->key);
 	if (chars >= (int)sizeof(fixed)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return NULL;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
@@ -726,7 +726,7 @@ curl_cache_child (void * ctx)
 	chars = snprintf(fixed,sizeof(fixed),
 		"http://%s:%u%s",prov->host,prov->port,ms->url);
 	if (chars >= (int)sizeof(fixed)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return NULL;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
@@ -767,7 +767,7 @@ curl_delete (const provider_t *prov, const char *bucket, const char *key,
 	chars = snprintf(fixed,sizeof(fixed),
 		"http://%s:%u%s",prov->host,prov->port,url);
 	if (chars >= (int)sizeof(fixed)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
@@ -788,13 +788,13 @@ curl_bcreate (const provider_t *prov, const char *bucket)
 	chars = snprintf(addr,sizeof(addr),"http://%s:%d/%s",
 		prov->host,prov->port,bucket);
 	if (chars >= (int)sizeof(addr)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 
 	curl = curl_easy_init();
 	if (!curl) {
-		error(0,errno,"no memory in %s",__func__);
+		error(0,errno,_("no memory in %s"),__func__);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,addr);
@@ -836,7 +836,7 @@ curl_register (my_state *ms, const provider_t *prov, const char *next,
 	chars = snprintf(fixed,sizeof(fixed),"http://%s:%d/%s/%s",
 		prov->host,prov->port, ms->bucket, ms->key);
 	if (chars >= (int)sizeof(fixed)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
@@ -932,7 +932,7 @@ cf_add_token (struct curl_slist *in_slist, const char *token)
 
 	chars = snprintf(auth_hdr,sizeof(auth_hdr),"X-Auth-Token: %s",token);
 	if (chars >= (int)sizeof(auth_hdr)) {
-		error(0,0,"auth_hdr too long");
+		error(0,0,_("auth_hdr too long"));
 		return in_slist;
 	}
 
@@ -956,21 +956,21 @@ cf_init (provider_t *prov)
 	chars = snprintf(addr,sizeof(addr),"https://%s:%u/v1.0",
 		prov->host, prov->port);
 	if (chars >= (int)sizeof(addr)) {
-		error(0,0,"API URL too long in %s",__func__);
+		error(0,0,_("API URL too long in %s"),__func__);
 		return;
 	}
 
 	chars = snprintf(auth_user,sizeof(auth_user),"X-Auth-User: %s",
 		prov->username);
 	if (chars >= (int)sizeof(auth_user)) {
-		error(0,0,"auth_user too long in %s",__func__);
+		error(0,0,_("auth_user too long in %s"),__func__);
 		return;
 	}
 
 	chars = snprintf(auth_key,sizeof(auth_key),"X-Auth-Key: %s",
 		prov->password);
 	if (chars >= (int)sizeof(auth_key)) {
-		error(0,0,"auth_key too long in %s",__func__);
+		error(0,0,_("auth_key too long in %s"),__func__);
 		return;
 	}
 
@@ -1020,7 +1020,7 @@ cf_get_child (void * ctx)
 	}
 	chars = snprintf(fixed,sizeof(fixed),"%s%s", prov->host, ms->url);
 	if (chars >= (int)sizeof(fixed)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return NULL;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
@@ -1067,7 +1067,7 @@ cf_put_child (void * ctx)
 			llen = strtoll(clen,NULL,10);
 		}
 		else {
-			error (0, 0, "missing Content-Length");
+			error (0, 0, _("missing Content-Length"));
 		}
 	}
 
@@ -1081,7 +1081,7 @@ cf_put_child (void * ctx)
 	chars = snprintf(fixed,sizeof(fixed),
 		"%s/%s/%s",prov->host,ms->bucket,ms->key);
 	if (chars >= (int)sizeof(fixed)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return NULL;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
@@ -1127,7 +1127,7 @@ cf_delete (const provider_t *prov,
 
 	chars = snprintf(fixed,sizeof(fixed),"%s%s",prov->host,url);
 	if (chars >= (int)sizeof(fixed)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
@@ -1174,7 +1174,7 @@ cf_bcreate (const provider_t *prov, const char *bucket)
 	}
 	chars = snprintf(fixed,sizeof(fixed),"%s/%s",prov->host,bucket);
 	if (chars >= (int)sizeof(fixed)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 	curl_easy_setopt(curl,CURLOPT_URL,fixed);
@@ -1201,7 +1201,7 @@ fs_init (provider_t *prov)
 {
 	DPRINTF("changing directory to %s\n",prov->path);
 	if (chdir(prov->path) < 0) {
-		error(0,errno,"chdir failed, unsafe to continue");
+		error(0,errno,_("chdir failed, unsafe to continue"));
 		exit(!0); /* Value doesn't matter, as long as it's not zero. */
 	}
 }
@@ -1230,7 +1230,7 @@ fs_get_child (void * ctx)
 		bytes = read(fd,buf,sizeof(buf));
 		if (bytes <= 0) {
 			if (bytes < 0) {
-				error (0, errno, "%s: read failed", file);
+				error (0, errno, _("%s: read failed"), file);
 			}
 			break;
 		}
@@ -1259,11 +1259,11 @@ fs_put_child (void * ctx)
 
 	chars = snprintf(fixed,sizeof(fixed),"%s/%s",ms->bucket,ms->key);
 	if (chars >= (int)sizeof(fixed)) {
-		error(0,0,"path too long in %s",__func__);
+		error(0,0,_("path too long in %s"),__func__);
 		return NULL;
 	}
 	if (unlink(fixed) < 0) {
-		error(0,errno,"unlink failed for %s (non-fatal)",fixed);
+		error(0,errno,_("unlink failed for %s (non-fatal)"),fixed);
 	}
 	fd = open(fixed,O_WRONLY|O_CREAT|O_EXCL,0666);
 	if (fd < 0) {
@@ -1281,7 +1281,7 @@ fs_put_child (void * ctx)
 				      ps->data_len-offset);
 			if (bytes <= 0) {
 				if (bytes < 0) {
-					error (0, errno, "%s: write failed",
+					error (0, errno, _("%s: write failed"),
 					       fixed);
 					pipe_cons_signal(pp, errno);
 				}
@@ -1310,7 +1310,7 @@ fs_delete (const provider_t *prov, const char *bucket, const char *key,
 	(void)key;
 
 	if (unlink(url+1) < 0) {
-		error (0, errno, "%s: failed to unlink", url+1);
+		error (0, errno, _("%s: failed to unlink"), url+1);
 		return MHD_HTTP_NOT_FOUND;
 	}
 
@@ -1325,7 +1325,7 @@ fs_bcreate (const provider_t *prov, const char *bucket)
 	DPRINTF("creating bucket %s\n",bucket);
 
 	if (mkdir(bucket,0750) < 0) {
-		error (0, errno, "%s: failed to create directory", bucket);
+		error (0, errno, _("%s: failed to create directory"), bucket);
 		return MHD_HTTP_INTERNAL_SERVER_ERROR;
 	}
 	/*
@@ -1392,7 +1392,7 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	api_url = kv_hash_lookup(args,"api-url");
 	if (!api_url) {
 		/* TBD: This has to have a defined field in provider, too. */
-		error (0, 0, "missing RHEV-M API URL (api-url)");
+		error (0, 0, _("missing RHEV-M API URL (api-url)"));
 		goto cleanup;
 	}
 
@@ -1400,7 +1400,7 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!api_user) {
 		api_user = (char *)prov->username;
 		if (!api_user) {
-			error (0, 0, "missing RHEV-M API username (api-key)");
+			error (0, 0, _("missing RHEV-M API username (api-key)"));
 			goto cleanup;
 		}
 	}
@@ -1409,7 +1409,7 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	if (!api_secret) {
 		api_secret = (char *)prov->password;
 		if (!prov->password) {
-			error (0, 0, "missing RHEV-M API secret (api-secret)");
+			error (0, 0, _("missing RHEV-M API secret (api-secret)"));
 			goto cleanup;
 		}
 	}
@@ -1427,15 +1427,15 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	nfs_path = kv_hash_lookup(args,"nfs-path");
 	nfs_dir = kv_hash_lookup(args,"nfs-dir");
 	if (!nfs_host) {
-		error (0, 0, "missing export domain's host (nfs-host)");
+		error (0, 0, _("missing export domain's host (nfs-host)"));
 		goto cleanup;
 	}
 	if (!nfs_path) {
-		error (0, 0, "missing export domain's path (nfs-path)");
+		error (0, 0, _("missing export domain's path (nfs-path)"));
 		goto cleanup;
 	}
 	if (!nfs_dir) {
-		error (0, 0, "missing target directory (nfs-dir)");
+		error (0, 0, _("missing target directory (nfs-dir)"));
 		goto cleanup;
 	}
 
@@ -1454,12 +1454,12 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 			nfs_host, nfs_path, nfs_dir
 	    );
 	if (rc < 0) {
-		error (0, 0, "no core");
+		error (0, 0, _("no core"));
 		goto cleanup;
 	}
 	conf_name = s3_init_tmpfile(conf_text);
 	if (!conf_name) {
-		error (0, 0, "cannot create a temporary file");
+		error (0, 0, _("cannot create a temporary file"));
 		goto cleanup;
 	}
 
@@ -1474,13 +1474,13 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	argv[argc] = NULL;
 
 	if (pipe(organ) < 0) {
-		error (0, errno, "pipe creation failed");
+		error (0, errno, _("pipe creation failed"));
 		goto cleanup;
 	}
 
 	pid = fork();
 	if (pid < 0) {
-		error (0, errno, "fork failed");
+		error (0, errno, _("fork failed"));
 		close(organ[0]);
 		close(organ[1]);
 		goto cleanup;
@@ -1490,13 +1490,13 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 		(void)dup2(organ[1],STDOUT_FILENO);
 		(void)dup2(organ[1],STDERR_FILENO);
 		execvp(cmd, (char* const*)argv);
-		error (EXIT_FAILURE, errno, "failed to run command %s", cmd);
+		error (EXIT_FAILURE, errno, _("failed to run command %s"), cmd);
 	}
 
 	close(organ[1]);
 	fp = fdopen(organ[0],"r");
 	if (!fp) {
-		error (0, 0, "could not open parent pipe stream");
+		error (0, 0, _("could not open parent pipe stream"));
 		close(organ[0]);
 		goto cleanup;
 	}
@@ -1522,15 +1522,15 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 
 	DPRINTF("waiting for child...\n");
 	if (waitpid(pid,&wstat,0) < 0) {
-		error (0, errno, "waitpid failed");
+		error (0, errno, _("waitpid failed"));
 		goto cleanup;
 	}
 	if (!WIFEXITED(wstat)) {
-		error (0, 0, "%s is killed (status 0x%x)", cmd, wstat);
+		error (0, 0, _("%s is killed (status 0x%x)"), cmd, wstat);
 		goto cleanup;
 	}
 	if (WEXITSTATUS(wstat)) {
-		error (0, 0, "%s exited with code %d",
+		error (0, 0, _("%s exited with code %d"),
 		       cmd, WEXITSTATUS(wstat));
 		goto cleanup;
 	}
