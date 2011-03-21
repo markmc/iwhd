@@ -1349,7 +1349,7 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	char		*nfs_path;
 	char		*nfs_dir;
 	const char	*conf_name = NULL;
-	char		*conf_text = NULL;
+	char		*conf_text;
 	int		 ret	= MHD_HTTP_BAD_REQUEST;
 	int		 rc;
 	const char	*argv[12];
@@ -1439,7 +1439,6 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 		goto cleanup;
 	}
 
-#if 0 /* The GC library crashes on free() in this case. */
 	rc = asprintf(&conf_text,
 		    "{\n"
 		    "  \"image\"   : \"%s/%s\",\n"
@@ -1455,31 +1454,9 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 			nfs_host, nfs_path, nfs_dir
 	    );
 	if (rc < 0) {
-		conf_text = NULL;
 		error (0, 0, "no core");
 		goto cleanup;
 	}
-#else
-	conf_text = malloc(1000);
-	if (!conf_text) {
-		error (0, 0, "no core");
-		goto cleanup;
-	}
-	snprintf(conf_text, 1000,
-		    "{\n"
-		    "  \"image\"   : \"%s/%s\",\n"
-		    "  \"apiurl\"  : \"%s\",\n"
-		    "  \"apiuser\" : \"%s\",\n"
-		    "  \"apipass\" : \"%s\",\n"
-		    "  \"nfshost\" : \"%s\",\n"
-		    "  \"nfspath\" : \"%s\",\n"
-		    "  \"nfsdir\" :  \"%s\"\n"
-		    "}\n",
-			ms->bucket, ms->key,
-			api_url, api_user, api_secret,
-			nfs_host, nfs_path, nfs_dir
-	    );
-#endif
 	conf_name = s3_init_tmpfile(conf_text);
 	if (!conf_name) {
 		error (0, 0, "cannot create a temporary file");
@@ -1568,7 +1545,6 @@ cleanup:
 	if (conf_name)
 		unlink(conf_name);
 	free((char *)conf_name);
-	free(conf_text);
 
 	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
 	return ret;
