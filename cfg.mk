@@ -64,6 +64,7 @@ sc_prohibit_emacs__indent_tabs_mode__setting:
 odt = ^doc/image_repo\.odt$
 exclude_file_name_regexp--sc_trailing_blank = $(odt)
 exclude_file_name_regexp--sc_prohibit_empty_lines_at_EOF = $(odt)
+exclude_file_name_regexp--sc_prohibit_test_double_equal = ^t/parse-test$$
 
 update-copyright-env = \
   UPDATE_COPYRIGHT_USE_INTERVALS=1 \
