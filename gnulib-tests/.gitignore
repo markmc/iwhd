@@ -66,6 +66,9 @@
 /test-btowc1.sh
 /test-btowc2.sh
 /test-c-ctype.c
+/test-c-strcase.sh
+/test-c-strcasecmp.c
+/test-c-strncasecmp.c
 /test-copy-acl.c
 /test-copy-acl.sh
 /test-copy-file.c
@@ -88,9 +91,12 @@
 /test-getopt_long.h
 /test-gettimeofday.c
 /test-hash.c
+/test-iconv-h.c
+/test-iconv.c
 /test-ignore-value.c
 /test-inttostr.c
 /test-inttypes.c
+/test-iswblank.c
 /test-locale.c
 /test-localename.c
 /test-lock.c
@@ -113,6 +119,11 @@
 /test-mbrtowc4.sh
 /test-mbsinit.c
 /test-mbsinit.sh
+/test-mbsstr1.c
+/test-mbsstr2.c
+/test-mbsstr2.sh
+/test-mbsstr3.c
+/test-mbsstr3.sh
 /test-memchr.c
 /test-open.c
 /test-open.h
@@ -139,6 +150,7 @@
 /test-stdio.c
 /test-stdlib.c
 /test-strerror.c
+/test-striconv.c
 /test-string.c
 /test-strnlen.c
 /test-strstr.c
@@ -171,6 +183,7 @@
 /test-wcrtomb.sh
 /test-wctype-h.c
 /test-wctype.c
+/test-wcwidth.c
 /test-xalloc-die.c
 /test-xalloc-die.sh
 /test-xstrtol.c
@@ -187,6 +200,7 @@
 /unsetenv.c
 /vasnprintf.c
 /vasnprintf.h
+/version-etc-fsf.c
 /wcrtomb.c
 /wctob.c
 /wctomb-impl.h

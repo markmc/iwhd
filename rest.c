@@ -43,11 +43,19 @@
 #include "meta.h"
 #include "backend.h"
 #include "setup.h"
+#include "propername.h"
 #include "quote.h"
 #include "replica.h"
 #include "template.h"
 #include "mpipe.h"
 #include "state_defs.h"
+#include "version-etc.h"
+
+const char version_etc_copyright[] =
+  /* Do *not* mark this string for translation.  %s is a copyright
+     symbol suitable for this locale, and %d is the copyright
+     year.  */
+  "Copyright %s %d Red Hat, Inc.";
 
 #if defined(DEBUG)
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION | MHD_USE_DEBUG
@@ -55,6 +63,11 @@
 #else
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION
 #endif
+
+#define AUTHORS \
+  proper_name ("Jeff Darcy"), \
+  proper_name ("Jim Meyering"), \
+  proper_name ("Pete Zaitcev")
 
 /* Buffer size for MHD_create_post_processor, used to buffer and parse keys. */
 enum { POST_BUF_SIZE = 4096 };
@@ -2320,7 +2333,8 @@ main (int argc, char **argv)
 		usage(EXIT_SUCCESS);
 		break;
 	case GETOPT_VERSION_CHAR:
-		printf ("%s version %s\n", program_name, PACKAGE_VERSION);
+		version_etc (stdout, program_name, PACKAGE_NAME,
+			     PACKAGE_VERSION, AUTHORS, (char *) NULL);
 		exit (EXIT_SUCCESS);
 		break;
 
