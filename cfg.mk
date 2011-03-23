@@ -21,7 +21,6 @@ manual_title = GNU Grep: Print lines matching a pattern
 skip_low_priority =			\
   sc_bindtextdomain			\
   sc_texinfo_acronym			\
-  sc_prohibit_atoi_atof			\
   sc_prohibit_tab_based_indentation	\
   sc_prohibit_strcmp			\
   sc_error_message_uppercase		\
