@@ -19,7 +19,6 @@ manual_title = GNU Grep: Print lines matching a pattern
 
 # Fixing these can wait.
 skip_low_priority =			\
-  sc_bindtextdomain			\
   sc_texinfo_acronym			\
   sc_prohibit_tab_based_indentation	\
   sc_prohibit_strcmp			\
@@ -63,6 +62,7 @@ odt = ^doc/image_repo\.odt$
 exclude_file_name_regexp--sc_trailing_blank = $(odt)
 exclude_file_name_regexp--sc_prohibit_empty_lines_at_EOF = $(odt)
 exclude_file_name_regexp--sc_prohibit_test_double_equal = ^t/parse-test$$
+exclude_file_name_regexp--sc_bindtextdomain = ^dc-rhev-image\.c$$
 
 update-copyright-env = \
   UPDATE_COPYRIGHT_USE_INTERVALS=1 \
