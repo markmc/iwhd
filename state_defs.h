@@ -79,15 +79,6 @@ typedef struct _my_state {
 	int				 be_flags;
 } my_state;
 
-#define CLEANUP_CURL	0x01	/* no longer needed */
-#define CLEANUP_BUF_PTR	0x02
-#define CLEANUP_POST	0x04
-#define CLEANUP_DICT	0x08
-#define CLEANUP_QUERY	0x10
-#define CLEANUP_TMPL	0x20
-#define CLEANUP_URL	0x40
-#define CLEANUP_AQUERY	0x80
-
 #define BACKEND_GET_SIZE	0x01	/* used in put_child_func */
 
 #endif
