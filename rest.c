@@ -1647,7 +1647,7 @@ prov_fmt (provider_t *prov, void *ms_v)
 		if (len < 0)
 			return 0; // tell iterator we've failed
 
-		if (len < n_remaining) {
+		if ((size_t) len < n_remaining) {
 			ms->buf_n_used += len;
 			return 1;
 		}

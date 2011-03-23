@@ -286,7 +286,7 @@ tmpl_prov_entry (char *buf, size_t buf_len,
 		fmt += ctx->format->z_offset;
 	int size = snprintf(buf, buf_len, fmt,
 			    name, type, host, port, user, pass);
-	if (0 < size && size < buf_len)
+	if (0 < size && (size_t) size < buf_len)
 		ctx->index++;
 
 	return size;

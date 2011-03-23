@@ -134,9 +134,7 @@ if test "$gl_gcc_warnings" = yes; then
   for w in $ws; do
     gl_WARN_ADD([$w])
   done
-  gl_WARN_ADD([-Wno-unused])
-  gl_WARN_ADD([-Wno-missing-field-initializers]) # We need this one
-  gl_WARN_ADD([-Wno-sign-compare])     # Too many warnings for now
+  gl_WARN_ADD([-Wno-unused-function])
   gl_WARN_ADD([-Wno-unused-parameter]) # Too many warnings for now
 
   # In spite of excluding -Wlogical-op above, it is enabled, as of

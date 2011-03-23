@@ -259,11 +259,12 @@ paren_expr:
 
 static const struct { char *name; char *value; } hacked_obj_fields[] = {
         /* Fake object fields for generic unit testing. */
-	{ (char*) "a", (char*) "2" }, { (char*) "b", (char*) "7" },
+	{ (char*) "a", (char*) "2" },
+	{ (char*) "b", (char*) "7" },
 	{ (char*) "c", (char*) "11" },
         /* This one's here to test links (e.g. $template.owner.name). */
 	{ (char*) "template", (char*) "templates/the_tmpl" },
-	{ NULL }
+	{ NULL, NULL }
 };
 
 /* Fake out the eval code for unit testing. */
@@ -280,7 +281,7 @@ unit_oget_func (void * notused, const char *text)
 
 	return NULL;
 }
-static const getter_t unit_oget = { unit_oget_func };
+static const getter_t unit_oget = { unit_oget_func, NULL };
 
 /*
  * Same as above, but the site-field stuff is so similar to the object-field
@@ -291,14 +292,14 @@ unit_sget_func (void * notused, const char *text)
 {
 	return "never";
 }
-static const getter_t unit_sget = { unit_sget_func };
+static const getter_t unit_sget = { unit_sget_func, NULL };
 
 /* Fake links from an object/key tuple to an object/key string. */
 static const struct { char *obj; char *key; char *value; } hacked_links[] = {
 	{ (char*) "templates/the_tmpl", (char*) "owner",
 	  (char*) "users/the_user" },
 	{ (char*) "users/the_user", (char*) "name", (char*) "Jeff Darcy" },
-	{ NULL }
+	{ NULL, NULL, NULL }
 };
 
 static char *
@@ -611,7 +612,7 @@ int
 main (int argc, char **argv)
 {
   int fail = 0;
-  unsigned int i;
+  int i;
   GC_INIT ();
   for (i = 1; i < argc; ++i)
     {
