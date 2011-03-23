@@ -45,7 +45,9 @@
 
 #include "base64.h"
 #include "close-stream.h"
+#include "closeout.h"
 #include "copy-file.h"
+#include "progname.h"
 
 /*
  * Note that we almost never prefix with TAG due to compatibility with EC2.
@@ -1481,6 +1483,9 @@ int main(int argc, char **argv, char **envp)
 	json_t *jcfg;
 	struct stor_dom *sd;
 	char uuidbuf[37];
+
+	set_program_name (TAG);
+	atexit (close_stdout);
 
 	env_p = envp;
 
