@@ -275,7 +275,7 @@ unit_oget_func (void * notused, const char *text)
 
 	for (i = 0; hacked_obj_fields[i].name; ++i) {
 		if (!strcmp(hacked_obj_fields[i].name,text)) {
-			return xstrdup(hacked_obj_fields[i].value);
+			return hacked_obj_fields[i].value;
 		}
 	}
 
