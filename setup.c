@@ -35,6 +35,7 @@
 #include "query.h"
 #include "meta.h"
 #include "xalloc.h"
+#include "xstrtol.h"
 
 /*
  * A config consists of a JSON array of objects, where each object includes:
@@ -398,7 +399,18 @@ add_provider (Hash_table *h)
         goto fail;
 
     prov->host = kv_hash_lookup(h,"host");
-    prov->port = atoi(kv_hash_lookup(h,"port"));
+
+    char *port_str = kv_hash_lookup (h, "port");
+    if (port_str == NULL)
+      goto fail;
+
+    long int port;
+    if ( ! (xstrtol (port_str, NULL, 10, &port, "") == LONGINT_OK
+            && 0 < port && port <= INT_MAX))
+      goto fail;
+
+    prov->port = port;
+
     /* TBD: change key/secret field names to username/password */
     prov->username = kv_hash_lookup(h,"key");
     prov->password = kv_hash_lookup(h,"secret");
