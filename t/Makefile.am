@@ -21,6 +21,14 @@ TESTS =						\
   replication					\
   auto
 
+lock_dir = $(abs_builddir)/lock-dir
+CONFIG_CLEAN_FILES = lock-dir
+.PHONY: prereq
+prereq:
+	$(AM_V_GEN)rm -rf "$(lock_dir)" && mkdir "$(lock_dir)"
+
+$(TEST_LOGS): prereq
+
 EXTRA_DIST =					\
   $(TESTS)					\
   init.cfg					\
@@ -52,6 +60,7 @@ TESTS_ENVIRONMENT =				\
   abs_top_srcdir='$(abs_top_srcdir)'		\
   abs_srcdir='$(abs_srcdir)'			\
   built_programs='$(built_programs)'		\
+  lock_dir='$(lock_dir)'			\
   srcdir='$(srcdir)'				\
   top_srcdir='$(top_srcdir)'			\
   CC='$(CC)'					\

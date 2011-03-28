@@ -14,7 +14,8 @@
 
 mkdir FS mongod iwhd || framework_failure_ mkdir failed
 
-m_port=$(expr $mongo_base_port + 0)
+m_port=$(get_port $mongo_base_port $lock_dir/m-) \
+  || fail_ "failed to get mongodb port"
 
 mongod --port $m_port --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1 &
 mongo_pid=$!
@@ -24,7 +25,7 @@ cleanup_() { kill -9 $mongo_pid; }
 wait_for .1 50 'mongo localhost:$m_port < /dev/null' \
   || framework_failure_ mongod failed to start
 
-port=9091
+port=$(get_port 9095 $lock_dir/i-) || fail_ "failed to get iwhd port"
 bucket=http://localhost:$port/b1
 
 cat <<EOF > root.xml || framework_failure_

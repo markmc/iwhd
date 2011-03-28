@@ -12,7 +12,8 @@
 
 mkdir mongod fs_upstream fs_downstream || framework_failure_ mkdir failed
 
-m_port=$(expr $mongo_base_port + 1)
+m_port=$(get_port $mongo_base_port $lock_dir/m-) \
+  || fail_ "failed to get mongodb port"
 
 mongod --port $m_port --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1 &
 mongo_pid=$!
@@ -22,15 +23,17 @@ cleanup_() { kill -9 $mongo_pid; }
 wait_for .1 120 'mongo localhost:$m_port < /dev/null' \
   || framework_failure_ mongod failed to start
 
+port=$(get_port 9095 $lock_dir/i-) || fail_ "failed to get iwhd port"
+d_port=$(get_port 9095 $lock_dir/i-) || fail_ "failed to get 2nd iwhd port"
+
 cat > iwhd_u.cfg << EOF
 [
 	{ "name":"upstream",   "type":"fs",   "path":"fs_upstream" },
-	{ "name":"downstream", "type":"http", "host":"localhost", "port": 9093,
+	{ "name":"downstream", "type":"http", "host":"localhost", "port": $d_port,
 	  "color": "blue" }
 ]
 EOF
 
-port=9092
 iwhd -v -p $port -c iwhd_u.cfg -d localhost:$m_port &
 iwhd_pid=$!
 wait_for .1 50 "curl http://localhost:$port" \
@@ -43,7 +46,6 @@ cat > iwhd_d.cfg << EOF
 ]
 EOF
 
-d_port=9093
 iwhd -v -p $d_port -c iwhd_d.cfg -d localhost:$m_port -m localhost:$port &
 iwhd_d_pid=$!
 wait_for .1 50 "curl http://localhost:$d_port" \

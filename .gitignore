@@ -35,6 +35,7 @@
 /qparser.h
 /stamp-h1
 /t/*.log
+/t/lock-dir
 ChangeLog
 ID
 INSTALL
