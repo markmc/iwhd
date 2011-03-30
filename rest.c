@@ -358,10 +358,8 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 }
 
 static void
-recheck_replication (my_state * ms, char *policy)
+recheck_replication (my_state *ms, char *policy)
 {
-	int	rc;  /* FIXME: set but never used */
-
 	if (is_reserved(ms->key,reserved_name)) {
 		DPRINTF("declining to replicate reserved object %s\n",ms->key);
 		return;
@@ -374,13 +372,22 @@ recheck_replication (my_state * ms, char *policy)
 
 	if (!policy) {
 		DPRINTF("fetching policy for %s/%s\n",ms->bucket,ms->key);
-		rc = meta_get_value(ms->bucket,ms->key, "_policy", &policy);
+		int rc = meta_get_value(ms->bucket,ms->key, "_policy", &policy);
+		if (rc) {
+			error (0, rc, _("failed to get policy for %s/%s"),
+			       ms->bucket,ms->key);
+			return;
+		}
 	}
 
 	if (!policy) {
 		DPRINTF("  inheriting policy from %s\n",ms->bucket);
-		rc = meta_get_value(ms->bucket,
-			"_default", "_policy", &policy);
+		int rc = meta_get_value(ms->bucket, "_default",
+					"_policy", &policy);
+		if (rc) {
+			error (0, rc, _("failed to get default policy"));
+			return;
+		}
 	}
 
 	if (policy) {
