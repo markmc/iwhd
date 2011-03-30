@@ -375,6 +375,9 @@ RepoMeta::GetValue (const char *bucket, const char *key, const char *mkey,
 	}
 
 	*mvalue = strdup(data);
+	if (*mvalue == NULL)
+		return ENOMEM;
+
 	return 0;
 }
 
