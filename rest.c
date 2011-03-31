@@ -373,36 +373,27 @@ recheck_replication (my_state *ms, char *policy)
 	if (!policy) {
 		DPRINTF("fetching policy for %s/%s\n",ms->bucket,ms->key);
 		int rc = meta_get_value(ms->bucket,ms->key, "_policy", &policy);
-		if (rc) {
+		if (rc)
 			error (0, rc, _("failed to get policy for %s/%s"),
 			       ms->bucket,ms->key);
-			return;
-		}
 	}
 
 	if (!policy) {
 		DPRINTF("  inheriting policy from %s\n",ms->bucket);
 		int rc = meta_get_value(ms->bucket, "_default",
 					"_policy", &policy);
-		if (rc) {
+		if (rc || !policy)
 			error (0, rc, _("failed to get default policy"));
-			return;
-		}
 	}
 
-	if (policy) {
-		char fixed[MAX_FIELD_LEN];
-		DPRINTF("  implementing policy %s\n",policy);
-		/*
-		 * Can't use ms->url here because it might be a bucket POST
-		 * and in that case ms->url points to the bucket.
-		 */
-		snprintf(fixed,sizeof(fixed),"%s/%s",ms->bucket,ms->key);
-		replicate(fixed,0,policy,ms);
-	}
-	else {
-		DPRINTF("  could not find a policy anywhere!\n");
-	}
+	char fixed[MAX_FIELD_LEN];
+	DPRINTF("  implementing policy %s\n",policy);
+	/*
+	 * Can't use ms->url here because it might be a bucket POST
+	 * and in that case ms->url points to the bucket.
+	 */
+	snprintf(fixed,sizeof(fixed),"%s/%s",ms->bucket,ms->key);
+	replicate(fixed,0,policy,ms);
 }
 
 static int
