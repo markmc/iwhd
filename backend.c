@@ -44,6 +44,8 @@
 #include "state_defs.h"
 #include "ignore-value.h"
 
+#define ARRAY_CARDINALITY(Array) (sizeof (Array) / sizeof *(Array))
+
 #define NFSGID 36
 
 struct hstor_client	*hstor;
@@ -373,8 +375,8 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	const char	*ami_key;
 	const char	*ami_uid;
 	const char	*argv[12];
-	int	 	 argc = 0;
-	pid_t	 	 pid;
+	unsigned int	 argc = 0;
+	pid_t		 pid;
 	int		 organ[2];
 	int		 wstat;
 	FILE		*fp;
@@ -386,6 +388,8 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	char		*ami_bkt;
 	char		 ami_id_buf[64];
 	regmatch_t	 match[2];
+
+	strcpy(ami_id_buf, "none");
 
 	if (!regex_ok) {
 		return MHD_HTTP_BAD_REQUEST;
@@ -492,6 +496,7 @@ s3_register (my_state *ms, const provider_t *prov, const char *next,
 	argv[argc++] = kernel ? kernel : "_default_";
 	argv[argc++] = ramdisk ? ramdisk : "_default_";
 	argv[argc] = NULL;
+	assert (argc < ARRAY_CARDINALITY (argv));
 
 	DPRINTF("api-key = %s\n",api_key);
 	DPRINTF("api-secret = %s\n",api_secret);
@@ -1350,11 +1355,10 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	char		*nfs_dir;
 	const char	*conf_name = NULL;
 	char		*conf_text;
-	int		 ret	= MHD_HTTP_BAD_REQUEST;
-	int		 rc;
+	int		 rc	= MHD_HTTP_BAD_REQUEST;
 	const char	*argv[12];
-	int	 	 argc = 0;
-	pid_t	 	 pid;
+	unsigned int	 argc = 0;
+	pid_t		 pid;
 	int		 organ[2];
 	int		 wstat;
 	FILE		*fp;
@@ -1362,6 +1366,8 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	char		*s;
 	char		 ami_id_buf[64];
 	regmatch_t	 match[2];
+
+	strcpy(ami_id_buf, "none");
 
 	if (!regex_ok) {
 		return MHD_HTTP_BAD_REQUEST;
@@ -1472,6 +1478,7 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	argv[argc++] = cmd;
 	argv[argc++] = conf_name;
 	argv[argc] = NULL;
+	assert (argc < ARRAY_CARDINALITY (argv));
 
 	if (pipe(organ) < 0) {
 		error (0, errno, _("pipe creation failed"));
@@ -1507,7 +1514,8 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 			buf[match[1].rm_eo] = '\0';
 			DPRINTF("found image UUID: %s\n",buf+match[1].rm_so);
 			sprintf(ami_id_buf,"OK %.60s",buf+match[1].rm_so);
-			rc = MHD_HTTP_OK;
+			if (rc == MHD_HTTP_BAD_REQUEST)
+				rc = MHD_HTTP_OK;
 		}
 		else if (strcmp(buf,"ERROR") == 0) {
 			DPRINTF("found err marker: %s\n",buf+sizeof("ERROR"));
@@ -1547,7 +1555,7 @@ cleanup:
 	free((char *)conf_name);
 
 	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
-	return ret;
+	return rc;
 }
 
 /***** Function tables. ****/
