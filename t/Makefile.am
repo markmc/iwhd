@@ -22,7 +22,9 @@ TESTS =						\
   auto
 
 lock_dir = $(abs_builddir)/lock-dir
-CONFIG_CLEAN_FILES = lock-dir
+clean-local:
+	$(AM_V_GEN)rm -rf "$(lock_dir)"
+
 .PHONY: prereq
 prereq:
 	$(AM_V_GEN)rm -rf "$(lock_dir)" && mkdir "$(lock_dir)"
