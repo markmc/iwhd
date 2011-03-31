@@ -19,7 +19,8 @@ TESTS =						\
   basic						\
   provider					\
   replication					\
-  auto
+  auto						\
+  registration
 
 lock_dir = $(abs_builddir)/lock-dir
 clean-local:

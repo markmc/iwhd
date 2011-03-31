@@ -24,6 +24,7 @@ ACLOCAL_AMFLAGS = -I m4
 bin_PROGRAMS = iwhd dc-rhev-image
 
 EXTRA_DIST =		\
+  dc-condor-image	\
   dc-register-image	\
   iwhd.init.in		\
   qparser.h		\

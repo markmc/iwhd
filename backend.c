@@ -1558,6 +1558,144 @@ cleanup:
 	return rc;
 }
 
+static int
+fs_condor_register (my_state *ms, const provider_t *prov, const char *next,
+		    Hash_table *args)
+{
+	char		*kernel		= kv_hash_lookup(args,"kernel");
+	char		*ramdisk	= kv_hash_lookup(args,"ramdisk");
+	const char	*nfs_dir;
+	const char	*argv[12];
+	unsigned int	 argc = 0;
+	pid_t		 pid;
+	int		 organ[2];
+	int		 wstat;
+	FILE		*fp;
+	char		 buf[LINE_SIZE];
+	char		*s;
+	int		 rc	= MHD_HTTP_BAD_REQUEST;
+	char		 ami_id_buf[64];
+	regmatch_t	 match[2];
+
+	strcpy(ami_id_buf, "none");
+
+	if (!regex_ok) {
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	if (next) {
+		DPRINTF("Falcon register with next!=NULL\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	DPRINTF("*** register %s/%s via %s\n",
+		ms->bucket, ms->key, prov->name);
+	if (kernel) {
+		DPRINTF("    (using kernel %s)\n",kernel);
+	}
+	if (ramdisk) {
+		DPRINTF("    (using ramdisk %s)\n",ramdisk);
+	}
+
+	/*
+	 * The discrepancy between POST argument key "nfs-dir" and JSON
+	 * key "nfsdir" is unfortunate, but nfs-dir was there first.
+	 */
+	nfs_dir = kv_hash_lookup(args,"nfs-dir");
+	if (!nfs_dir) {
+		nfs_dir = get_provider_value(prov,"nfsdir");
+		if (!nfs_dir) {
+			error (0, 0,
+			       _("missing target directory (nfs-dir,nfsdir)"));
+			goto cleanup;
+		}
+	}
+
+	/*
+	 * This is the point where we go from validation to execution.  If we
+	 * were double-forking so this could all be asynchronous, or for that
+	 * matter to return an early 100-continue, this would probably be the
+	 * place to do it.  Even without that, we set the ami-id here so that
+	 * the caller can know things are actually in progress.
+	 */
+	sprintf(ami_id_buf,"pending %lld",(long long)time(NULL));
+	DPRINTF("temporary ami-id = \"%s\"\n",ami_id_buf);
+	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
+	rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
+
+	const char *cmd = "dc-condor-image";
+	argv[argc++] = cmd;
+	argv[argc++] = ms->bucket;
+	argv[argc++] = ms->key;
+	argv[argc++] = nfs_dir;
+	argv[argc++] = kernel ? kernel : "_default_";
+	argv[argc++] = ramdisk ? ramdisk : "_default_";
+	argv[argc] = NULL;
+	assert (argc < ARRAY_CARDINALITY (argv));
+
+	if (pipe(organ) < 0) {
+		error (0, errno, _("pipe creation failed"));
+		goto cleanup;
+	}
+
+	pid = fork();
+	if (pid < 0) {
+		error (0, errno, _("fork failed"));
+		close(organ[0]);
+		close(organ[1]);
+		goto cleanup;
+	}
+
+	if (pid == 0) {
+		(void)dup2(organ[1],STDOUT_FILENO);
+		(void)dup2(organ[1],STDERR_FILENO);
+		execvp(cmd, (char* const*)argv);
+		error (EXIT_FAILURE, errno, _("failed to run command %s"), cmd);
+	}
+
+	close(organ[1]);
+	fp = fdopen(organ[0],"r");
+	if (!fp) {
+		error (0, 0, _("could not open parent pipe stream"));
+		close(organ[0]);
+		goto cleanup;
+	}
+	while (fgets(buf,sizeof(buf)-1,fp)) {
+		if ((s = strchr(buf, '\n')) != NULL)
+			*s = '\0';
+		if (regexec(&s3_success_pat,buf,2,match,0) == 0) {
+			buf[match[1].rm_eo] = '\0';
+			DPRINTF("found AMI ID: %s\n",buf+match[1].rm_so);
+			sprintf(ami_id_buf,"OK %.60s",buf+match[1].rm_so);
+			rc = MHD_HTTP_OK;
+		}
+		else {
+			DPRINTF("ignoring line: <%s>\n",buf);
+		}
+	}
+	fclose(fp);
+
+	DPRINTF("waiting for child...\n");
+	if (waitpid(pid,&wstat,0) < 0) {
+		error (0, errno, _("waitpid failed"));
+		goto cleanup;
+	}
+	if (!WIFEXITED(wstat)) {
+		error (0, 0, _("%s is killed (status 0x%x)"), cmd, wstat);
+		goto cleanup;
+	}
+	if (WEXITSTATUS(wstat)) {
+		error (0, 0, _("%s exited with code %d"),
+		       cmd, WEXITSTATUS(wstat));
+		goto cleanup;
+	}
+	DPRINTF("...child exited\n");
+
+cleanup:
+	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
+	return rc;
+}
+
 /***** Function tables. ****/
 
 backend_func_tbl bad_func_tbl = {
@@ -1624,4 +1762,15 @@ backend_func_tbl fs_rhevm_func_tbl = {
 	fs_delete,
 	fs_bcreate,
 	fs_rhevm_register,
+};
+
+backend_func_tbl fs_condor_func_tbl = {
+	"FS-FALCON",
+	fs_init,
+	fs_get_child,
+	fs_put_child,
+	bad_cache_child,
+	fs_delete,
+	fs_bcreate,
+	fs_condor_register,
 };

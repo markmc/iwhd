@@ -67,6 +67,7 @@ extern backend_func_tbl	curl_func_tbl;
 extern backend_func_tbl	cf_func_tbl;
 extern backend_func_tbl	fs_func_tbl;
 extern backend_func_tbl	fs_rhevm_func_tbl;
+extern backend_func_tbl	fs_condor_func_tbl;
 
 static json_t		*config		= NULL;
 static Hash_table	*prov_hash	= NULL;
@@ -213,7 +214,9 @@ json_validate_server (unsigned int i)
 	else if (!strcasecmp(type,"http")) {
 		needs = NEED_SERVER;
 	}
-	else if (!strcasecmp(type,"fs") || !strcasecmp(type,"fs-rhev-m")) {
+	else if (!strcasecmp(type,"fs") ||
+		 !strcasecmp(type,"fs-rhev-m") ||
+		 !strcasecmp(type,"fs-condor")) {
 		needs = NEED_PATH;
 	}
 	else {
@@ -334,6 +337,9 @@ convert_provider (int i, provider_t *out)
 	else if (!strcasecmp(out->type,"fs-rhev-m")) {
 		out->func_tbl = &fs_rhevm_func_tbl;
 	}
+	else if (!strcasecmp(out->type,"fs-condor")) {
+		out->func_tbl = &fs_condor_func_tbl;
+	}
 	else {
 		out->func_tbl = &bad_func_tbl;
 	}
@@ -436,6 +442,8 @@ add_provider (Hash_table *h)
         prov->func_tbl = &fs_func_tbl;
     else if (!strcasecmp(prov->type,"fs-rhev-m"))
         prov->func_tbl = &fs_rhevm_func_tbl;
+    else if (!strcasecmp(prov->type,"fs-condor"))
+        prov->func_tbl = &fs_condor_func_tbl;
     else
         prov->func_tbl = &bad_func_tbl;
 

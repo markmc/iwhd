@@ -1,0 +1,97 @@
+#!/bin/sh
+# Test registration functionality.
+# (currently Falcon only)
+
+. "${srcdir=.}/init.sh"; path_prepend_ ..
+
+mkdir -p reg/mongod reg/_fs reg/condor/staging \
+  || framework_failure_ mkdir failed
+
+port=$(get_port 9095 $lock_dir/i-) || fail_ "failed to get iwhd port"
+m_port=$(get_port $mongo_base_port $lock_dir/m-) \
+  || fail_ "failed to get mongodb port"
+
+mongod --port $m_port --pidfilepath reg/mongod/pid --dbpath reg/mongod \
+  > reg/mongod.log 2>&1 &
+mongo_pid=$!
+cleanup_() { kill -9 $mongo_pid; }
+
+# Wait for up to 12 seconds for mongod to begin listening.
+wait_for .1 120 'mongo localhost:$m_port < /dev/null' \
+  || framework_failure_ mongod failed to start
+
+# Nobody sanity-checks nfsdir for being absolute pathname, but as it happens
+# iwhd runs dc-condor-image inside the fs back-end top directory, so
+# we must use an absolute path anyway.
+cat > iwhd_reg.conf << EOF
+[
+  {
+    "name": "main",
+    "type": "fs-condor",
+    "path": "reg/_fs",
+    "nfsdir": "$(pwd)/reg/condor"
+  }
+]
+EOF
+
+PATH=$PATH:${abs_top_srcdir} iwhd -v -p $port -c iwhd_reg.conf \
+  -d localhost:$m_port &
+iwhd_pid=$!
+cleanup_() { kill -9 $mongo_pid; kill $iwhd_pid; }
+
+wait_for .1 50 "curl -s http://localhost:$port" \
+  || framework_failure_ iwhd failed to start
+
+# Create an empty bucket.
+curl -X PUT http://localhost:$port/buk || fail=1
+# Create a file in that bucket.
+dd if=/dev/zero bs=8k count=1 2>/dev/null | \
+  curl -T - http://localhost:$port/buk/test_image || fail=1
+
+# Encoding the image as a here document is not future-proof in that it's
+# entirely legal for the registration script to format XML in whatever way.
+# However, this test works for us as long as the dc-condor-image also
+# generates the XML from a similar literal (instead of, say, calling xslt).
+cat <<EOF > reg/test_image.known.xml || framework_failure_
+<domain type='kvm'>
+  <name>test_image</name>
+  <uuid>00000000-0000-0000-0000-000000000000</uuid>
+  <os>
+    <type arch='x86_64' machine='pc'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+  <devices>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='raw'/>
+      <source file='test_image'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+  </devices>
+</domain>
+EOF
+
+curl -d op=register -d site=main http://localhost:$port/buk/test_image
+# This location (condor/${ID}.xml) is future-proof as a part of Falcon API.
+compare reg/condor/test_image.xml reg/test_image.known.xml || fail=1
+# BTW, check if we saved the image, too. It's full of zeroes though...
+[ -s reg/condor/test_image ] || fail=1
+
+# One poorly understood feature of curl is that it actually exits with zero
+# upon an HTTP server error such as our favourite 500. The -f flag suppresses
+# the output to stderr _and_ enables error exit code. This is crazy, insane.
+# But it's life. We run one final curl with -f, in case iwhd spams 500 at us.
+curl -f http://localhost:$port/buk/test_image/ami-id > reg/ami-id || fail=1
+read regstatus regid < reg/ami-id
+# There may be conditions when registration failure is not detected, but
+# produces a diagnostic message inside the ami-id attribute (e.g. "pending").
+if [ "$regstatus" != "OK" ]; then
+  echo "Registration error:" $(cat reg/ami-id) >&2
+  fail=1
+fi
+# Current dc-condor-image returns the name that we sent as an ID. Verify that.
+if [ "$regid" != "test_image" ]; then
+  echo "Registration ID mismatch:" $(cat reg/ami-id) >&2
+  fail=1
+fi
+
+Exit $fail
