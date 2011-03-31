@@ -1,5 +1,11 @@
 iwhd NEWS                                                   -*- outline -*-
 
+* Noteworthy changes in trunk (to be release 0.93 [stable])
+
+** New features
+
+  Condor back-end
+
 * Noteworthy changes in release 0.92 (2011-03-15) [stable]
 
 ** New features
