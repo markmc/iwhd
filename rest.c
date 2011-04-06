@@ -2405,10 +2405,8 @@ args_done:
 		my_port, NULL, NULL, &access_handler, &the_sem,
 		MHD_OPTION_CONNECTION_MEMORY_LIMIT, (size_t)1048576,
 		MHD_OPTION_END);
-	if (!the_daemon) {
-		fprintf(stderr,"Could not create daemon.\n");
-		return !0;
-	}
+	if (!the_daemon)
+		error (EXIT_FAILURE, errno, _("failed to start daemon"));
 
 	sem_wait(&the_sem);
 	return 0;
