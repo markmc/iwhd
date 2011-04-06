@@ -46,9 +46,10 @@
 
 #define ARRAY_CARDINALITY(Array) (sizeof (Array) / sizeof *(Array))
 
-#define NFSGID 36
+/* FIXME: describe/justify */
+enum { NFSGID = 36 };
 
-struct hstor_client	*hstor;
+static struct hstor_client *hstor;
 
 /***** Generic module stuff, not specific to one back end *****/
 
@@ -65,9 +66,9 @@ struct hstor_client	*hstor;
 #define S3_IMAGE_PATTERN "^IMAGE[[:blank:]]+([^[:space:]]+)"
 #define S3_ERROR_PATTERN "^ERROR[[:blank:]]+([^[:space:]]+)"
 
-regex_t s3_success_pat;
-regex_t s3_failure_pat;
-int	regex_ok = FALSE;
+static regex_t s3_success_pat;
+static regex_t s3_failure_pat;
+static int regex_ok = FALSE;
 
 void
 backend_init (void)
