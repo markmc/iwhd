@@ -97,7 +97,6 @@ typedef struct {
 } rule;
 
 static unsigned short		 my_port	= MY_PORT;
-char				*cfg_file	= NULL;
 
 static const char *const (reserved_name[]) = {"_default", "_new", "_policy", "_query", NULL};
 static const char *const (reserved_attr[]) = {"_attrs", "_bucket", "_date", "_etag", "_key", "_loc", "_size", NULL};
@@ -2288,6 +2287,7 @@ main (int argc, char **argv)
 	char			*stctx = NULL;
 	char			*port_tmp;
 	bool			 autostart = false;
+	char *cfg_file = NULL;
 
 	set_program_name (argv[0]);
 	setlocale (LC_ALL, "");
