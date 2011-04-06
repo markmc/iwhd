@@ -46,7 +46,8 @@ using namespace mongo;
 
 #define SHOW_CONTENTION
 
-pthread_mutex_t		client_lock	= PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t client_lock = PTHREAD_MUTEX_INITIALIZER;
+
 #if defined(SHOW_CONTENTION)
 #define CLIENT_LOCK do {					\
 	if (pthread_mutex_trylock(&client_lock) != 0) {		\
