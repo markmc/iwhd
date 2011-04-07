@@ -1,0 +1,7 @@
+[main]
+host = https://www.transifex.net
+
+[iwhd.iwhdpot]
+file_filter = po/<lang>.po
+source_file = po/iwhd.pot
+source_lang = en
