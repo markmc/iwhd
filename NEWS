@@ -6,6 +6,10 @@ iwhd NEWS                                                   -*- outline -*-
 
   Condor back-end
 
+** Bug fixes
+
+  RHEV-M registration did all the right things, but returned code 400.
+
 * Noteworthy changes in release 0.92 (2011-03-15) [stable]
 
 ** New features
