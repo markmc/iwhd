@@ -1355,7 +1355,7 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	char		*nfs_dir;
 	const char	*conf_name = NULL;
 	char		*conf_text;
-	int		 rc	= MHD_HTTP_BAD_REQUEST;
+	int		 ret	= MHD_HTTP_BAD_REQUEST;
 	const char	*argv[12];
 	unsigned int	 argc = 0;
 	pid_t		 pid;
@@ -1366,6 +1366,7 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	char		*s;
 	char		 ami_id_buf[64];
 	regmatch_t	 match[2];
+	int		 rc;
 
 	strcpy(ami_id_buf, "none");
 
@@ -1445,6 +1446,8 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 		goto cleanup;
 	}
 
+	ret = MHD_HTTP_INTERNAL_SERVER_ERROR;
+
 	rc = asprintf(&conf_text,
 		    "{\n"
 		    "  \"image\"   : \"%s/%s\",\n"
@@ -1472,7 +1475,6 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	sprintf(ami_id_buf,"pending %lld",(long long)time(NULL));
 	DPRINTF("temporary ami-id = \"%s\"\n",ami_id_buf);
 	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
-	rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
 	const char *cmd = "dc-rhev-image";
 	argv[argc++] = cmd;
@@ -1514,13 +1516,11 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 			buf[match[1].rm_eo] = '\0';
 			DPRINTF("found image UUID: %s\n",buf+match[1].rm_so);
 			sprintf(ami_id_buf,"OK %.60s",buf+match[1].rm_so);
-			if (rc == MHD_HTTP_BAD_REQUEST)
-				rc = MHD_HTTP_OK;
+			ret = MHD_HTTP_OK;
 		}
 		else if (strncmp(buf,"ERROR",sizeof("ERROR")-1) == 0) {
 			DPRINTF("found err marker: %s\n",buf+sizeof("ERROR"));
 			sprintf(ami_id_buf,"failed %.56s",buf+sizeof("ERROR"));
-			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
 		}
 		else {
 			DPRINTF("ignoring line: <%s>\n",buf);
@@ -1555,7 +1555,7 @@ cleanup:
 	free((char *)conf_name);
 
 	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
-	return rc;
+	return ret;
 }
 
 static int
