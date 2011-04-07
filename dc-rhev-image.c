@@ -898,6 +898,7 @@ static struct stor_dom *apistart(struct config *cfg)
 	sd->poolid = apipool(cfg, &connection, headers, pathdc, sd->uuid);
 
 	curl_easy_cleanup(connection.curl);
+	curl_slist_free_all(headers);
 
 	free(authhdr);
 	free(authraw);
