@@ -267,6 +267,33 @@ cfg_veripick(char **cfgval, const char *cfgname, json_t *jcfg,
 	*cfgval = tmp;
 }
 
+static void ensure_path(const char *filename)
+{
+	char *path;
+	char *s;
+
+	path = strdup(filename);
+	if (!path)
+		return;
+	for (s = path; ; s++) {
+		if (!*s)
+			break;
+		if (*s == '/')
+			continue;
+		s = strchr(s, '/');
+		if (!s)
+			break;
+		*s = 0;
+		if (mkdir(path, 0770) < 0 && errno != EEXIST) {
+			fprintf(stderr, "ERROR mkdir(%s): %s\n",
+				path, strerror(errno));
+			exit(EXIT_FAILURE);
+		}
+		*s = '/';
+	}
+	free(path);
+}
+
 static size_t api_wcb(void *ptr, size_t bsz, size_t nmemb, void *arg)
 {
 	struct api_buf *bp = arg;
@@ -928,6 +955,12 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	rc = asprintf(&ovfdir, "%s/master/vms/%s", domdir, uuidbuf);
 	if (rc < 0)
 		goto err_alloc;
+
+	/*
+	 * When storage domain is freshly imported, without any VMs,
+	 * the RHEV-M may not create the "master/vms/". Pre-create.
+	 */
+	ensure_path(ovfdir);
 
 	now = time(NULL);
 	gmtime_r(&now, &now_tm);
