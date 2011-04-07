@@ -1517,7 +1517,7 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 			if (rc == MHD_HTTP_BAD_REQUEST)
 				rc = MHD_HTTP_OK;
 		}
-		else if (strcmp(buf,"ERROR") == 0) {
+		else if (strncmp(buf,"ERROR",sizeof("ERROR")-1) == 0) {
 			DPRINTF("found err marker: %s\n",buf+sizeof("ERROR"));
 			sprintf(ami_id_buf,"failed %.56s",buf+sizeof("ERROR"));
 			rc = MHD_HTTP_INTERNAL_SERVER_ERROR;
