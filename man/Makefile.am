@@ -22,5 +22,6 @@ MAINTAINERCLEANFILES = $(dist_man8_MANS)
 iwhd.8: $(top_srcdir)/configure.ac $(top_srcdir)/rest.c
 	$(AM_V_GEN) \
 	  (echo '[NAME]' && sed 's@/\* *@@; s/-/\\-/; q' $(top_srcdir)/rest.c)|\
-	  $(HELP2MAN) --no-info -i - -S '$(PACKAGE) $(VERSION)' ../iwhd | \
-	  sed 's/^\.B info .*/.B info FIXME/' > $@-t && mv $@-t $@
+	  PATH=..:$$PATH \
+	    $(HELP2MAN) --no-info -i - -S '$(PACKAGE) $(VERSION)' iwhd \
+	      > $@-t && mv $@-t $@
