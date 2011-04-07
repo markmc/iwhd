@@ -49,6 +49,7 @@
 #include "copy-file.h"
 #include "progname.h"
 #include "dirname.h"
+#include "xalloc.h"
 
 /*
  * Note that we almost never prefix with TAG due to compatibility with EC2.
@@ -269,12 +270,8 @@ cfg_veripick(char **cfgval, const char *cfgname, json_t *jcfg,
 
 static void ensure_path(const char *filename)
 {
-	char *path;
 	char *s;
-
-	path = strdup(filename);
-	if (!path)
-		return;
+	char *path = xstrdup(filename);
 	for (s = path; ; s++) {
 		if (!*s)
 			break;
