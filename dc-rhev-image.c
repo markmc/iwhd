@@ -48,6 +48,7 @@
 #include "closeout.h"
 #include "copy-file.h"
 #include "progname.h"
+#include "dirname.h"
 
 /*
  * Note that we almost never prefix with TAG due to compatibility with EC2.
@@ -229,6 +230,12 @@ error:
 static int path_exists(const char *path)
 {
 	return access(path, R_OK) == 0;
+}
+
+static const char *image_name(const char *path)
+{
+	const char *b = last_component(path);
+	return *b ? b : "-";
 }
 
 static void
@@ -886,7 +893,6 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	xmlTextWriterPtr writer;
 	char uuidbuf[37];
 	char buf100[100];
-	char *s;
 	char *domdir, *tmpovfdir, *tmpovf, *tmpimgdir, *imgdir, *ovfdir;
 	int rc;
 
@@ -980,13 +986,8 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	rc = xmlTextWriterWriteAttribute(writer,
 	    BAD_CAST "ovf:size", BAD_CAST buf100);
 	if (rc < 0) goto err_xml;
-	/* This is basename(), but we handroll it to make sure, due to BSD. */
-	if (!(s = strrchr(cfg->image, '/')) || s[1]==0)
-		s = cfg->image;
-	else
-		s++;
 	rc = xmlTextWriterWriteAttribute(writer,
-	    BAD_CAST "ovf:description", BAD_CAST s);
+	    BAD_CAST "ovf:description", BAD_CAST image_name(cfg->image));
 	if (rc < 0) goto err_xml;
 	rc = xmlTextWriterEndElement(writer);	/* close <File> */
 	if (rc < 0) goto err_xml;
@@ -1070,8 +1071,8 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	    BAD_CAST "ovf:id", BAD_CAST "out");
 	if (rc < 0) goto err_xml;
 
-	if (!(s = strrchr(cfg->image, '/'))) s = cfg->image;
-	rc = xmlTextWriterWriteElement(writer, BAD_CAST "Name", BAD_CAST s);
+	rc = xmlTextWriterWriteElement(writer,
+	    BAD_CAST "Name", BAD_CAST image_name(cfg->image));
 	if (rc < 0) goto err_xml;
 
 	uuid_unparse_lower(tpl_uuid, uuidbuf);
