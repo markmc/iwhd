@@ -1,6 +1,6 @@
 iwhd NEWS                                                   -*- outline -*-
 
-* Noteworthy changes in trunk (to be release 0.93 [stable])
+* Noteworthy changes in release ?.? (????-??-??) [?]
 
 ** New features
 
@@ -9,6 +9,7 @@ iwhd NEWS                                                   -*- outline -*-
 ** Bug fixes
 
   RHEV-M registration did all the right things, but returned code 400.
+
 
 * Noteworthy changes in release 0.92 (2011-03-15) [stable]
 
