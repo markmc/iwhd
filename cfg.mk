@@ -67,3 +67,8 @@ exclude_file_name_regexp--sc_bindtextdomain = ^dc-rhev-image\.c$$
 update-copyright-env = \
   UPDATE_COPYRIGHT_USE_INTERVALS=1 \
   UPDATE_COPYRIGHT_MAX_LINE_LENGTH=79
+
+announcement_mail_headers_ =                                            \
+To: iwhd-devel@lists.fedorahosted.org					\
+Cc: aeolus-devel@lists.fedorahosted.org					\
+Mail-Followup-To: iwhd-devel@lists.fedorahosted.org
