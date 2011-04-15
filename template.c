@@ -108,6 +108,7 @@ static const char json_root_header[] = "\
 {\n\
 	\"service\": \"%s\",\n\
 	\"version\": \"%s\",\n\
+	\"providers\":\n\
 	[\
 ";
 

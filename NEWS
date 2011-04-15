@@ -2,6 +2,12 @@ iwhd NEWS                                                   -*- outline -*-
 
 * Noteworthy changes in release ?.? (????-??-??) [?]
 
+** Bug fixes
+
+  iwhd now emits syntactically valid JSON output for the root query.
+  Before, it omitted the "providers": tag before the list of
+  provider descriptions. [bug introduced in the beginning]
+
 
 * Noteworthy changes in release 0.93 (2011-04-08) [stable]
 

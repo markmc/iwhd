@@ -40,6 +40,7 @@ cat <<EOF > root.json || framework_failure_
 {
 	"service": "image_warehouse",
 	"version": "$VERSION",
+	"providers":
 	[
 		{
 			"rel": "bucket_factory",
