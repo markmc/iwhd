@@ -17,6 +17,8 @@ mkdir FS mongod iwhd || framework_failure_ mkdir failed
 m_port=$(get_port $mongo_base_port $lock_dir/m-) \
   || fail_ "failed to get mongodb port"
 
+mongod --help || fail_ "mongod is not installed"
+
 mongod --port $m_port --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1 &
 mongo_pid=$!
 cleanup_() { kill -9 $mongo_pid; }
