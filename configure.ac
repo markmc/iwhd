@@ -16,7 +16,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-AC_PREREQ([2.65])
 AC_INIT([iwhd],
         m4_esyscmd([build-aux/git-version-gen .tarball-version]),
         [iwhd-devel@fedorahosted.org])
