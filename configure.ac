@@ -79,6 +79,12 @@ gl_LIBXML2([2.6.0])
 AC_CHECK_HEADER([gc.h], ,
   [AC_MSG_ERROR([Missing GC development library: gc-devel or libgc-dev])])
 
+AC_LANG_PUSH([C++])
+AC_CHECK_HEADER([mongo/client/dbclient.h], ,
+  [AC_MSG_ERROR([Missing Mongo DB client development library: mongodb-devel])],
+  [#undef VERSION])
+AC_LANG_POP
+
 # from http://www.gnu.org/software/autoconf-archive/
 AX_BOOST_BASE
 AX_BOOST_SYSTEM
