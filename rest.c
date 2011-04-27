@@ -509,7 +509,7 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 			}
 			DPRINTF("rereplicate (obj PUT)\n");
 			recheck_replication(ms,NULL);
-			rc = MHD_HTTP_OK;
+			rc = MHD_HTTP_CREATED;
 		}
 		resp = MHD_create_response_from_data(0,NULL,MHD_NO,MHD_NO);
 		if (!resp) {
@@ -1227,6 +1227,9 @@ create_bucket (char *name, my_state *ms)
 		 * general replica-repair policy/system in place.
 		 */
 		replicate_bcreate(name,ms);
+
+		/* Use this (201): slightly more descriptive than 200.  */
+		rc = MHD_HTTP_CREATED;
 	}
 
 	return rc;
