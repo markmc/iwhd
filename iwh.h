@@ -15,7 +15,7 @@
 
 #define MY_PORT 9090
 
-#if defined(GLOBALS_IMPL)
+#ifdef GLOBALS_IMPL
 #define GLOBAL(type,name,value)	type name = value
 #else
 #define GLOBAL(type,name,value)	extern type name

@@ -16,7 +16,7 @@
 #ifndef _QUERY_H
 #define _QUERY_H 1
 
-#if defined(__CPLUSPLUS__) || defined(__cplusplus)
+#if defined __CPLUSPLUS__ || defined __cplusplus
 extern "C" {
 #endif
 
@@ -83,7 +83,7 @@ void	 print_value	(const value_t *);
 
 value_t *parse (const char *text);
 
-#if defined(__CPLUSPLUS__) || defined(__cplusplus)
+#if defined __CPLUSPLUS__ || defined __cplusplus
 }
 #endif
 

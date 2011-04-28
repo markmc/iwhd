@@ -46,7 +46,7 @@ using namespace mongo;
 
 static pthread_mutex_t client_lock = PTHREAD_MUTEX_INITIALIZER;
 
-#if defined(SHOW_CONTENTION)
+#ifdef SHOW_CONTENTION
 #define CLIENT_LOCK do {					\
 	if (pthread_mutex_trylock(&client_lock) != 0) {		\
 		cout << "contention in " << __func__ << endl;	\

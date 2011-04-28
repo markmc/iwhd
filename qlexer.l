@@ -43,7 +43,7 @@
 
 %%
 
-#if defined(UNIT_TEST)
+#ifdef UNIT_TEST
 static void
 yyerror (const char *msg)
 {

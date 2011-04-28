@@ -57,7 +57,7 @@ const char version_etc_copyright[] =
      year.  */
   "Copyright %s %d Red Hat, Inc.";
 
-#if defined(DEBUG)
+#ifdef DEBUG
 #define MY_MHD_FLAGS MHD_USE_THREAD_PER_CONNECTION | MHD_USE_DEBUG
 //#define MY_MHD_FLAGS MHD_USE_SELECT_INTERNALLY | MHD_USE_DEBUG
 #else

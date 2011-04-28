@@ -13,10 +13,10 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#if !defined(_META_H)
+#ifndef _META_H
 #define _META_H
 
-#if defined(__cplusplus)
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -42,7 +42,7 @@ void *meta_get_attrs (const char *bucket, const char *key);
 int meta_attr_next (void *aobj, const char **, const char **);
 void meta_attr_stop (void *aobj);
 
-#if defined(__cplusplus)
+#ifdef __cplusplus
 }
 #endif
 

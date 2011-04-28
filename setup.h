@@ -13,7 +13,7 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#if !defined(_SETUP_H)
+#ifndef _SETUP_H
 #define _SETUP_H
 
 #include <curl/curl.h>	/* needed by stuff in state_defs.h (from backend.h) */
