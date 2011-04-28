@@ -30,7 +30,6 @@ skip_low_priority =			\
 local-checks-to-skip =			\
   sc_program_name			\
   sc_space_tab				\
-  sc_useless_cpp_parens			\
   $(skip_low_priority)
 
 # Tools used to bootstrap this package, used for "announcement".
