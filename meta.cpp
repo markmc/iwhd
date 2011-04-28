@@ -27,9 +27,7 @@
 using namespace std;
 
 /* Mongo (rather antisocially) tries to define this itself. */
-#if defined(VERSION)
 #undef VERSION
-#endif
 
 #include <mongo/client/dbclient.h>
 using namespace mongo;
