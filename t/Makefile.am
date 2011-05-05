@@ -18,6 +18,7 @@ TESTS =						\
   parse-test					\
   basic						\
   creation-code					\
+  exercise					\
   provider					\
   replication					\
   auto						\

@@ -44,9 +44,13 @@
 /fclose.c
 /fcntl.h
 /fcntl.in.h
+/fd-hook.c
+/fd-hook.h
 /file-has-acl.c
 /fpending.c
 /fpending.h
+/freading.c
+/freading.h
 /full-write.c
 /full-write.h
 /getopt.c
@@ -82,6 +86,7 @@
 /libiwhd.a
 /localcharset.c
 /localcharset.h
+/lseek.c
 /lstat.c
 /malloc.c
 /malloca.c
@@ -108,6 +113,7 @@
 /quote.h
 /quotearg.c
 /quotearg.h
+/read.c
 /realloc.c
 /ref-add.sed
 /ref-add.sin
@@ -127,6 +133,7 @@
 /stddef.in.h
 /stdint.h
 /stdint.in.h
+/stdio-impl.h
 /stdio-write.c
 /stdio.h
 /stdio.in.h
@@ -186,6 +193,7 @@
 /wcwidth.c
 /write.c
 /xalloc-die.c
+/xalloc-oversized.h
 /xalloc.h
 /xmalloc.c
 /xstriconv.c

@@ -1,0 +1,74 @@
+#!/bin/sh
+# Push some bytes through the system, to exercise the garbage collector.
+
+. "${srcdir=.}/init.sh"; path_prepend_ ..
+
+parallel --version || skip_ this test requires GNU parallel
+
+ulimit -c unlimited # ensure we get a core dump
+
+mkdir FS mongod iwhd || framework_failure_ mkdir failed
+
+m_port=$(get_port $mongo_base_port $lock_dir/m-) \
+  || fail_ "failed to get mongodb port"
+
+mongod --help > /dev/null || fail_ "the mongod program is not installed"
+
+mongod --port $m_port --pidfilepath mongod/pid --dbpath mongod > mongod.log 2>&1 &
+mongo_pid=$!
+cleanup_() { kill -9 $mongo_pid; }
+
+# Wait for up to 5 seconds for mongod to begin listening.
+wait_for .1 50 'mongo localhost:$m_port < /dev/null' \
+  || framework_failure_ mongod failed to start
+
+port=$(get_port 9095 $lock_dir/i-) || fail_ "failed to get iwhd port"
+
+printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
+  > iwhd.cfg || fail=1
+
+MALLOC_PERTURB_=31 MALLOC_CHECK_=3 \
+  iwhd -v -p $port -c iwhd.cfg -d localhost:$m_port &
+iwhd_pid=$!
+cleanup_() { kill -9 $mongo_pid; kill $iwhd_pid; }
+
+# Wait for up to 5 seconds for iwhd to begin listening on $port.
+wait_for .1 50 "curl -s http://localhost:$port" \
+  || { echo iwhd failed to listen; Exit 1; }
+
+
+curl_w() { curl --write-out '%{http_code}' "$@"; }
+
+# Create many objects in parallel.
+# Before iwhd-0.94, this would evoke a segmentation fault.
+create_many()
+{
+  local nb=40
+
+  # Use -j3 on a uniprocessor, else -j(3/2 N)
+  local n_procs=$(nproc || echo 2)
+  n_procs=$(expr $n_procs \* 3 / 2)
+
+  for i in $(seq $nb); do
+    # Create a bucket.
+    local b=http://localhost:$port/b-$i
+    curl_w -XPUT $b > http-code || fail=1
+    test "$(cat http-code)" = 201 || fail=1
+  done
+
+  seq 20000 > data
+  for i in $(seq $nb); do
+    local b=http://localhost:$port/b-$i
+    for j in $(seq --format=%04g 50); do
+      # Create an object in that bucket.
+      local obj=$b/9756a40c-7668-11e0-$j-0015c5f4d7e4
+      echo "curl -S -T - $obj < data"
+    done
+  done |parallel --halt-on-error=2 -j $n_procs || fail=1
+}
+
+create_many
+
+test $fail = 1 && sleep 9999d
+
+Exit $fail
