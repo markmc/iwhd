@@ -611,7 +611,7 @@ public:
 	int			Next		(const char **, const char **);
         BSONObj                 obj;
 	vector<BSONElement>	vec;
-	int			idx;
+	size_t			idx;
 };
 
 AttrList::AttrList (BSONObj &bo)
@@ -627,7 +627,12 @@ AttrList::Next (const char **name, const char **value)
 	BSONElement	elem;
 
 	while (idx < vec.size()) {
-		elem = vec[idx++];
+		elem = vec[idx];
+
+		// Do not wrap back to 0 when vec.size is SIZE_MAX.
+		if (idx != vec.size())
+			idx++;
+
 		if (elem.type() == String) {
 			*name = elem.fieldName();
 			*value = elem.String().c_str();
