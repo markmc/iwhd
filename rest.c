@@ -76,6 +76,14 @@ enum { POST_BUF_SIZE = 4096 };
    the callback function (i.e., I/O buffer size).  */
 enum { CB_BLOCK_SIZE = 64 * 1024 };
 
+/* Whenever a thread is created via a 3rd-party library, we must
+   register it with GC before it can allocate garbage collected memory,
+   or assign pointers   to the garbage collected heap.
+   For example, the microhttpd library creates threads running
+   our prov_list_generator and access_handler functions.
+   Thus, each of those must use this macro.
+   WARNING: whenever you use this macro, you must also arrange
+   to call GC_unregister_my_thread upon thread completion.  */
 #define gc_register_thread()						\
   {									\
     struct GC_stack_base gc_stack_base;					\
@@ -1691,7 +1699,7 @@ prov_name_compare (const void *av, const void *bv)
 }
 
 static ssize_t
-prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
+prov_list_generator_0 (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	gc_register_thread();
 	my_state *ms = ctx;
@@ -1764,6 +1772,13 @@ prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 		ms->gen_ctx = TMPL_CTX_DONE;
 		return len;
 	}
+}
+
+static ssize_t
+prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
+{
+  int ret = prov_list_generator_0 (ctx, pos, buf, max);
+  return ret;
 }
 
 static int
@@ -2166,9 +2181,9 @@ parse_url (const char *url, my_state *ms)
 }
 
 static int
-access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
-		const char *method, const char *version, const char *data,
-		size_t *data_size, void **rctx)
+access_handler_0 (void *cctx, struct MHD_Connection *conn, const char *url,
+		  const char *method, const char *version, const char *data,
+		  size_t *data_size, void **rctx)
 {
 	unsigned int		 i;
 	url_type		 utype;
@@ -2223,6 +2238,16 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 	MHD_queue_response(conn,MHD_HTTP_NOT_FOUND,resp);
 	MHD_destroy_response(resp);
 	return MHD_YES;
+}
+
+static int
+access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
+		const char *method, const char *version, const char *data,
+		size_t *data_size, void **rctx)
+{
+  int ret = access_handler_0 (cctx, conn, url, method, version,
+			      data, data_size, rctx);
+  return ret;
 }
 
 /* These enum values cannot possibly conflict with the option values
