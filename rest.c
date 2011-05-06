@@ -1701,7 +1701,6 @@ prov_name_compare (const void *av, const void *bv)
 static ssize_t
 prov_list_generator_0 (void *ctx, uint64_t pos, char *buf, size_t max)
 {
-	gc_register_thread();
 	my_state *ms = ctx;
 	(void)pos;
 
@@ -1777,7 +1776,9 @@ prov_list_generator_0 (void *ctx, uint64_t pos, char *buf, size_t max)
 static ssize_t
 prov_list_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 {
+  gc_register_thread();
   int ret = prov_list_generator_0 (ctx, pos, buf, max);
+  GC_unregister_my_thread();
   return ret;
 }
 
@@ -2190,8 +2191,6 @@ access_handler_0 (void *cctx, struct MHD_Connection *conn, const char *url,
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
 
-	gc_register_thread();
-
 	if (ms) {
 		return ms->handler(cctx,conn,url,method,version,
 			data,data_size,rctx);
@@ -2245,8 +2244,10 @@ access_handler (void *cctx, struct MHD_Connection *conn, const char *url,
 		const char *method, const char *version, const char *data,
 		size_t *data_size, void **rctx)
 {
+  gc_register_thread();
   int ret = access_handler_0 (cctx, conn, url, method, version,
 			      data, data_size, rctx);
+  GC_unregister_my_thread();
   return ret;
 }
 

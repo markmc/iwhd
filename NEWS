@@ -4,6 +4,9 @@ iwhd NEWS                                                   -*- outline -*-
 
 ** Bug fixes
 
+  iwhd no longer segfaults during garbage-collection
+  [bug introduced in 0.91]
+
   iwhd now emits syntactically valid JSON output for the root query.
   Before, it omitted the "providers": tag before the list of
   provider descriptions. [bug introduced in the beginning]
