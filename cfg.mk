@@ -71,3 +71,10 @@ announcement_mail_headers_ =						\
 To: iwhd-devel@lists.fedorahosted.org					\
 Cc: aeolus-devel@lists.fedorahosted.org					\
 Mail-Followup-To: iwhd-devel@lists.fedorahosted.org
+
+# Make the automatically generated announcement email use the right URL.
+url_dir_list = http://people.redhat.com/$(USER)/$(PACKAGE)
+
+# Make the distcheck-emitted gnupload command use the right URL.
+gnu_rel_host = people.redhat.com
+upload_dest_dir_ = public_html/$(PACKAGE)
