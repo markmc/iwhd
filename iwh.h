@@ -68,7 +68,7 @@ GLOBAL(const char *,    me,             "here");
 #define AUTO_MONGOD_LOG	"_mongod.log"
 #define AUTO_MONGOD_PORT 27018
 
-int	 auto_start		(int dbport);
+extern int auto_start (int dbport);
 
 #include <locale.h>
 #include "gettext.h"

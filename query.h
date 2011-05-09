@@ -77,11 +77,11 @@ typedef struct {
  * user state and still relies quite a bit on internal globals.  That might
  * mean that we just have to put a lock around it instead.
  */
-int	 eval		(const value_t *expr,
-			 const getter_t *oget, const getter_t *sget);
-void	 print_value	(const value_t *);
+extern int eval (const value_t *expr,
+		 const getter_t *oget, const getter_t *sget);
+extern void print_value (const value_t *);
 
-value_t *parse (const char *text);
+extern value_t *parse (const char *text);
 
 #if defined __CPLUSPLUS__ || defined __cplusplus
 }

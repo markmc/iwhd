@@ -22,25 +22,25 @@ extern "C" {
 
 enum { QUERY_BKT_LIST, QUERY_OBJ_LIST, QUERY_FILTER };
 
-void meta_init (void);
-void meta_fini (void);
-char *meta_did_put (const char *bucket, const char *key, const char *loc,
-		    size_t size);
-void meta_got_copy (const char *bucket, const char *key, const char *loc);
-char *meta_has_copy (const char *bucket, const char *key, const char *loc);
-int meta_set_value (const char *bucket, const char *key, const char *mkey,
-		    const char *mvalue);
-int meta_get_value (const char *bucket, const char *key, const char *mkey,
-		    char **mvalue);
-
-void *meta_query_new (const char *bucket, const char *key, const char *expr);
-int meta_query_next (void *qobj, char **bucket, char **key);
-void meta_query_stop (void *qobj);
-void meta_delete (const char *bucket, const char *key);
-size_t meta_get_size (const char *bucket, const char *key);
-void *meta_get_attrs (const char *bucket, const char *key);
-int meta_attr_next (void *aobj, const char **, const char **);
-void meta_attr_stop (void *aobj);
+extern void meta_init (void);
+extern void meta_fini (void);
+extern char *meta_did_put (const char *bucket, const char *key, const char *loc,
+			   size_t size);
+extern void meta_got_copy (const char *bucket, const char *key, const char *loc);
+extern char *meta_has_copy (const char *bucket, const char *key, const char *loc);
+extern int meta_set_value (const char *bucket, const char *key, const char *mkey,
+			   const char *mvalue);
+extern int meta_get_value (const char *bucket, const char *key, const char *mkey,
+			   char **mvalue);
+extern void *meta_query_new (const char *bucket, const char *key,
+			     const char *expr);
+extern int meta_query_next (void *qobj, char **bucket, char **key);
+extern void meta_query_stop (void *qobj);
+extern void meta_delete (const char *bucket, const char *key);
+extern size_t meta_get_size (const char *bucket, const char *key);
+extern void *meta_get_attrs (const char *bucket, const char *key);
+extern int meta_attr_next (void *aobj, const char **, const char **);
+extern void meta_attr_stop (void *aobj);
 
 #ifdef __cplusplus
 }

@@ -37,26 +37,26 @@ typedef struct _provider {
 	char			*token;
 } provider_t;
 
-provider_t	*g_master_prov;
+extern provider_t *g_master_prov;
 
-const char	 *parse_config		(char *);
-provider_t	 *get_provider		(const char *name);
-void		  update_provider	(const char *provname,
-					 const char *username,
-					 const char *password);
-const char	 *get_provider_value	(const provider_t *prov,
-					 const char *fname);
+extern const char *parse_config (char *);
+extern provider_t *get_provider (const char *name);
+extern void update_provider (const char *provname,
+			     const char *username,
+			     const char *password);
+extern const char *get_provider_value (const provider_t *prov,
+				       const char *fname);
 
-const char	 *auto_config		(void);
-int validate_provider (Hash_table *h);
-provider_t *find_provider (const char *name);
-int add_provider (Hash_table *h);
-provider_t *get_main_provider (void);
-void set_main_provider (provider_t *prov);
+extern const char *auto_config (void);
+extern int validate_provider (Hash_table *h);
+extern provider_t *find_provider (const char *name);
+extern int add_provider (Hash_table *h);
+extern provider_t *get_main_provider (void);
+extern void set_main_provider (provider_t *prov);
 
 typedef int (*prov_iterator_fn) (provider_t *, void *);
-int prov_do_for_each (prov_iterator_fn fn, void *client_data);
-provider_t **hash_get_prov_list (size_t *n);
+extern int prov_do_for_each (prov_iterator_fn fn, void *client_data);
+extern provider_t **hash_get_prov_list (size_t *n);
 
 struct kv_pair
 {
