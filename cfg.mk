@@ -78,3 +78,25 @@ url_dir_list = http://people.redhat.com/$(USER)/$(PACKAGE)
 # Make the distcheck-emitted gnupload command use the right URL.
 gnu_rel_host = people.redhat.com
 upload_dest_dir_ = public_html/$(PACKAGE)
+
+# Tell the tight_scope rule that sources are in ".".
+export _gl_TS_dir = .
+
+# Tell the tight_scope rule that yacc-related yy* names
+# and "_Z"-prefixed C++ mangled names are all "extern".
+export _gl_TS_unmarked_extern_functions = main usage yy.* _Z.*
+
+# Also deduce that "verbose" is global.
+# It's declared/defined via this: GLOBAL(int, verbose, 0);
+export _gl_TS_var_match = \
+  /^(?:extern|XTERN) .*?\**(\w+)(\[.*?\])?;/ || /\bGLOBAL\(.*?,\s*(.*?),/
+
+# List these _tbl variables, to exempt them for now.
+export _gl_TS_unmarked_extern_vars = version_etc_copyright \
+  bad_func_tbl \
+  cf_func_tbl \
+  curl_func_tbl \
+  fs_condor_func_tbl \
+  fs_func_tbl \
+  fs_rhevm_func_tbl \
+  s3_func_tbl

@@ -39,22 +39,24 @@ MAINTAINERCLEANFILES =
 iwhd_SOURCES = \
   auto.c	\
   backend.c	\
+  meta.cpp	\
+  mpipe.c	\
+  replica.c	\
+  qparser.y	\
+  rest.c	\
+  setup.c	\
+  template.c
+
+noinst_HEADERS = \
   backend.h	\
   gc-wrap.h	\
   iwh.h		\
-  meta.cpp	\
   meta.h	\
-  mpipe.c	\
   mpipe.h	\
-  replica.c	\
-  replica.h	\
-  qparser.y	\
   query.h	\
-  rest.c	\
-  setup.c	\
+  replica.h	\
   setup.h	\
   state_defs.h	\
-  template.c	\
   template.h
 
 EXTRA_iwhd_SOURCES = qlexer.l
