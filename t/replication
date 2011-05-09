@@ -54,7 +54,7 @@ cleanup_() { kill -9 $mongo_pid; kill $iwhd_pid $iwhd_d_pid; }
 
 api=http://localhost:$port
 wait_for_repl() {
-	local n_req=$(curl -d op=rep_status $api) || return 1
+	local n_req; n_req=$(curl -d op=rep_status $api) || return 1
 	case $n_req in
 	  '0 requests') return 0 ;;
 	  *) return 1 ;;
