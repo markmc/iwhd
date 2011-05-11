@@ -46,11 +46,15 @@
 /fcntl.in.h
 /fd-hook.c
 /fd-hook.h
+/fflush.c
 /file-has-acl.c
 /fpending.c
 /fpending.h
+/fpurge.c
 /freading.c
 /freading.h
+/fseeko.c
+/ftello.c
 /full-write.c
 /full-write.h
 /getopt.c
