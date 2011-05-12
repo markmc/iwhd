@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
@@ -50,6 +51,7 @@
 #include "progname.h"
 #include "dirname.h"
 #include "xalloc.h"
+#include "c-strcase.h"
 
 /*
  * Note that we almost never prefix with TAG due to compatibility with EC2.
@@ -452,7 +454,7 @@ static struct stor_dom *apistordom_1(struct config *cfg, xmlChar *uuidsd,
 	}
 
 	/*
-	 * XXX canonicalize host in case of e.g. raw IPv4/IPv6 address.
+	 * FIXME canonicalize host in case of e.g. raw IPv4/IPv6 address.
 	 */
 	ettext = etaddr->children;	/* mysterious indirection */
 	if (!ettext || ettext->type!=XML_TEXT_NODE || !ettext->content)
@@ -514,10 +516,8 @@ static struct stor_dom *apistordom(struct config *cfg,
 	CURLcode rcc;
 	int rc;
 
-	// XXX GET /rhevm-api/storagedomains/ crashes server, see bz#670397
 	// So for now we ignore the pathsd and use a query instead.
-	// rc = asprintf(&url, "%s%s", connection->base, pathsd);
-	rc = asprintf(&url, "%s%s", connection->base, "/rhevm-api/storagedomains/?search=type%20%21%3D%20fcp");
+	rc = asprintf(&url, "%s%s", connection->base, pathsd);
 	if (rc < 0)
 		goto err_alloc;
 
@@ -566,7 +566,7 @@ static struct stor_dom *apistordom(struct config *cfg,
 		ettext = ettype->children;	/* mysterious indirection */
 		if (!ettext || ettext->type!=XML_TEXT_NODE || !ettext->content)
 			continue;
-		if (strcmp((char *)ettext->content, "EXPORT") != 0)
+		if (c_strcasecmp((char *)ettext->content, "EXPORT") != 0)
 			continue;
 
 		etstor = xmlGetChild(et, "storage");
@@ -579,7 +579,7 @@ static struct stor_dom *apistordom(struct config *cfg,
 		ettext = ettype->children;	/* mysterious indirection */
 		if (!ettext || ettext->type!=XML_TEXT_NODE || !ettext->content)
 			continue;
-		if (strcmp((char *)ettext->content, "NFS") != 0)
+		if (c_strcasecmp((char *)ettext->content, "NFS") != 0)
 			continue;
 
 		uuidsd = xmlGetProp(et, (xmlChar *)"id");
@@ -595,8 +595,9 @@ static struct stor_dom *apistordom(struct config *cfg,
 	}
 
 	if (!sd) {
-		fprintf(stderr, "ERROR NFS storage domain for `%s' not found\n",
-		    url);
+		fprintf(stderr,
+		    "ERROR NFS storage domain for `%s:%s' not found\n",
+		    cfg->nfshost, cfg->nfspath);
 		exit(EXIT_FAILURE);
 	}
 
@@ -812,7 +813,8 @@ static struct stor_dom *apistart(struct config *cfg)
 {
 	struct http_uri huri;
 	struct stor_dom *sd;
-	char *host, *path, *base;
+	char *scheme, *host, *path, *base;
+	bool is_ssl;
 	char *pathsd, *pathdc;
 	char *authraw, *authhdr;
 	size_t authrlen, authhlen;
@@ -837,16 +839,35 @@ static struct stor_dom *apistart(struct config *cfg)
 	host = strndup(huri.hostname, huri.hostname_len);
 	if (!host)
 		goto err_alloc;
+	scheme = strndup(huri.scheme, huri.scheme_len);
+	if (!host)
+		goto err_alloc;
+
+	if (strcmp(scheme, "http") == 0) {
+		is_ssl = false;
+	} else if (strcmp(scheme, "https") == 0) {
+		is_ssl = true;
+	} else {
+		fprintf(stderr, "ERROR Invalid URL scheme `%s'\n", scheme);
+		exit(EXIT_FAILURE);
+	}
 
 	if (huri.port)
-		rc = asprintf(&base, "http://%s:%u", host, huri.port);
+		rc = asprintf(&base, "%s://%s:%u", scheme, host, huri.port);
 	else
-		rc = asprintf(&base, "http://%s", host);
+		rc = asprintf(&base, "%s://%s", scheme, host);
 	if (rc < 0)
 		goto err_alloc;
 
 	connection.base = base;
 	connection.curl = curl_easy_init();
+	if (is_ssl) {
+		/*
+		 * FIXME We should check the certificates, not ignore the problem.
+		 */
+		curl_easy_setopt(connection.curl, CURLOPT_SSL_VERIFYHOST, 0);
+		curl_easy_setopt(connection.curl, CURLOPT_SSL_VERIFYPEER, 0);
+	}
 
 	headers = NULL;
 
@@ -880,8 +901,6 @@ static struct stor_dom *apistart(struct config *cfg)
 	apipaths(&connection, headers, path, &pathsd, &pathdc);
 
 	/*
-	 * We should pull the API version and check that it's more than 2.3 XXX
-	 *
 	 * Step 2, connect again, get domains
 	 */
 	sd = apistordom(cfg, &connection, headers, pathsd);
@@ -1430,7 +1449,7 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 	uuid_generate_random(vol_uuid);
 	uuid_generate_random(img_uuid);
 
-	/* XXX Do something about garbage-collecting iwhd.* directories */
+	/* FIXME Do something about garbage-collecting iwhd.* directories */
 
 	uuid_unparse_lower(img_uuid, uuidbuf);
 	rc = asprintf(&tmpimgdir, "%s/iwhd.%s", domdir, uuidbuf);
@@ -1573,8 +1592,8 @@ int main(int argc, char **argv, char **envp)
 	cfg_veripick(&cfg.nfshost, cfgname, jcfg, "nfshost");
 	cfg_veripick(&cfg.nfspath, cfgname, jcfg, "nfspath");
 	/*
-	 * nfsdir: A directory where sysadmin or boot scripts or autofs mounted
-	 * the same area that RHEV-M considers an export domain (/mnt/vdsm/rhevm23).
+	 * nfsdir: A directory where sysadmin, boot scripts or autofs mounted the
+	 * same area that RHEV-M considers an export domain (/mnt/vdsm/rhevm23).
 	 * N.B. If iwhd is running on the NFS server itself, nfsdir can be the
 	 * exported directory itself (like /home/vdsm/rhevm23). We verify that
 	 * the directory contains an expected structure, so attach it to RHEV-M

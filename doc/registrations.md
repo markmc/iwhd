@@ -75,6 +75,13 @@ tricks with wrapping dc-rhev-image into a script that calls sudo.
 Do not attempt it if you value your sanity.
 
 The area S must be mounted at H (example below assumes /mnt/iwhd-fish).
+For the curl example below, mount like this:
+ mount -t nfs -o v3 fish.usersys.redhat.com:/home/vdsm/v1 /mnt/iwhd-fish
+
+In RHEL 6 and Fedora 14, NFS mounts default to v4, which causes some
+weird file ownership issues. Verify by checking what RHEV-M created
+on the next step. The /mnt/iwhd-fish should contain files owned by vdsm.
+Note that this has nothing to do with root_squash.
 
 Finally, RHEV-M must be told to "import" and "attach" so-called
 "export storage domain". At this time, RHEV-M server mounts the area S
