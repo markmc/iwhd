@@ -6,8 +6,7 @@ Summary:	Image WareHouse Daemon
 Group:		System Environment/Libraries
 License:	GPLv3
 
-# FIXME: this is just the gitweb URL.  Do we need more?
-URL:		http://repo.or.cz/w/iwhd.git
+URL:		http://git.fedorahosted.org/git/?p=iwhd.git
 
 # pulled from upstream git,
 # to recreate tarball, check out commit, then run "make dist"
