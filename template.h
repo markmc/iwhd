@@ -45,30 +45,30 @@ typedef struct {
 
 #define TMPL_CTX_DONE	((tmpl_ctx_t *)(-1))
 
-tmpl_ctx_t	*tmpl_get_ctx		(const char *type);
-size_t		 tmpl_root_header	(tmpl_ctx_t *ctx,
-					 const char *name, const char *version);
-size_t		 tmpl_root_entry	(tmpl_ctx_t *ctx,
-					 const char *rel, const char *link);
-size_t		 tmpl_root_footer	(tmpl_ctx_t *ctx);
-size_t		 tmpl_prov_header	(tmpl_ctx_t *ctx);
+extern tmpl_ctx_t *tmpl_get_ctx (const char *type);
+extern size_t tmpl_root_header (tmpl_ctx_t *ctx,
+				const char *name, const char *version);
+extern size_t tmpl_root_entry (tmpl_ctx_t *ctx,
+			       const char *rel, const char *link);
+extern size_t tmpl_root_footer (tmpl_ctx_t *ctx);
+extern size_t tmpl_prov_header (tmpl_ctx_t *ctx);
 
-int tmpl_prov_entry (char *buf, size_t buf_len,
-		     tmpl_ctx_t *ctx,
-		     const char *name, const char *type,
-		     const char *host, int port,
-		     const char *user, const char *pass);
+extern int tmpl_prov_entry (char *buf, size_t buf_len,
+			    tmpl_ctx_t *ctx,
+			    const char *name, const char *type,
+			    const char *host, int port,
+			    const char *user, const char *pass);
 
-size_t		 tmpl_prov_footer	(tmpl_ctx_t *ctx);
-size_t		 tmpl_list_header	(tmpl_ctx_t *ctx);
-size_t		 tmpl_list_entry	(tmpl_ctx_t *ctx,
-					 const char *bucket, const char *key);
-size_t		 tmpl_list_footer	(tmpl_ctx_t *ctx);
-size_t		 tmpl_obj_header	(tmpl_ctx_t *ctx,
-					 const char *bucket, const char *key);
-size_t		 tmpl_obj_entry		(tmpl_ctx_t *ctx, const char *bucket,
-					 const char *key, const char *attr);
-size_t		 tmpl_obj_footer	(tmpl_ctx_t *ctx);
+extern size_t tmpl_prov_footer (tmpl_ctx_t *ctx);
+extern size_t tmpl_list_header (tmpl_ctx_t *ctx);
+extern size_t tmpl_list_entry (tmpl_ctx_t *ctx,
+			       const char *bucket, const char *key);
+extern size_t tmpl_list_footer (tmpl_ctx_t *ctx);
+extern size_t tmpl_obj_header (tmpl_ctx_t *ctx,
+			       const char *bucket, const char *key);
+extern size_t tmpl_obj_entry (tmpl_ctx_t *ctx, const char *bucket,
+			      const char *key, const char *attr);
+extern size_t tmpl_obj_footer (tmpl_ctx_t *ctx);
 
 
 #endif

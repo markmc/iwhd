@@ -88,18 +88,18 @@ typedef struct {
 } pipe_private;
 
 
-void		 pipe_init_shared	(pipe_shared *ps,
-					 void *owner, unsigned short ncons);
-pipe_private	*pipe_init_private	(pipe_shared *ps);
-int		 pipe_cons_wait		(pipe_private *pp);
-void		 pipe_cons_signal	(pipe_private *pp, int error);
-void		 pipe_cons_siginit	(pipe_shared *ps, int error);
-int		 pipe_prod_wait_init	(pipe_shared *ps);
-void             pipe_prod_siginit      (pipe_shared *ps, int error);
-int              pipe_cons_wait_init    (pipe_shared *ps);
-void		 pipe_prod_signal	(pipe_shared *ps,
-					 void *ptr, size_t total);
-void		 pipe_prod_finish	(pipe_shared *ps);
-void		 pipe_reset		(pipe_shared *ps, unsigned short ncons);
+extern void pipe_init_shared (pipe_shared *ps,
+			      void *owner, unsigned short ncons);
+extern pipe_private *pipe_init_private (pipe_shared *ps);
+extern int pipe_cons_wait (pipe_private *pp);
+extern void pipe_cons_signal (pipe_private *pp, int error);
+extern void pipe_cons_siginit (pipe_shared *ps, int error);
+extern int pipe_prod_wait_init (pipe_shared *ps);
+extern void pipe_prod_siginit (pipe_shared *ps, int error);
+extern int pipe_cons_wait_init (pipe_shared *ps);
+extern void pipe_prod_signal (pipe_shared *ps,
+			      void *ptr, size_t total);
+extern void pipe_prod_finish (pipe_shared *ps);
+extern void pipe_reset (pipe_shared *ps, unsigned short ncons);
 
 #endif

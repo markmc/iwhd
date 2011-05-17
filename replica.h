@@ -18,13 +18,13 @@
 
 #include "state_defs.h"
 
-void	 	  repl_init		(void);
-void	 	  replicate		(const char *url, size_t size,
-					 const char *policy, my_state *ms);
-void	 	  replicate_delete	(const char *url, my_state *ms);
-void	 	  replicate_bcreate	(const char *bucket, my_state *ms);
-int	 	  get_rep_count		(void);
+extern void repl_init (void);
+extern void replicate (const char *url, size_t size,
+		       const char *policy, my_state *ms);
+extern void replicate_delete (const char *url, my_state *ms);
+extern void replicate_bcreate (const char *bucket, my_state *ms);
+extern int get_rep_count (void);
 
-char *follow_link (char *object, const char *key);
+extern char *follow_link (char *object, const char *key);
 
 #endif
