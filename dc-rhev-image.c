@@ -840,7 +840,7 @@ static struct stor_dom *apistart(struct config *cfg)
 	if (!host)
 		goto err_alloc;
 	scheme = strndup(huri.scheme, huri.scheme_len);
-	if (!host)
+	if (!scheme)
 		goto err_alloc;
 
 	if (strcmp(scheme, "http") == 0) {
