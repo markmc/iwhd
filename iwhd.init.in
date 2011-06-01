@@ -73,7 +73,8 @@ start() {
     mkdir -p @localstatedir@/cache/iwhd
     rm -rf @localstatedir@/cache/iwhd/*
     printf %s $"waiting for mongod to listen on $MONGOD_SERVER_SPEC"
-    wait_for_mongod $MONGOD_N_SECONDS && echo_success || echo_failure
+    wait_for_mongod $MONGOD_N_SECONDS && echo_success \
+	|| { echo_failure; echo; return 1; }
     echo
 
     printf %s $"Starting $SERVICE daemon: "
