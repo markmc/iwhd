@@ -21,7 +21,7 @@ SUBDIRS = lib . gnulib-tests t man po
 ACLOCAL_AMFLAGS = -I m4
 
 # iwhd is short for Image WareHouse Daemon.
-bin_PROGRAMS = iwhd dc-rhev-image
+bin_PROGRAMS = iwhd dc-rhev-image dc-vmware-image
 
 EXTRA_DIST =		\
   dc-condor-image	\
@@ -62,6 +62,7 @@ noinst_HEADERS = \
 EXTRA_iwhd_SOURCES = qlexer.l
 
 dc_rhev_image_SOURCES = dc-rhev-image.c
+dc_vmware_image_SOURCES = dc-vmware-image.c
 
 VERSION_no_hyphen = $$(echo $(VERSION)|tr - _)
 
@@ -156,6 +157,12 @@ dc_rhev_image_LDADD =	\
   $(JANSSON_LIB)	\
   $(LIBXML_LIBS)	\
   $(UUID_LIB)
+
+dc_vmware_image_CPPFLAGS = $(LIBXML_CFLAGS) -I$(top_srcdir)/lib
+dc_vmware_image_LDADD =	\
+  lib/libiwhd.a		\
+  $(CURL_LIB)		\
+  $(LIBXML_LIBS)
 
 MOSTLYCLEANFILES += qlexer.c
 MAINTAINERCLEANFILES += qlexer.c

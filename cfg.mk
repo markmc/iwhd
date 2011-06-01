@@ -61,7 +61,7 @@ odt = ^doc/image_repo\.odt$
 exclude_file_name_regexp--sc_trailing_blank = $(odt)
 exclude_file_name_regexp--sc_prohibit_empty_lines_at_EOF = $(odt)
 exclude_file_name_regexp--sc_prohibit_test_double_equal = ^t/parse-test$$
-exclude_file_name_regexp--sc_bindtextdomain = ^dc-rhev-image\.c$$
+exclude_file_name_regexp--sc_bindtextdomain = ^dc-.*-image\.c$$
 
 update-copyright-env = \
   UPDATE_COPYRIGHT_USE_INTERVALS=1 \
@@ -99,4 +99,5 @@ export _gl_TS_unmarked_extern_vars = version_etc_copyright \
   fs_condor_func_tbl \
   fs_func_tbl \
   fs_rhevm_func_tbl \
+  fs_vmw_func_tbl \
   s3_func_tbl

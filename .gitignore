@@ -16,6 +16,7 @@
 /config.status
 /configure
 /dc-rhev-image
+/dc-vmware-image
 /gnulib-tests
 /iwhd
 /iwhd-*.tar.gz

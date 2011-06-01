@@ -146,4 +146,32 @@ renames it into /mnt/falcon-in/.
 VMware vSphere
 --------------
 
-Not implemented yet.
+Registration in vSphere requires no presets. Unfortunately, one still has
+to select the appropriate "VM host" among those that given vSphere manages.
+The VM image is going to be registered in vSphere as a whole, but uploaded
+to the specific host.
+
+[
+   {
+      "name": "main",
+      "type": "fs-vmw",
+      "path": "_fs",
+   }
+]
+
+Registration call:
+
+ curl -d op=register -d site=main \
+  -d api-url=https://vsphere.virt.bos.redhat.com/sdk \
+  -d api-key=Administrator@virt.lab.eng.bos.redhat.com \
+  -d api-secret=donotusepassw0rd \
+  -d vm-name=dummy_img_3 \
+  -d vm-host=virtlab110.virt.bos.redhat.com \
+  http://localhost:9090/buk1/dummy_img_3
+
+The VM name has to be unique in the vSphere environment. If not set, the
+image's key is used.
+
+The ami-id contains a pattern like "OK name:dummy_img_3". The "name:"
+selector is supposed to provide a measure of compatibility for the future,
+in case we ever decide to return a MOR or UUID.

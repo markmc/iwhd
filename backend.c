@@ -1697,6 +1697,163 @@ cleanup:
 	return rc;
 }
 
+static int
+fs_vmw_register (my_state *ms, const provider_t *prov, const char *next,
+		 Hash_table *args)
+{
+	char		*api_url;
+	char		*api_user;
+	char		*api_secret;
+	char		*vm_name;
+	char		*vm_host;
+	char		*vm_image = NULL;	/* filename */
+	int		 ret	= MHD_HTTP_BAD_REQUEST;
+	const char	*argv[12];
+	unsigned int	 argc = 0;
+	pid_t		 pid;
+	int		 organ[2];
+	int		 wstat;
+	FILE		*fp;
+	char		 buf[LINE_SIZE];
+	char		*s;
+	char		 ami_id_buf[64];
+	regmatch_t	 match[2];
+
+	strcpy(ami_id_buf, "none");
+
+	if (!regex_ok) {
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	DPRINTF("*** vSphere register %s/%s via %s (%s:%d)\n",
+		ms->bucket, ms->key, prov->name, prov->host, prov->port);
+	if (next) {
+		DPRINTF("RHEV-M register with next!=NULL\n");
+		return MHD_HTTP_BAD_REQUEST;
+	}
+
+	if (asprintf(&vm_image, "%s/%s", ms->bucket, ms->key) < 0)
+		return MHD_HTTP_BAD_REQUEST;
+
+	api_url = kv_hash_lookup(args,"api-url");
+	if (!api_url) {
+		/* TBD: This has to have a defined field in provider, too. */
+		error (0, 0, _("missing vSphere API URL (api-url)"));
+		goto cleanup;
+	}
+
+	api_user = kv_hash_lookup(args,"api-key");
+	if (!api_user) {
+		api_user = (char *)prov->username;
+		if (!api_user) {
+			error (0, 0, _("missing vSphere API username (api-key)"));
+			goto cleanup;
+		}
+	}
+
+	api_secret = kv_hash_lookup(args,"api-secret");
+	if (!api_secret) {
+		api_secret = (char *)prov->password;
+		if (!prov->password) {
+			error (0, 0, _("missing vSphere API secret (api-secret)"));
+			goto cleanup;
+		}
+	}
+
+	vm_name = kv_hash_lookup(args,"vm-name");
+	if (!vm_name) {
+		/* Not sure if this is great default, but it's convenient. */
+		vm_name = ms->key;
+	}
+
+	vm_host = kv_hash_lookup(args,"vm-host");
+	if (!vm_host) {
+		error (0, 0, _("missing ESXi host (vm-host)"));
+		goto cleanup;
+	}
+
+	ret = MHD_HTTP_INTERNAL_SERVER_ERROR;
+
+	sprintf(ami_id_buf,"pending %lld",(long long)time(NULL));
+	DPRINTF("temporary ami-id = \"%s\"\n",ami_id_buf);
+	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
+
+	const char *cmd = "dc-vmware-image";
+	argv[argc++] = cmd;
+	argv[argc++] = api_url;
+	argv[argc++] = api_user;
+	argv[argc++] = api_secret;	/* XXX Hide in a file again. */
+	argv[argc++] = vm_name;
+	argv[argc++] = vm_image;
+	argv[argc++] = vm_host;
+	argv[argc++] = "-";
+	argv[argc] = NULL;
+	assert (argc < ARRAY_CARDINALITY (argv));
+
+	if (pipe(organ) < 0) {
+		error (0, errno, _("pipe creation failed"));
+		goto cleanup;
+	}
+
+	pid = fork();
+	if (pid < 0) {
+		error (0, errno, _("fork failed"));
+		close(organ[0]);
+		close(organ[1]);
+		goto cleanup;
+	}
+
+	if (pid == 0) {
+		(void)dup2(organ[1],STDOUT_FILENO);
+		(void)dup2(organ[1],STDERR_FILENO);
+		execvp(cmd, (char* const*)argv);
+		error (EXIT_FAILURE, errno, _("failed to run command %s"), cmd);
+	}
+
+	close(organ[1]);
+	fp = fdopen(organ[0],"r");
+	if (!fp) {
+		error (0, 0, _("could not open parent pipe stream"));
+		close(organ[0]);
+		goto cleanup;
+	}
+	while (fgets(buf,sizeof(buf)-1,fp)) {
+		if ((s = strchr(buf, '\n')) != NULL)
+			*s = '\0';
+		if (regexec(&s3_success_pat,buf,2,match,0) == 0) {
+			buf[match[1].rm_eo] = '\0';
+			DPRINTF("found image tag: %s\n",buf+match[1].rm_so);
+			sprintf(ami_id_buf,"OK %.60s",buf+match[1].rm_so);
+			ret = MHD_HTTP_OK;
+		}
+		else {
+			DPRINTF("ignoring line: <%s>\n",buf);
+		}
+	}
+	fclose(fp);
+
+	DPRINTF("waiting for child...\n");
+	if (waitpid(pid,&wstat,0) < 0) {
+		error (0, errno, _("waitpid failed"));
+		goto cleanup;
+	}
+	if (!WIFEXITED(wstat)) {
+		error (0, 0, _("%s is killed (status 0x%x)"), cmd, wstat);
+		goto cleanup;
+	}
+	if (WEXITSTATUS(wstat)) {
+		error (0, 0, _("%s exited with code %d"),
+		       cmd, WEXITSTATUS(wstat));
+		goto cleanup;
+	}
+	DPRINTF("...child exited\n");
+
+cleanup:
+	free(vm_image);
+	(void)meta_set_value(ms->bucket,ms->key,"ami-id",ami_id_buf);
+	return ret;
+}
+
 /***** Function tables. ****/
 
 backend_func_tbl bad_func_tbl = {
@@ -1774,4 +1931,15 @@ backend_func_tbl fs_condor_func_tbl = {
 	fs_delete,
 	fs_bcreate,
 	fs_condor_register,
+};
+
+backend_func_tbl fs_vmw_func_tbl = {
+	"FS-VMW",
+	fs_init,
+	fs_get_child,
+	fs_put_child,
+	bad_cache_child,
+	fs_delete,
+	fs_bcreate,
+	fs_vmw_register,
 };
