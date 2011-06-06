@@ -1268,8 +1268,8 @@ fs_put_child (void * ctx)
 		error(0,0,_("path too long in %s"),__func__);
 		return NULL;
 	}
-	if (unlink(fixed) < 0) {
-		error(0,errno,_("unlink failed for %s (non-fatal)"),fixed);
+	if (unlink(fixed) < 0 && errno != ENOENT) {
+		error(0,errno,_("unlink failed for %s"),fixed);
 	}
 	fd = open(fixed,O_WRONLY|O_CREAT|O_EXCL,0666);
 	if (fd < 0) {
