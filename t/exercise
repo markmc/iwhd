@@ -28,7 +28,7 @@ printf '[{"path": "FS", "type": "fs", "name": "primary"}]\n' \
   > iwhd.cfg || fail=1
 
 MALLOC_PERTURB_=31 MALLOC_CHECK_=3 \
-  iwhd -v -p $port -c iwhd.cfg -d localhost:$m_port &
+  iwhd -p $port -c iwhd.cfg -d localhost:$m_port &
 iwhd_pid=$!
 cleanup_() { kill -9 $mongo_pid; kill $iwhd_pid; }
 
@@ -49,12 +49,11 @@ create_many()
   local n_procs=$(nproc || echo 2)
   n_procs=$(expr $n_procs \* 3 / 2)
 
-  for i in $(seq $nb); do
-    # Create a bucket.
-    local b=http://localhost:$port/b-$i
-    curl_w -XPUT $b > http-code || fail=1
-    test "$(cat http-code)" = 201 || fail=1
-  done
+  # Create many buckets in parallel, though we'll use only
+  # the first $nb of them in the following loop.
+  seq 2000 | parallel -j 200% curl -s --write-out '%{http_code}' -XPUT \
+    http://localhost:$port/b-{} > http-code || fail=1
+  grep -q 201 http-code || fail=1
 
   seq 20000 > data
   for i in $(seq $nb); do
@@ -62,7 +61,7 @@ create_many()
     for j in $(seq --format=%04g 50); do
       # Create an object in that bucket.
       local obj=$b/9756a40c-7668-11e0-$j-0015c5f4d7e4
-      echo "curl -S -T - $obj < data"
+      echo "curl -s -S -T - $obj < data"
     done
   done |parallel --halt-on-error=2 -j $n_procs || fail=1
 }
