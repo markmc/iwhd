@@ -380,7 +380,7 @@ recheck_replication (my_state *ms, char *policy)
 	if (!policy) {
 		DPRINTF("fetching policy for %s/%s\n",ms->bucket,ms->key);
 		int rc = meta_get_value(ms->bucket,ms->key, "_policy", &policy);
-		if (rc)
+		if (rc && rc != ENOENT)
 			error (0, rc, _("failed to get policy for %s/%s"),
 			       ms->bucket,ms->key);
 	}

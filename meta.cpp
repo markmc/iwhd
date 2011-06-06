@@ -370,7 +370,7 @@ RepoMeta::GetValue (const char *bucket, const char *key, const char *mkey,
 	bo = curs->next();
 	data = bo.getStringField(mkey);
 	if (!data || !*data) {
-		return ENXIO;
+		return ENOENT;
 	}
 
 	*mvalue = strdup(data);
