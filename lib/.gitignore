@@ -147,6 +147,8 @@
 /str-kmp.h
 /str-two-way.h
 /streq.h
+/strerror-override.c
+/strerror-override.h
 /strerror.c
 /striconv.c
 /striconv.h

@@ -111,6 +111,7 @@
 /test-iconv-h.c
 /test-iconv.c
 /test-ignore-value.c
+/test-intprops.c
 /test-inttostr.c
 /test-inttypes.c
 /test-iswblank.c
