@@ -210,13 +210,14 @@ child_closer (void * ctx)
 
 /* Invoked from MHD. */
 static ssize_t
-proxy_get_cons (void *ctx, uint64_t pos, char *buf, size_t max)
+proxy_get_cons_0 (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	pipe_private	*pp	= ctx;
 	pipe_shared	*ps	= pp->shared;
 	my_state	*ms	= ps->owner;
 	ssize_t		 done;
 
+	gc_register_thread();
 	(void)pos;
 
 	DPRINTF("consumer asked to read %zu\n",max);
@@ -260,6 +261,17 @@ proxy_get_cons (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 
 	return done;
+	GC_unregister_my_thread();
+}
+
+/* This is just a wrapper.  See the *_0 function, above.  */
+static ssize_t
+proxy_get_cons (void *ctx, uint64_t pos, char *buf, size_t max)
+{
+	gc_register_thread();
+	ssize_t len = proxy_get_cons_0 (ctx, pos, buf, max);
+	GC_unregister_my_thread();
+	return len;
 }
 
 static int
@@ -788,7 +800,7 @@ proxy_query_init (my_state *ms, const char *expr)
 
 /* MHD reader function during queries.  Return -1 for EOF. */
 static ssize_t
-proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
+proxy_query_func_0 (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state	*ms	= ctx;
 	size_t		 len;
@@ -840,6 +852,16 @@ proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
 	ms->gen_ctx = TMPL_CTX_DONE;
+	return len;
+}
+
+/* This is just a wrapper.  See the *_0 function, above.  */
+static ssize_t
+proxy_query_func (void *ctx, uint64_t pos, char *buf, size_t max)
+{
+	gc_register_thread();
+	ssize_t len = proxy_query_func_0 (ctx, pos, buf, max);
+	GC_unregister_my_thread();
 	return len;
 }
 
@@ -1034,7 +1056,7 @@ static const fake_bucket_t fake_bucket_list[] = {
 };
 
 static ssize_t
-root_blob_generator (void *ctx, uint64_t pos, char *buf, size_t max)
+root_blob_generator_0 (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state	*ms	= ctx;
 	const fake_bucket_t *fb;
@@ -1105,6 +1127,16 @@ root_blob_generator (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
 	ms->gen_ctx = TMPL_CTX_DONE;
+	return len;
+}
+
+/* This is just a wrapper.  See the *_0 function, above.  */
+static ssize_t
+root_blob_generator (void *ctx, uint64_t pos, char *buf, size_t max)
+{
+	gc_register_thread();
+	ssize_t len = root_blob_generator_0 (ctx, pos, buf, max);
+	GC_unregister_my_thread();
 	return len;
 }
 
@@ -1439,7 +1471,7 @@ register_image (my_state *ms)
 }
 
 static ssize_t
-parts_callback (void *ctx, uint64_t pos, char *buf, size_t max)
+parts_callback_0 (void *ctx, uint64_t pos, char *buf, size_t max)
 {
 	my_state	*ms	= ctx;
 	size_t		 len;
@@ -1504,6 +1536,16 @@ parts_callback (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 	memcpy(buf,ms->gen_ctx->buf,len);
 	ms->gen_ctx = TMPL_CTX_DONE;
+	return len;
+}
+
+/* This is just a wrapper.  See the *_0 function, above.  */
+static ssize_t
+parts_callback (void *ctx, uint64_t pos, char *buf, size_t max)
+{
+	gc_register_thread();
+	ssize_t len = parts_callback_0 (ctx, pos, buf, max);
+	GC_unregister_my_thread();
 	return len;
 }
 

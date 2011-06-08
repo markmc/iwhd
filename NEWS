@@ -8,7 +8,8 @@ iwhd NEWS                                                   -*- outline -*-
 
 ** Bug fixes
 
-  a query_ with a result longer than FIXME would evoke a segfault
+  iwhd will segfault or hang less often during garbage-collection.
+  [bug introduced in 0.91, partially fixed in 0.94]
 
   the iwhd init script start function would mistakenly succeed even when
   mongod failed to start in time.  Now, when mongod fails to start, that
