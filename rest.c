@@ -874,10 +874,6 @@ destroy_state_postprocessor (void *ms_v, void *client_data)
 		MHD_destroy_post_processor (ms->post);
 	if (ms->dict)
 		hash_free (ms->dict);
-	if (ms->query)
-		meta_query_stop (ms->query);
-	if (ms->aquery)
-		meta_query_stop (ms->aquery);
 }
 
 /* Tell the garbage collector that when freeing MS, it must invoke

@@ -1,8 +1,10 @@
 #include <string.h>
 #define GC_THREADS
-#include "gc.h"
 
-#ifndef __cplusplus
+#ifdef __cplusplus
+# include "gc_cpp.h"
+#else
+# include "gc.h"
 # define malloc(n) GC_MALLOC(n)
 # define calloc(m,n) GC_MALLOC((m)*(n))
 # define free(p) GC_FREE(p)
