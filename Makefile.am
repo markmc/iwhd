@@ -79,8 +79,11 @@ iwhd.spec: iwhd.spec.in Makefile
 # like "0.0.273-1621" that contain a "-".  Repack the tarball
 # to one with "." substituted for any - in the version string.
 .PHONY: rpm
-rpm: dist iwhd.spec
-	chmod 644 $(distdir).tar.gz
+rpm:
+	$(MAKE) clean
+	$(MAKE) _version
+	umask 022; $(MAKE) LDFLAGS='-Wl,--build-id' dist
+	umask 022; export LDFLAGS='-Wl,--build-id';		\
 	case $(VERSION) in					\
 	  *-*)							\
 	    v=$$(echo $(VERSION)|tr - .);			\
