@@ -60,6 +60,7 @@ rm -rf %{buildroot}
 %doc AUTHORS COPYING README NEWS
 %{_bindir}/iwhd
 %{_bindir}/dc-rhev-image
+%{_bindir}/dc-vmware-image
 %{_mandir}/man8/iwhd.8*
 %{_sysconfdir}/rc.d/init.d/iwhd
 %{_sysconfdir}/iwhd/conf.js
