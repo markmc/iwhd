@@ -499,7 +499,6 @@ static struct stor_dom *apistordom_1(struct config *cfg, xmlChar *uuidsd)
 	}
 	sd->address = cfg->nfshost;
 	sd->path = cfg->nfspath;
-
 	return sd;
 }
 
@@ -518,7 +517,6 @@ static struct stor_dom *apistordom(struct config *cfg,
 	CURLcode rcc;
 	int rc;
 
-	// So for now we ignore the pathsd and use a query instead.
 	rc = asprintf(&url, "%s%s", connection->base, pathsd);
 	if (rc < 0)
 		goto err_alloc;
@@ -709,7 +707,6 @@ static char *apipool(struct config *cfg, struct api_conn *connection,
 	xmlDocPtr doc;
 	xmlNode *etroot;
 	xmlNode *etdc, *etlink;
-	// xmlNode *ettype, *etstor, *ettext;
 	xmlChar *uuiddc;
 	xmlChar *rel, *href;
 	CURLcode rcc;
