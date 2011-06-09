@@ -8,6 +8,8 @@ iwhd NEWS                                                   -*- outline -*-
 
 ** Bug fixes
 
+  a query_ with a result longer than FIXME would evoke a segfault
+
   the iwhd init script start function would mistakenly succeed even when
   mongod failed to start in time.  Now, when mongod fails to start, that
   "start" function also fails.

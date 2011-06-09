@@ -435,6 +435,10 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!ms->url) {
 			return MHD_NO;
 		}
+		ms->dict = hash_initialize(SMALL_PRIME, NULL, kv_hash,
+					   kv_compare, NULL);
+		if (!ms->dict)
+			return MHD_NO;
 		ms->size = 0;
 		pipe_init_shared(&ms->pipe,ms,1);
 		pipe_private *pp = pipe_init_private(&ms->pipe);
@@ -631,6 +635,10 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!ms->url) {
 			return MHD_NO;
 		}
+		ms->dict = hash_initialize(SMALL_PRIME, NULL, kv_hash,
+					   kv_compare, NULL);
+		if (!ms->dict)
+			return MHD_NO;
 		attrval = MHD_lookup_connection_value(conn,MHD_HEADER_KIND,
 			"X-redhat-value");
 		if (attrval) {
