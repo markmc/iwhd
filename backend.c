@@ -1344,6 +1344,76 @@ fs_bcreate (const provider_t *prov, const char *bucket)
 	return MHD_HTTP_OK;
 }
 
+static char *json_escape(const char *str)
+{
+	char *escaped_str, *p;
+	int cnt;
+	int i;
+
+	cnt = 0;
+	for (i = 0; str[i]; i++) {
+		if (str[i] == '\\' || str[i] == '"')
+			cnt++;
+		cnt++;
+	}
+	escaped_str = malloc(cnt+1);
+	if (!escaped_str)
+		return NULL;
+	p = escaped_str;
+	for (i = 0; str[i]; i++) {
+		if (str[i] == '\\' || str[i] == '"')
+			*p++ = '\\';
+		*p++ = str[i];
+	}
+	*p++ = '\0';
+	return escaped_str;
+}
+
+static char *
+fs_rhevm_genconf(const char *bucket, const char *key, const char *api_url,
+	const char *api_user, const char *api_secret,
+	const char *nfs_host, const char *nfs_path, const char *nfs_dir)
+{
+	int rc;
+	char *b, *k, *url, *user, *pass, *nhost, *npath, *ndir;
+	char *ret = NULL;
+
+	b = json_escape(bucket);
+	k = json_escape(key);
+	url = json_escape(api_url);
+	user = json_escape(api_user);
+	pass = json_escape(api_secret);
+	nhost = json_escape(nfs_host);
+	npath = json_escape(nfs_path);
+	ndir = json_escape(nfs_dir);
+	if (!b || !k || !url || !user || !pass || !nhost || !npath || !ndir)
+		goto err;
+
+	rc = asprintf(&ret,
+		"{\n"
+		"  \"image\"   : \"%s/%s\",\n"
+		"  \"apiurl\"  : \"%s\",\n"
+		"  \"apiuser\" : \"%s\",\n"
+		"  \"apipass\" : \"%s\",\n"
+		"  \"nfshost\" : \"%s\",\n"
+		"  \"nfspath\" : \"%s\",\n"
+		"  \"nfsdir\" :  \"%s\"\n"
+		"}\n",
+		b, k, url, user, pass, nhost, npath, ndir);
+	if (rc < 0)
+		ret = NULL;	/* for undefined behaviour in asprintf() */
+ err:
+	free(ndir);
+	free(npath);
+	free(nhost);
+	free(pass);
+	free(user);
+	free(url);
+	free(k);
+	free(b);
+	return ret;
+}
+
 static int
 fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 		   Hash_table *args)
@@ -1367,7 +1437,6 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	char		*s;
 	char		 ami_id_buf[64];
 	regmatch_t	 match[2];
-	int		 rc;
 
 	strcpy(ami_id_buf, "none");
 
@@ -1449,21 +1518,10 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 
 	ret = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
-	rc = asprintf(&conf_text,
-		    "{\n"
-		    "  \"image\"   : \"%s/%s\",\n"
-		    "  \"apiurl\"  : \"%s\",\n"
-		    "  \"apiuser\" : \"%s\",\n"
-		    "  \"apipass\" : \"%s\",\n"
-		    "  \"nfshost\" : \"%s\",\n"
-		    "  \"nfspath\" : \"%s\",\n"
-		    "  \"nfsdir\" :  \"%s\"\n"
-		    "}\n",
-			ms->bucket, ms->key,
+	conf_text = fs_rhevm_genconf(ms->bucket, ms->key,
 			api_url, api_user, api_secret,
-			nfs_host, nfs_path, nfs_dir
-	    );
-	if (rc < 0) {
+			nfs_host, nfs_path, nfs_dir);
+	if (!conf_text) {
 		error (0, 0, _("no core"));
 		goto cleanup;
 	}

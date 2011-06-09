@@ -12,6 +12,10 @@ iwhd NEWS                                                   -*- outline -*-
   mongod failed to start in time.  Now, when mongod fails to start, that
   "start" function also fails.
 
+  It is now possible to use Windows.Domain\Administrator as a user name
+  in a cloud with Windows credentials. The back slash was causing an
+  internal error due to improper JSON escaping.
+
 
 * Noteworthy changes in release 0.95 (2011-05-17) [stable]
 
