@@ -991,6 +991,7 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 		    tmpovf);
 		exit(EXIT_FAILURE);
 	}
+	xmlTextWriterSetIndent(writer, 1);
 
 	rc = xmlTextWriterStartDocument(writer, NULL, "UTF-8", NULL);
 	if (rc < 0) {
