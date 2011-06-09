@@ -44,6 +44,7 @@ curl_w() { curl --write-out '%{http_code}' "$@"; }
 create_many()
 {
   local nb=40
+  local n_items=50  # number of objects per bucket
 
   # Use -j3 on a uniprocessor, else -j(3/2 N)
   local n_procs=$(nproc || echo 2)
@@ -58,12 +59,36 @@ create_many()
   seq 20000 > data
   for i in $(seq $nb); do
     local b=http://localhost:$port/b-$i
-    for j in $(seq --format=%04g 50); do
+    for j in $(seq --format=%04g $n_items); do
       # Create an object in that bucket.
       local obj=$b/9756a40c-7668-11e0-$j-0015c5f4d7e4
       echo "curl -s -S -T - $obj < data"
     done
   done |parallel --halt-on-error=2 -j $n_procs || fail=1
+
+  # Set the A=V attribute for each of those objects:
+  for i in $(seq $nb); do
+    local b=http://localhost:$port/b-$i
+    for j in $(seq --format=%04g $n_items); do
+      # Set each object's A attribute to V.
+      local obj=$b/9756a40c-7668-11e0-$j-0015c5f4d7e4
+      echo "printf V | curl -sST - $obj/A"
+    done
+  done |parallel --halt-on-error=2 -j $n_procs || fail=1
+
+  # Query for objects with A=V in the first bucket:
+  i=1
+  b=http://localhost:$port/b-$i
+  curl --write-out '%{http_code}' -H 'Accept: */json' \
+      -d '$A=="V"' $b/_query > q.json || fail=1
+  echo >> q.json
+
+  # Require a 200 HTTP return code:
+  test "$(tail -1 q.json)" = 200 || fail=1
+
+  # Require the right number of matching keys:
+  grep -c '"key"' q.json > n
+  test "$(cat n)" = $n_items || fail=1
 }
 
 create_many
