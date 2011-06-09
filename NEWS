@@ -13,7 +13,7 @@ iwhd NEWS                                                   -*- outline -*-
   "start" function also fails.
 
   It is now possible to use Windows.Domain\Administrator as a user name
-  in a cloud with Windows credentials. The back slash was causing an
+  in a cloud with Windows credentials. The backslash was causing an
   internal error due to improper JSON escaping.
 
 
