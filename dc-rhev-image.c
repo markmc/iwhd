@@ -434,23 +434,21 @@ static xmlNode *xmlGetChild(xmlNode *node, const char *name)
 	return NULL;
 }
 
-static struct stor_dom *apistordom_1(struct config *cfg, xmlChar *uuidsd,
-    xmlNode *etstor)
+static bool check_stor(struct config *cfg, xmlNode *etstor)
 {
 	xmlNode *ettext, *etaddr, *etpath;
-	struct stor_dom *sd;
 
 	etaddr = xmlGetChild(etstor, "address");
 	if (!etaddr) {
 		fprintf(stderr,
 		    "WARNIING NFS storage domain without address\n");
-		return NULL;
+		return false;
 	}
 	etpath = xmlGetChild(etstor, "path");
 	if (!etpath) {
 		fprintf(stderr,
 		    "WARNIING NFS storage domain without path\n");
-		return NULL;
+		return false;
 	}
 
 	/*
@@ -460,6 +458,7 @@ static struct stor_dom *apistordom_1(struct config *cfg, xmlChar *uuidsd,
 	if (!ettext || ettext->type!=XML_TEXT_NODE || !ettext->content)
 		return NULL;
 	if (strcmp((char *)ettext->content, cfg->nfshost) != 0) {
+#if 0 /* XXX really find a better way */
 		/*
 		 * Why even print this message? Because we want to do at least
 		 * something if configuration is ham-fisted. However, this
@@ -468,22 +467,25 @@ static struct stor_dom *apistordom_1(struct config *cfg, xmlChar *uuidsd,
 		 */
 		fprintf(stderr, "INFO Host `%s' does not match cfg `%s'\n",
 		    (char *)ettext->content, cfg->nfshost);
-		return NULL;
+#endif
+		return false;
 	}
-	ettext = etpath->children;	/* mysterious indirection */
+	ettext = etpath->children;
 	if (!ettext || ettext->type!=XML_TEXT_NODE || !ettext->content)
-		return NULL;
+		return false;
 	if (strcmp((char *)ettext->content, cfg->nfspath) != 0) {
-		/*
-		 * Why even print this message? Because we want to do at least
-		 * something if configuration is ham-fisted. However, this
-		 * will pop up for every server that has 2 NFS storage domains.
-		 * For now we cop-out by tagging it "INFO".
-		 */
-		fprintf(stderr, "INFO Host `%s' does not match cfg `%s'\n",
-		    (char *)ettext->content, cfg->nfshost);
-		return NULL;
+#if 0 /* XXX really find a better way */
+		fprintf(stderr, "INFO Path `%s' does not match cfg `%s'\n",
+		    (char *)ettext->content, cfg->nfspath);
+#endif
+		return false;
 	}
+	return true;
+}
+
+static struct stor_dom *apistordom_1(struct config *cfg, xmlChar *uuidsd)
+{
+	struct stor_dom *sd;
 
 	if (!(sd = malloc(sizeof(struct stor_dom)))) {
 		fprintf(stderr, "ERROR No core\n");
@@ -582,13 +584,16 @@ static struct stor_dom *apistordom(struct config *cfg,
 		if (c_strcasecmp((char *)ettext->content, "NFS") != 0)
 			continue;
 
+		if (!check_stor(cfg, etstor))
+			continue;
+
 		uuidsd = xmlGetProp(et, (xmlChar *)"id");
 		if (!uuidsd) {
 			fprintf(stderr,
 			    "WARNING NFS storage domain without UUID\n");
 			continue;
 		}
-		sd = apistordom_1(cfg, uuidsd, etstor);
+		sd = apistordom_1(cfg, uuidsd);
 		xmlFree(uuidsd);
 		if (sd)
 			break;
