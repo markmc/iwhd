@@ -152,7 +152,7 @@ repl_worker_bcreate (repl_item *item)
   do {									\
     int err = pthread_create (thread, NULL, start_routine, item);	\
     if (err) {								\
-      error (0, err, msg);						\
+      error (0, err, _(msg));						\
       return NULL;							\
     }									\
   } while (0)
@@ -182,11 +182,14 @@ repl_worker (void *notused ATTRIBUTE_UNUSED)
 		 * in the normal case where we're actually storing a new file.
 		 */
 		ms = item->ms;
-		pipe_init_shared(&ms->pipe,ms,1);
+		if (pipe_init_shared(&ms->pipe,ms,1)) {
+			error (0, errno, _("thread mutex init failed"));
+			return NULL;
+		}
 		switch (item->type) {
 		case REPL_PUT:
-		  xpthread_create(&prod,proxy_repl_prod,item,
-				  "failed to start producer thread");
+			xpthread_create(&prod,proxy_repl_prod,item,
+					"failed to start producer thread");
 			xpthread_create(&cons,proxy_repl_cons,item,
 					"failed to start consumer thread");
 			pthread_join(prod,NULL);

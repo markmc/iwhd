@@ -319,7 +319,8 @@ proxy_get_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		ms->from_master = 1;
 	}
 
-	pipe_init_shared(&ms->pipe,ms,ms->from_master+1);
+	if (pipe_init_shared(&ms->pipe,ms,ms->from_master+1))
+		return MHD_NO;
 	pp = pipe_init_private(&ms->pipe);
 	if (!pp) {
 		return MHD_NO;
@@ -440,7 +441,8 @@ proxy_put_data (void *cctx, struct MHD_Connection *conn, const char *url,
 		if (!ms->dict)
 			return MHD_NO;
 		ms->size = 0;
-		pipe_init_shared(&ms->pipe,ms,1);
+		if (pipe_init_shared(&ms->pipe,ms,1))
+			return MHD_NO;
 		pipe_private *pp = pipe_init_private(&ms->pipe);
 		if (!pp) {
 			return MHD_NO;

@@ -87,9 +87,16 @@ typedef struct {
 	void		*prov;
 } pipe_private;
 
+#undef ATTRIBUTE_WARN_UNUSED_RESULT
+#if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
+# define ATTRIBUTE_WARN_UNUSED_RESULT /* empty */
+#else
+# define ATTRIBUTE_WARN_UNUSED_RESULT __attribute__ ((__warn_unused_result__))
+#endif
 
-extern void pipe_init_shared (pipe_shared *ps,
-			      void *owner, unsigned short ncons);
+extern int pipe_init_shared (pipe_shared *ps,
+			     void *owner, unsigned short ncons)
+  ATTRIBUTE_WARN_UNUSED_RESULT;
 extern pipe_private *pipe_init_private (pipe_shared *ps);
 extern int pipe_cons_wait (pipe_private *pp);
 extern void pipe_cons_signal (pipe_private *pp, int error);

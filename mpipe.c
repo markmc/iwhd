@@ -20,14 +20,16 @@
 #include "iwh.h"
 #include "mpipe.h"
 
-void
+int
 pipe_init_shared (pipe_shared *ps, void *owner, unsigned short ncons)
 {
 	ps->owner = owner;
-	pthread_mutex_init(&ps->lock,NULL);
-	pthread_cond_init(&ps->prod_cond,NULL);
-	pthread_cond_init(&ps->cons_cond,NULL);
+	if (pthread_mutex_init(&ps->lock,NULL)
+	    || pthread_cond_init(&ps->prod_cond,NULL)
+	    || pthread_cond_init(&ps->cons_cond,NULL))
+		return -1;
 	pipe_reset(ps,ncons);
+	return 0;
 }
 
 void
