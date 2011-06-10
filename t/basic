@@ -164,13 +164,16 @@ tr -s '\t \n' ' ' < q.xml > k && mv k q.xml
 printf '[ { "bucket": "b99", "key": "my_file" } ] ' > exp.xml
 compare q.xml exp.xml || fail=1
 
-# Run a query that produces nontrivial output by creating many
-# objects that match:
+# Run a query that produces nontrivial output;
+# First, create many objects that will match it.
+# Before iwhd-0.96, this would hang consistently around i==390
+# with "contention in meta_query_stop".
 for i in $(seq 500); do
   obj=http://localhost:$port/b99/99999999999999999999-$i
   echo x | curl -T - $obj
   printf mock | curl -T - $obj/target
 done
+# Run the query:
 curl -H 'Accept: */json' -d '$target=="mock"' \
     http://localhost:$port/b99/_query > q
 cat q
