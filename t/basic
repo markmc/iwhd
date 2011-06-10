@@ -164,6 +164,17 @@ tr -s '\t \n' ' ' < q.xml > k && mv k q.xml
 printf '[ { "bucket": "b99", "key": "my_file" } ] ' > exp.xml
 compare q.xml exp.xml || fail=1
 
+# Run a query that produces nontrivial output by creating many
+# objects that match:
+for i in $(seq 500); do
+  obj=http://localhost:$port/b99/99999999999999999999-$i
+  echo x | curl -T - $obj
+  printf mock | curl -T - $obj/target
+done
+curl -H 'Accept: */json' -d '$target=="mock"' \
+    http://localhost:$port/b99/_query > q
+cat q
+
 # Before 2011-02-07, this would cause iwhd to hang.
 printf hang | curl -T - http://localhost:$port/no-such/fff
 
