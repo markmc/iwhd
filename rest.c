@@ -217,7 +217,6 @@ proxy_get_cons_0 (void *ctx, uint64_t pos, char *buf, size_t max)
 	my_state	*ms	= ps->owner;
 	ssize_t		 done;
 
-	gc_register_thread();
 	(void)pos;
 
 	DPRINTF("consumer asked to read %zu\n",max);
@@ -261,7 +260,6 @@ proxy_get_cons_0 (void *ctx, uint64_t pos, char *buf, size_t max)
 	}
 
 	return done;
-	GC_unregister_my_thread();
 }
 
 /* This is just a wrapper.  See the *_0 function, above.  */
