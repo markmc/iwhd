@@ -92,6 +92,9 @@
 /test-fpending.sh
 /test-fpurge.c
 /test-freading.c
+/test-fseek.c
+/test-fseek.sh
+/test-fseek2.sh
 /test-fseeko.c
 /test-fseeko.sh
 /test-fseeko2.sh

@@ -53,7 +53,9 @@
 /fpurge.c
 /freading.c
 /freading.h
+/fseek.c
 /fseeko.c
+/ftell.c
 /ftello.c
 /full-write.c
 /full-write.h
