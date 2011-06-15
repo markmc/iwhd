@@ -632,7 +632,6 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 {
 	struct MHD_Response	*resp;
 	my_state		*ms	= *rctx;
-	const char		*attrval;
 	int			 send_resp = 0;
 
 	(void)cctx;
@@ -651,11 +650,11 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 					   kv_compare, NULL);
 		if (!ms->dict)
 			return MHD_NO;
-		attrval = MHD_lookup_connection_value(conn,MHD_HEADER_KIND,
-			"X-redhat-value");
+		const char *attrval
+		  = MHD_lookup_connection_value(conn,MHD_HEADER_KIND,
+						"X-redhat-value");
 		if (attrval) {
-			meta_set_value(ms->bucket,ms->key,ms->attr,
-				(char *)attrval);
+			meta_set_value(ms->bucket,ms->key,ms->attr, attrval);
 			send_resp = 1;
 		}
 	}
