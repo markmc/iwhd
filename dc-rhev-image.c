@@ -879,7 +879,7 @@ static struct stor_dom *apistart(struct config *cfg)
 	authrlen = strlen(authraw);
 	authhlen = ((authrlen+2)/3) * 4;	/* base64 expands 3 into 4 */
 	authhlen += sizeof("Authorization: Basic ")-1;
-	authhdr = malloc(authhlen + 1);		/* \r\n and nul */
+	authhdr = malloc(authhlen + 1);		/* nul */
 	if (!authhdr)
 		goto err_alloc;
 	strcpy(authhdr, "Authorization: Basic ");
