@@ -1372,7 +1372,8 @@ static char *json_escape(const char *str)
 static char *
 fs_rhevm_genconf(const char *bucket, const char *key, const char *api_url,
 	const char *api_user, const char *api_secret,
-	const char *nfs_host, const char *nfs_path, const char *nfs_dir)
+	const char *nfs_host, const char *nfs_path, const char *nfs_dir,
+	const char *cluster)
 {
 	int rc;
 	char *b, *k, *url, *user, *pass, *nhost, *npath, *ndir;
@@ -1397,9 +1398,10 @@ fs_rhevm_genconf(const char *bucket, const char *key, const char *api_url,
 		"  \"apipass\" : \"%s\",\n"
 		"  \"nfshost\" : \"%s\",\n"
 		"  \"nfspath\" : \"%s\",\n"
-		"  \"nfsdir\" :  \"%s\"\n"
+		"  \"nfsdir\"  : \"%s\",\n"
+		"  \"cluster\" : \"%s\"\n"
 		"}\n",
-		b, k, url, user, pass, nhost, npath, ndir);
+		b, k, url, user, pass, nhost, npath, ndir, cluster);
 	if (rc < 0)
 		ret = NULL;	/* for undefined behaviour in asprintf() */
  err:
@@ -1424,6 +1426,7 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 	char		*nfs_host;
 	char		*nfs_path;
 	char		*nfs_dir;
+	const char	*cluster;
 	const char	*conf_name = NULL;
 	char		*conf_text;
 	int		 ret	= MHD_HTTP_BAD_REQUEST;
@@ -1516,11 +1519,15 @@ fs_rhevm_register (my_state *ms, const provider_t *prov, const char *next,
 		goto cleanup;
 	}
 
+	cluster = kv_hash_lookup(args,"cluster");
+	if (!cluster)
+		cluster = "_none_";
+
 	ret = MHD_HTTP_INTERNAL_SERVER_ERROR;
 
 	conf_text = fs_rhevm_genconf(ms->bucket, ms->key,
 			api_url, api_user, api_secret,
-			nfs_host, nfs_path, nfs_dir);
+			nfs_host, nfs_path, nfs_dir, cluster);
 	if (!conf_text) {
 		error (0, 0, _("no core"));
 		goto cleanup;

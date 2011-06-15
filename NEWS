@@ -6,6 +6,9 @@ iwhd NEWS                                                   -*- outline -*-
 
   Added VMware vSphere registration back-end. Type is "fs-vmw".
 
+  The RHEV-M registration back-end can now import a just-uploaded template
+  into a master storage domain. See new POST parameter "cluster".
+
 ** Bug fixes
 
   iwhd will segfault or hang less often during garbage-collection.

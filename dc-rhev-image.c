@@ -71,6 +71,7 @@ struct config {
 	char *nfshost;
 	char *nfspath;
 	char *nfsdir;
+	char *cluster;
 };
 
 struct http_uri {
@@ -91,11 +92,18 @@ struct http_uri {
 	unsigned int	fragment_len;	/* see FIXME in huri_parse */
 };
 
+struct id_pack {
+	/* char exp_dom[37];	-- kept in stor_dom */
+	char volume[37];
+	char image[37];
+	char template[37];
+};
+
 struct stor_dom {
 	char *uuid;
 	char *address;
 	char *path;
-	char *poolid;
+	bool toptpl;
 };
 
 struct api_buf {
@@ -105,8 +113,10 @@ struct api_buf {
 };
 
 struct api_conn {
+	struct curl_slist *hdrs;
 	CURL *curl;
-	char *base;
+	char *base;	/* "https://rhevm.host.corp.com:8543/" */
+	char *path;	/* "/rhevm-api" or "/rhevm-api-powershell" */
 };
 
 static void Usage(void)
@@ -230,6 +240,40 @@ error:
 	return NULL;
 }
 
+static xmlChar *xmlGetRel(xmlNode *etparent, const char *relname)
+{
+	xmlNode *et;
+	xmlChar *rel, *href;
+
+	for (et = etparent->children; et; et = et->next) {
+		if (et->type != XML_ELEMENT_NODE)
+			continue;
+		if (strcmp((const char *)et->name, "link") != 0)
+			continue;
+		rel = xmlGetProp(et, (xmlChar *)"rel");
+		if (!rel)
+			continue;
+		if (strcmp((const char *)rel, relname) == 0) {
+			xmlFree(rel);
+			break;
+		}
+		xmlFree(rel);
+	}
+
+	if (!et)
+		return NULL;
+
+	href = xmlGetProp(et, (xmlChar *)"href");
+	if (!href)
+		goto err_href;
+
+	return href;
+
+ err_href:
+	fprintf(stderr, "ERROR link in %s without href\n", etparent->name);
+	exit(EXIT_FAILURE);
+}
+
 static int path_exists(const char *path)
 {
 	return access(path, R_OK) == 0;
@@ -252,13 +296,14 @@ cfg_veripick(char **cfgval, const char *cfgname, json_t *jcfg,
 	elem = json_object_get(jcfg, cfgtag);
 	if (!json_is_string(elem)) {
 		fprintf(stderr,
-		    "ERROR configuration %s: tag %s is not a string\n",
+		    "ERROR configuration %s: tag `%s' is not a string\n",
 		    cfgname, cfgtag);
 		exit(EXIT_FAILURE);
 	}
 	name = json_string_value(elem);
 	if (!name) {
-		fprintf(stderr, "ERROR configuration %s: tag %s has no value\n",
+		fprintf(stderr,
+		    "ERROR configuration %s: tag `%s' has no value\n",
 		    cfgname, cfgtag);
 		exit(EXIT_FAILURE);
 	}
@@ -312,22 +357,45 @@ static size_t api_wcb(void *ptr, size_t bsz, size_t nmemb, void *arg)
 	return nmemb;
 }
 
-static void apipaths(struct api_conn *connection, struct curl_slist *headers,
-    char *path, char **psd, char **pdc)
+static size_t api_rcb(void *ptr, size_t bsz, size_t nmemb, void *arg)
+{
+	struct api_buf *bp = arg;
+	size_t count;
+
+	count = bp->alloc - bp->used;
+	if (count > nmemb)
+		count = nmemb;
+	if (count) {
+		memcpy(ptr, bp->buf + bp->used, count);
+		bp->used += count;
+	}
+	return count;
+}
+
+static void require_api_root(const xmlChar *actual, const char *required)
+{
+	if (strcmp((const char *)actual, required) != 0) {
+		fprintf(stderr,
+			"ERROR invalid API root: `%s' (expected `%s')\n",
+			actual, required);
+		exit(EXIT_FAILURE);
+	}
+}
+
+static void apipaths(struct api_conn *connection,
+    char **psd, char **pdc, char **pcl)
 {
 	CURL *curl = connection->curl;
+	struct curl_slist *headers = connection->hdrs;
 	struct api_buf apib;
 	char *url;
 	xmlDocPtr doc;
 	xmlNode *etroot;
-	xmlNode *et;
-	xmlChar *reltype;
-	xmlChar *s;
-	char *pathsd = NULL, *pathdc = NULL;
+	xmlChar *pathsd, *pathdc, *pathcl;
 	CURLcode rcc;
 	int rc;
 
-	rc = asprintf(&url, "%s%s", connection->base, path);
+	rc = asprintf(&url, "%s%s/", connection->base, connection->path);
 	if (rc < 0)
 		goto err_alloc;
 
@@ -338,7 +406,7 @@ static void apipaths(struct api_conn *connection, struct curl_slist *headers,
 	apib.alloc = 4000;
 
 	// if (debugging) /* if (verbose) */
-	// 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	//	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
@@ -358,65 +426,45 @@ static void apipaths(struct api_conn *connection, struct curl_slist *headers,
 	}
 
 	etroot = xmlDocGetRootElement(doc);
-	if (strcmp((const char *)etroot->name, "api") != 0) {
-		fprintf(stderr, "ERROR API root is `api'\n");
-		exit(EXIT_FAILURE);
-	}
+	require_api_root(etroot->name, "api");
 
-	for (et = etroot->children; et; et = et->next) {
-		if (et->type != XML_ELEMENT_NODE)
-			continue;
-		if (strcmp((const char *)et->name, "link") != 0)
-			continue;
-		reltype = xmlGetProp(et, (xmlChar *)"rel");
-		if (!reltype)
-			continue;
-		if (strcmp((char *)reltype, "storagedomains") == 0) {
-			s = xmlGetProp(et, (xmlChar *)"href");
-			if (!s)
-				goto err_href;
-			free(pathsd);
-			pathsd = strdup((char *)s);
-			if (!pathsd)
-				goto err_alloc;
-			xmlFree(s);
-		} else if (strcmp((char *)reltype, "datacenters") == 0) {
-			s = xmlGetProp(et, (xmlChar *)"href");
-			if (!s)
-				goto err_href;
-			free(pathdc);
-			pathdc = strdup((char *)s);
-			if (!pathdc)
-				goto err_alloc;
-			xmlFree(s);
-		}
-		xmlFree(reltype);
-	}
-
+	pathsd = xmlGetRel(etroot, "storagedomains");
 	if (!pathsd) {
 		fprintf(stderr, "ERROR API has no `rel=storagedomains'\n");
 		exit(EXIT_FAILURE);
 	}
+	pathdc = xmlGetRel(etroot, "datacenters");
 	if (!pathdc) {
 		fprintf(stderr, "ERROR API has no `rel=datacenters'\n");
 		exit(EXIT_FAILURE);
 	}
+	pathcl = xmlGetRel(etroot, "clusters");
+	if (!pathcl) {
+		fprintf(stderr, "ERROR API has no `rel=clusters'\n");
+		exit(EXIT_FAILURE);
+	}
 
-	*psd = pathsd;
-	*pdc = pathdc;
+	*psd = strdup((const char *)pathsd);
+	if (!*psd)
+		goto err_alloc;
+	*pdc = strdup((const char *)pathdc);
+	if (!*pdc)
+		goto err_alloc;
+	*pcl = strdup((const char *)pathcl);
+	if (!*pcl)
+		goto err_alloc;
+
+	xmlFree(pathsd);
+	xmlFree(pathdc);
+	xmlFree(pathcl);
 
 	xmlFreeDoc(doc);
-	/* xmlCleanupParser(); -- hopefuly not necessary */
 	free(apib.buf);
 	free(url);
 	return;
 
  err_alloc:
 	fprintf(stderr, "ERROR No core\n");
-	exit(EXIT_FAILURE);
-
- err_href:
-	fprintf(stderr, "ERROR <link /> with no `href'\n");
 	exit(EXIT_FAILURE);
 }
 
@@ -483,7 +531,8 @@ static bool check_stor(struct config *cfg, xmlNode *etstor)
 	return true;
 }
 
-static struct stor_dom *apistordom_1(struct config *cfg, xmlChar *uuidsd)
+static struct stor_dom *stordom_new(struct config *cfg, xmlChar *uuidsd,
+    bool has_templates_on_top_level)
 {
 	struct stor_dom *sd;
 
@@ -499,13 +548,15 @@ static struct stor_dom *apistordom_1(struct config *cfg, xmlChar *uuidsd)
 	}
 	sd->address = cfg->nfshost;
 	sd->path = cfg->nfspath;
+	sd->toptpl = has_templates_on_top_level;
 	return sd;
 }
 
 static struct stor_dom *apistordom(struct config *cfg,
-    struct api_conn *connection, struct curl_slist *headers, char *pathsd)
+    struct api_conn *connection, char *pathsd)
 {
 	CURL *curl = connection->curl;
+	struct curl_slist *headers = connection->hdrs;
 	struct api_buf apib;
 	char *url;
 	struct stor_dom *sd;
@@ -513,6 +564,8 @@ static struct stor_dom *apistordom(struct config *cfg,
 	xmlNode *etroot;
 	xmlNode *et;
 	xmlNode *ettype, *etstor, *ettext;
+	xmlChar *href;
+	bool has_templates;
 	xmlChar *uuidsd;
 	CURLcode rcc;
 	int rc;
@@ -528,7 +581,7 @@ static struct stor_dom *apistordom(struct config *cfg,
 	apib.alloc = 4000;
 
 	// if (debugging) /* if (verbose) */
-	// 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	//	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
@@ -548,10 +601,7 @@ static struct stor_dom *apistordom(struct config *cfg,
 	}
 
 	etroot = xmlDocGetRootElement(doc);
-	if (strcmp((const char *)etroot->name, "storage_domains") != 0) {
-		fprintf(stderr, "ERROR API root is `storage_domains'\n");
-		exit(EXIT_FAILURE);
-	}
+	require_api_root(etroot->name, "storage_domains");
 
 	sd = NULL;
 	for (et = etroot->children; et; et = et->next) {
@@ -585,13 +635,21 @@ static struct stor_dom *apistordom(struct config *cfg,
 		if (!check_stor(cfg, etstor))
 			continue;
 
+		href = xmlGetRel(et, "templates");
+		if (href) {
+			has_templates = true;
+			xmlFree(href);
+		} else {
+			has_templates = false;
+		}
+
 		uuidsd = xmlGetProp(et, (xmlChar *)"id");
 		if (!uuidsd) {
 			fprintf(stderr,
 			    "WARNING NFS storage domain without UUID\n");
 			continue;
 		}
-		sd = apistordom_1(cfg, uuidsd);
+		sd = stordom_new(cfg, uuidsd, has_templates);
 		xmlFree(uuidsd);
 		if (sd)
 			break;
@@ -605,7 +663,6 @@ static struct stor_dom *apistordom(struct config *cfg,
 	}
 
 	xmlFreeDoc(doc);
-	/* xmlCleanupParser(); -- hopefuly not necessary */
 	free(apib.buf);
 	free(url);
 	return sd;
@@ -616,9 +673,10 @@ static struct stor_dom *apistordom(struct config *cfg,
 }
 
 static int apipoolid(struct config *cfg, struct api_conn *connection,
-    struct curl_slist *headers, xmlChar *pathsds, char *sd_uuid)
+    xmlChar *pathsds, char *sd_uuid)
 {
 	CURL *curl = connection->curl;
+	struct curl_slist *headers = connection->hdrs;
 	struct api_buf apib;
 	char *url;
 	xmlDocPtr doc;
@@ -639,7 +697,7 @@ static int apipoolid(struct config *cfg, struct api_conn *connection,
 	apib.alloc = 4000;
 
 	// if (debugging) /* if (verbose) */
-	// 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	//	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
@@ -659,10 +717,7 @@ static int apipoolid(struct config *cfg, struct api_conn *connection,
 	}
 
 	etroot = xmlDocGetRootElement(doc);
-	if (strcmp((const char *)etroot->name, "storage_domains") != 0) {
-		fprintf(stderr, "ERROR API root is `storage_domains'\n");
-		exit(EXIT_FAILURE);
-	}
+	require_api_root(etroot->name, "storage_domains");
 
 	for (etsd = etroot->children; etsd; etsd = etsd->next) {
 		if (etsd->type != XML_ELEMENT_NODE)
@@ -687,7 +742,6 @@ static int apipoolid(struct config *cfg, struct api_conn *connection,
 	rc = 0;
 ret:
 	xmlFreeDoc(doc);
-	/* xmlCleanupParser(); -- hopefuly not necessary */
 	free(apib.buf);
 	free(url);
 	return rc;
@@ -698,17 +752,18 @@ ret:
 }
 
 static char *apipool(struct config *cfg, struct api_conn *connection,
-    struct curl_slist *headers, char *pathdc, char *sd_uuid)
+    char *pathdc, char *sd_uuid)
 {
 	CURL *curl = connection->curl;
+	struct curl_slist *headers = connection->hdrs;
 	struct api_buf apib;
 	char *url;
 	char *ret;
 	xmlDocPtr doc;
 	xmlNode *etroot;
-	xmlNode *etdc, *etlink;
+	xmlNode *etdc;
 	xmlChar *uuiddc;
-	xmlChar *rel, *href;
+	xmlChar *href;
 	CURLcode rcc;
 	int rc;
 
@@ -723,7 +778,7 @@ static char *apipool(struct config *cfg, struct api_conn *connection,
 	apib.alloc = 4000;
 
 	// if (debugging) /* if (verbose) */
-	// 	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	//	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
 	curl_easy_setopt(curl, CURLOPT_URL, url);
 	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
@@ -745,65 +800,302 @@ static char *apipool(struct config *cfg, struct api_conn *connection,
 	}
 
 	etroot = xmlDocGetRootElement(doc);
-	if (strcmp((const char *)etroot->name, "data_centers") != 0) {
-		fprintf(stderr, "ERROR API root is `data_centers'\n");
+	require_api_root(etroot->name, "data_centers");
+
+	uuiddc = NULL;
+	for (etdc = etroot->children; etdc; etdc = etdc->next) {
+		if (etdc->type != XML_ELEMENT_NODE)
+			continue;
+		uuiddc = xmlGetProp(etdc, (xmlChar *)"id");
+		if (!uuiddc) {
+			fprintf(stderr, "WARNING Datacenter without UUID\n");
+			continue;
+		}
+		/* XXX Check for <status>UP</status> */
+		href = xmlGetRel(etdc, "storagedomains");
+		if (!href)
+			continue;
+
+		/* StoragePoolId is Data Center's UUID */
+		if (apipoolid(cfg, connection, href, sd_uuid)) {
+			xmlFree(href);
+			break;
+		}
+
+		xmlFree(href);
+		xmlFree(uuiddc);
+	}
+
+	if (!uuiddc) {
+		fprintf(stderr,
+		     "ERROR pool not found for storage domain %s\n", sd_uuid);
 		exit(EXIT_FAILURE);
 	}
+
+	ret = strdup((char *)uuiddc);
+	if (!ret)
+		goto err_alloc;
+
+	xmlFree(uuiddc);
+	xmlFreeDoc(doc);
+	free(apib.buf);
+	free(url);
+	return ret;
+
+ err_alloc:
+	fprintf(stderr, "ERROR No core\n");
+	exit(EXIT_FAILURE);
+}
+
+static char *apimasterid(const struct config *cfg, struct api_conn *connection,
+    xmlChar *pathsds)
+{
+	CURL *curl = connection->curl;
+	struct curl_slist *headers = connection->hdrs;
+	struct api_buf apib;
+	char *url;
+	xmlDocPtr doc;
+	xmlNode *etroot;
+	xmlNode *etsd;
+	xmlNode *et;
+	xmlNode *ettext;
+	xmlChar *xid;
+	char *master;
+	char *ret;
+	CURLcode rcc;
+	int rc;
+
+	rc = asprintf(&url, "%s%s", connection->base, pathsds);
+	if (rc < 0)
+		goto err_alloc;
+
+	memset(&apib, 0, sizeof(struct api_buf));
+	apib.buf = malloc(4000);
+	if (!apib.buf)
+		goto err_alloc;
+	apib.alloc = 4000;
+
+	// if (debugging) /* if (verbose) */
+	//	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, api_wcb);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &apib);
+
+	rcc = curl_easy_perform(curl);
+	if (rcc != CURLE_OK) {
+		fprintf(stderr, "ERROR curl failed GET url `%s'\n", url);
+		exit(EXIT_FAILURE);
+	}
+
+	doc = xmlReadMemory(apib.buf, apib.used, "rhev-api.xml", NULL, 0);
+	if (doc == NULL) {
+		fprintf(stderr, "ERROR API parse error in `%s'\n", url);
+		exit(EXIT_FAILURE);
+	}
+
+	etroot = xmlDocGetRootElement(doc);
+	require_api_root(etroot->name, "storage_domains");
+
+	for (etsd = etroot->children; etsd; etsd = etsd->next) {
+		if (etsd->type != XML_ELEMENT_NODE)
+			continue;
+		if (strcmp((const char *)etsd->name, "storage_domain") != 0)
+			continue;
+
+		xid = xmlGetProp(etsd, (xmlChar *)"id");
+		if (!xid) {
+			fprintf(stderr,
+			    "WARNING storage domain without UUID\n");
+			continue;
+		}
+
+		master = NULL;
+		for (et = etsd->children; et; et = et->next) {
+			if (et->type != XML_ELEMENT_NODE)
+				continue;
+			if (strcmp((const char *)et->name, "master") == 0) {
+				ettext = et->children;
+				if (!ettext ||
+				    ettext->type != XML_TEXT_NODE ||
+				    !ettext->content)
+					continue;
+				master = (char *)ettext->content;
+				break;
+			}
+		}
+
+		if (!master) {
+			fprintf(stderr,
+			    "WARNING storage domain without <master>\n");
+			xmlFree(xid);
+			continue;
+		}
+		if (strcmp(master, "true") == 0) {
+			ret = strdup((char *)xid);
+			if (!ret)
+				goto err_alloc;
+			xmlFree(xid);
+			goto out;
+		}
+		xmlFree(xid);
+	}
+
+	ret = NULL;
+out:
+	xmlFreeDoc(doc);
+	free(apib.buf);
+	free(url);
+	return ret;
+
+ err_alloc:
+	fprintf(stderr, "ERROR No core\n");
+	exit(EXIT_FAILURE);
+}
+
+static char *apimaster(const struct config *cfg, struct api_conn *connection,
+    const char *pathdc, const char *dc_uuid)
+{
+	CURL *curl = connection->curl;
+	struct curl_slist *headers = connection->hdrs;
+	struct api_buf apib;
+	char *url;
+	char *ret;
+	xmlDocPtr doc;
+	xmlNode *etroot;
+	xmlNode *etdc;
+	xmlChar *uuiddc;
+	xmlChar *href;
+	CURLcode rcc;
+	int rc;
+
+	rc = asprintf(&url, "%s%s", connection->base, pathdc);
+	if (rc < 0)
+		goto err_alloc;
+
+	memset(&apib, 0, sizeof(struct api_buf));
+	apib.buf = malloc(4000);
+	if (!apib.buf)
+		goto err_alloc;
+	apib.alloc = 4000;
+
+	// if (debugging) /* if (verbose) */
+	//	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, api_wcb);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &apib);
+
+	rcc = curl_easy_perform(curl);
+	if (rcc != CURLE_OK) {
+		fprintf(stderr, "ERROR curl failed GET url `%s'\n", url);
+		exit(EXIT_FAILURE);
+	}
+
+	doc = xmlReadMemory(apib.buf, apib.used, "rhev-api-dc.xml", NULL, 0);
+	if (doc == NULL) {
+		fprintf(stderr, "ERROR API parse error in `%s'\n", url);
+		exit(EXIT_FAILURE);
+	}
+
+	etroot = xmlDocGetRootElement(doc);
+	require_api_root(etroot->name, "data_centers");
 
 	for (etdc = etroot->children; etdc; etdc = etdc->next) {
 		if (etdc->type != XML_ELEMENT_NODE)
 			continue;
 		uuiddc = xmlGetProp(etdc, (xmlChar *)"id");
 		if (!uuiddc) {
-			fprintf(stderr,
-			    "WARNING NFS storage domain without UUID\n");
+			fprintf(stderr, "WARNING Datacenter without UUID\n");
 			continue;
 		}
-		for (etlink = etdc->children; etlink; etlink = etlink->next) {
-			if (etlink->type != XML_ELEMENT_NODE)
-				continue;
-			/* most likely it's not even a link, but "name" or "version" */
-			if (strcmp((const char *)etlink->name, "link") != 0)
-				continue;
-			rel = xmlGetProp(etlink, (xmlChar *)"rel");
-			if (!rel)
-				continue;
-			/* there's a bunch of other links like "files", "permissions" */
-			if (strcmp((const char *)rel, "storagedomains") != 0) {
-				xmlFree(rel);
-				continue;
-			}
-			href = xmlGetProp(etlink, (xmlChar *)"href");
-			if (!href) {
-				fprintf(stderr,
-				    "WARNING data canter link without href\n");
-				xmlFree(rel);
-				continue;
-			}
-
-			if (apipoolid(cfg, connection, headers, href, sd_uuid)) {
-				/* StoragePoolId is Data Center's UUID */
-
-				ret = strdup((char *)uuiddc);
-				if (!ret)
-					goto err_alloc;
-				xmlFree(href);
-				xmlFree(rel);
-
-				xmlFree(uuiddc);
-				xmlFreeDoc(doc);
-				/* xmlCleanupParser(); -- hopefuly not necessary */
-				free(apib.buf);
-				free(url);
-				return ret;
-			}
-			xmlFree(href);
-			xmlFree(rel);
+		/* No need to check <status>UP</status>, we've got UUID. */
+		if (strcmp((char *)uuiddc, dc_uuid) == 0) {
+			xmlFree(uuiddc);
+			break;
 		}
 		xmlFree(uuiddc);
 	}
+	if (!etdc) {
+		/* impossible, but... */
+		fprintf(stderr, "ERROR Datacenter `%s' not found\n", dc_uuid);
+		exit(EXIT_FAILURE);
+	}
 
-	fprintf(stderr, "ERROR pool not found for storage domain %s\n", sd_uuid);
+	href = xmlGetRel(etdc, "storagedomains");
+	if (!href) {
+		fprintf(stderr,
+		    "ERROR Storagedomains not found for datacenter `%s'\n",
+		    dc_uuid);
+		exit(EXIT_FAILURE);
+	}
+
+	ret = apimasterid(cfg, connection, href);
+	if (!ret) {
+		fprintf(stderr, "ERROR "
+		    "Master storage domain not found for datacenter `%s'\n",
+		    dc_uuid);
+		exit(EXIT_FAILURE);
+	}
+
+	xmlFree(href);
+
+	xmlFreeDoc(doc);
+	free(apib.buf);
+	free(url);
+	return ret;
+
+ err_alloc:
+	fprintf(stderr, "ERROR No core\n");
+	exit(EXIT_FAILURE);
+}
+
+static char *apiclust_by_dc(xmlNode *etroot, const char *dcid)
+{
+	xmlNode *et, *etcl;
+	xmlChar *id, *id1;
+	xmlChar *uuidcl;
+	char *ret;
+
+	for (etcl = etroot->children; etcl; etcl = etcl->next) {
+		if (etcl->type != XML_ELEMENT_NODE)
+			continue;
+		uuidcl = xmlGetProp(etcl, (xmlChar *)"id");
+		if (!uuidcl) {
+			fprintf(stderr, "WARNING Cluster without UUID\n");
+			continue;
+		}
+		id = NULL;
+		for (et = etcl->children; et; et = et->next) {
+			if (et->type != XML_ELEMENT_NODE)
+				continue;
+			if (strcmp((const char *)et->name,"data_center") == 0) {
+				id1 = xmlGetProp(et, (xmlChar *)"id");
+				if (!id1)
+					continue;
+				if (id)
+					xmlFree(id);
+				id = id1;
+			}
+		}
+
+		if (id) {
+			if (strcmp((const char *)id, dcid) == 0) {
+				ret = strdup((char *)uuidcl);
+				if (!ret)
+					goto err_alloc;
+				xmlFree(id);
+				xmlFree(uuidcl);
+				return ret;
+			}
+			xmlFree(id);
+		}
+		xmlFree(uuidcl);
+	}
+
+	fprintf(stderr, "ERROR No cluster for DC `%s'\n", dcid);
 	exit(EXIT_FAILURE);
 
  err_alloc:
@@ -811,17 +1103,132 @@ static char *apipool(struct config *cfg, struct api_conn *connection,
 	exit(EXIT_FAILURE);
 }
 
-static struct stor_dom *apistart(struct config *cfg)
+static char *apiclust_by_name(xmlNode *etroot, const char *clname)
+{
+	xmlNode *et, *ettext, *etcl;
+	char *name;
+	xmlChar *uuidcl;
+	char *ret;
+
+	for (etcl = etroot->children; etcl; etcl = etcl->next) {
+		if (etcl->type != XML_ELEMENT_NODE)
+			continue;
+		uuidcl = xmlGetProp(etcl, (xmlChar *)"id");
+		if (!uuidcl) {
+			fprintf(stderr, "WARNING Cluster without UUID\n");
+			continue;
+		}
+		name = NULL;
+		for (et = etcl->children; et; et = et->next) {
+			if (et->type != XML_ELEMENT_NODE)
+				continue;
+			if (strcmp((const char *)et->name, "name") == 0) {
+				ettext = et->children;
+				if (!ettext ||
+				    ettext->type != XML_TEXT_NODE ||
+				    !ettext->content)
+					continue;
+				name = (char *)ettext->content;
+			}
+		}
+		if (name && strcmp(name, clname) == 0) {
+			ret = strdup((char *)uuidcl);
+			if (!ret)
+				goto err_alloc;
+			xmlFree(uuidcl);
+			return ret;
+		}
+		xmlFree(uuidcl);
+	}
+
+	fprintf(stderr, "ERROR cluster `%s' not found\n", clname);
+	exit(EXIT_FAILURE);
+
+ err_alloc:
+	fprintf(stderr, "ERROR No core\n");
+	exit(EXIT_FAILURE);
+}
+
+/*
+ * Factory supplies us the cluster name, _none_, or _any_.
+ * In case a name, find the UUID.
+ * In case of _any_, find something suitable or abort if unable.
+ * In case of _none_, return NULL (this means "do not import").
+ *
+ * This is yet another case of matching every object to find the one we want.
+ */
+static char *apiclust(struct config *cfg, struct api_conn *connection,
+    const char *pathcl, const char *dcid)
+{
+	CURL *curl = connection->curl;
+	struct curl_slist *headers = connection->hdrs;
+	struct api_buf apib;
+	char *url;
+	char *ret;
+	xmlDocPtr doc;
+	xmlNode *etroot;
+	CURLcode rcc;
+	int rc;
+
+	if (strcmp(cfg->cluster, "_none_") == 0)
+		return NULL;
+
+	rc = asprintf(&url, "%s%s", connection->base, pathcl);
+	if (rc < 0)
+		goto err_alloc;
+
+	memset(&apib, 0, sizeof(struct api_buf));
+	apib.buf = malloc(4000);
+	if (!apib.buf)
+		goto err_alloc;
+	apib.alloc = 4000;
+
+	// if (debugging) /* if (verbose) */
+	//	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, api_wcb);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &apib);
+
+	rcc = curl_easy_perform(curl);
+	if (rcc != CURLE_OK) {
+		fprintf(stderr, "ERROR curl failed GET url `%s'\n", url);
+		exit(EXIT_FAILURE);
+	}
+
+	doc = xmlReadMemory(apib.buf, apib.used, "rhev-api-dc.xml", NULL, 0);
+	if (doc == NULL) {
+		fprintf(stderr, "ERROR API parse error in `%s'\n", url);
+		exit(EXIT_FAILURE);
+	}
+
+	etroot = xmlDocGetRootElement(doc);
+	require_api_root(etroot->name, "clusters");
+
+	if (strcmp(cfg->cluster, "_any_") == 0)
+		ret = apiclust_by_dc(etroot, dcid);
+	else
+		ret = apiclust_by_name(etroot, cfg->cluster);
+
+	xmlFreeDoc(doc);
+	free(apib.buf);
+	free(url);
+	return ret;
+
+ err_alloc:
+	fprintf(stderr, "ERROR No core\n");
+	exit(EXIT_FAILURE);
+}
+
+static void api_start(struct api_conn *connection, struct config *cfg)
 {
 	struct http_uri huri;
-	struct stor_dom *sd;
 	char *scheme, *host, *path, *base;
 	bool is_ssl;
-	char *pathsd, *pathdc;
 	char *authraw, *authhdr;
 	size_t authrlen, authhlen;
 	struct curl_slist *headers, *h;
-	struct api_conn connection;
 	int rc;
 
 	/*
@@ -861,14 +1268,15 @@ static struct stor_dom *apistart(struct config *cfg)
 	if (rc < 0)
 		goto err_alloc;
 
-	connection.base = base;
-	connection.curl = curl_easy_init();
+	connection->base = base;
+	connection->path = path;
+	connection->curl = curl_easy_init();
 	if (is_ssl) {
 		/*
 		 * FIXME We should check the certificates, not ignore the problem.
 		 */
-		curl_easy_setopt(connection.curl, CURLOPT_SSL_VERIFYHOST, 0);
-		curl_easy_setopt(connection.curl, CURLOPT_SSL_VERIFYPEER, 0);
+		curl_easy_setopt(connection->curl, CURLOPT_SSL_VERIFYHOST, 0);
+		curl_easy_setopt(connection->curl, CURLOPT_SSL_VERIFYPEER, 0);
 	}
 
 	headers = NULL;
@@ -893,66 +1301,61 @@ static struct stor_dom *apistart(struct config *cfg)
 		goto err_alloc;
 	headers = h;
 
-	/*
-	 * Step 1, fetch the API root
-	 *
-	 * This is largely a formality, because if we know names of resources,
-	 * why not to fetch resources directly? But the docs imply we should
-	 * jump through this hoop.
-	 */
-	apipaths(&connection, headers, path, &pathsd, &pathdc);
-
-	/*
-	 * Step 2, connect again, get domains
-	 */
-	sd = apistordom(cfg, &connection, headers, pathsd);
-
-	/*
-	 * Step 3, find the "storage pool ID"
-	 *
-	 * This is crazy to be a separate step. You'd expect the storage domain
-	 * descriptor itself contain its pool, to be saved on Step 2. But no.
-	 */
-	sd->poolid = apipool(cfg, &connection, headers, pathdc, sd->uuid);
-
-	curl_easy_cleanup(connection.curl);
-	curl_slist_free_all(headers);
+	connection->hdrs = headers;
 
 	free(authhdr);
 	free(authraw);
+	free(scheme);
 	free(host);
-	free(path);
-	free(base);
-	return sd;
+	return;
 
  err_alloc:
 	fprintf(stderr, "ERROR No core\n");
 	exit(EXIT_FAILURE);
 }
 
-static void spitovf(struct config *cfg, struct stor_dom *sd,
-    uuid_t img_uuid, uuid_t vol_uuid, off_t vol_size, uuid_t tpl_uuid)
+static void api_done(struct api_conn *connection)
+{
+	curl_easy_cleanup(connection->curl);
+	curl_slist_free_all(connection->hdrs);
+	free(connection->base);
+	free(connection->path);
+}
+
+static void gen_uuids(struct id_pack *idp)
+{
+	uuid_t uuid;
+
+	memset(idp, 0, sizeof(struct id_pack));
+
+	uuid_generate_random(uuid);
+	uuid_unparse_lower(uuid, idp->volume);
+
+	uuid_generate_random(uuid);
+	uuid_unparse_lower(uuid, idp->image);
+
+	uuid_generate_random(uuid);
+	uuid_unparse_lower(uuid, idp->template);
+}
+
+static void spitovf(const struct config *cfg, const struct stor_dom *sd,
+    const char *poolid, const struct id_pack *idp, off_t vol_size)
 {
 	time_t now;
 	struct tm now_tm;
 	char now_str[50];
 	xmlTextWriterPtr writer;
-	char uuidbuf[37];
 	char buf100[100];
 	char *domdir, *tmpovfdir, *tmpovf, *tmpimgdir, *imgdir, *ovfdir;
 	int rc;
 
-	uuid_generate_random(tpl_uuid);
-
 	rc = asprintf(&domdir, "%s/%s", cfg->nfsdir, sd->uuid);
 	if (rc < 0)
 		goto err_alloc;
-	uuid_unparse_lower(tpl_uuid, uuidbuf);
-	rc = asprintf(&tmpovfdir, "%s/iwhd.%s", domdir, uuidbuf);
+	rc = asprintf(&tmpovfdir, "%s/iwhd.%s", domdir, idp->template);
 	if (rc < 0)
 		goto err_alloc;
-	uuid_unparse_lower(tpl_uuid, uuidbuf);
-	rc = asprintf(&tmpovf, "%s/%s.ovf", tmpovfdir, uuidbuf);
+	rc = asprintf(&tmpovf, "%s/%s.ovf", tmpovfdir, idp->template);
 	if (rc < 0)
 		goto err_alloc;
 	if (mkdir(tmpovfdir, 0770) < 0) {
@@ -961,17 +1364,14 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 		exit(EXIT_FAILURE);
 	}
 
-	uuid_unparse_lower(img_uuid, uuidbuf);
-	rc = asprintf(&tmpimgdir, "%s/iwhd.%s", domdir, uuidbuf);
+	rc = asprintf(&tmpimgdir, "%s/iwhd.%s", domdir, idp->image);
 	if (rc < 0)
 		goto err_alloc;
-	uuid_unparse_lower(img_uuid, uuidbuf);
-	rc = asprintf(&imgdir, "%s/images/%s", domdir, uuidbuf);
+	rc = asprintf(&imgdir, "%s/images/%s", domdir, idp->image);
 	if (rc < 0)
 		goto err_alloc;
 
-	uuid_unparse_lower(tpl_uuid, uuidbuf);
-	rc = asprintf(&ovfdir, "%s/master/vms/%s", domdir, uuidbuf);
+	rc = asprintf(&ovfdir, "%s/master/vms/%s", domdir, idp->template);
 	if (rc < 0)
 		goto err_alloc;
 
@@ -1025,15 +1425,12 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	if (rc < 0) goto err_xml;
 	rc = xmlTextWriterStartElement(writer, BAD_CAST "File");
 	if (rc < 0) goto err_xml;
-	uuid_unparse_lower(img_uuid, buf100);
-	buf100[36] = '/';
-	uuid_unparse_lower(vol_uuid, buf100+37);
+	snprintf(buf100, 100, "%s/%s", idp->image, idp->volume);
 	rc = xmlTextWriterWriteAttribute(writer,
 	    BAD_CAST "ovf:href", BAD_CAST buf100);
 	if (rc < 0) goto err_xml;
-	uuid_unparse_lower(vol_uuid, uuidbuf);
 	rc = xmlTextWriterWriteAttribute(writer,
-	    BAD_CAST "ovf:id", BAD_CAST uuidbuf);
+	    BAD_CAST "ovf:id", BAD_CAST idp->volume);
 	if (rc < 0) goto err_xml;
 	snprintf(buf100, 100, "%llu", (long long) vol_size);
 	rc = xmlTextWriterWriteAttribute(writer,
@@ -1066,9 +1463,8 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 
 	rc = xmlTextWriterStartElement(writer, BAD_CAST "Disk");
 	if (rc < 0) goto err_xml;
-	uuid_unparse_lower(vol_uuid, uuidbuf);
 	rc = xmlTextWriterWriteAttribute(writer,
-	    BAD_CAST "ovf:diskId", BAD_CAST uuidbuf);
+	    BAD_CAST "ovf:diskId", BAD_CAST idp->volume);
 	if (rc < 0) goto err_xml;
 	snprintf(buf100, 100, "%llu",
 	    (long long)((vol_size + (1024*1024*1024) - 1) / (1024*1024*1024)));
@@ -1081,9 +1477,7 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	rc = xmlTextWriterWriteAttribute(writer,
 	    BAD_CAST "ovf:vm_snapshot_id", (const xmlChar *) NULID);
 	if (rc < 0) goto err_xml;
-	uuid_unparse_lower(img_uuid, buf100);
-	buf100[36] = '/';
-	uuid_unparse_lower(vol_uuid, buf100+37);
+	snprintf(buf100, 100, "%s/%s", idp->image, idp->volume);
 	rc = xmlTextWriterWriteAttribute(writer,
 	    BAD_CAST "ovf:fileRef", BAD_CAST buf100);
 	if (rc < 0) goto err_xml;
@@ -1128,9 +1522,8 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	    BAD_CAST "Name", BAD_CAST image_name(cfg->image));
 	if (rc < 0) goto err_xml;
 
-	uuid_unparse_lower(tpl_uuid, uuidbuf);
 	rc = xmlTextWriterWriteElement(writer,
-	    BAD_CAST "TemplateId", BAD_CAST uuidbuf);
+	    BAD_CAST "TemplateId", BAD_CAST idp->template);
 	if (rc < 0) goto err_xml;
 	/* spec also has 'TemplateName' */
 	rc = xmlTextWriterWriteElement(writer,
@@ -1176,9 +1569,8 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	rc = xmlTextWriterWriteAttribute(writer,
 	    BAD_CAST "xsi:type", BAD_CAST "ovf:OperatingSystemSection_Type");
 	if (rc < 0) goto err_xml;
-	uuid_unparse_lower(tpl_uuid, uuidbuf);
 	rc = xmlTextWriterWriteAttribute(writer,
-	    BAD_CAST "ovf:id", BAD_CAST uuidbuf);
+	    BAD_CAST "ovf:id", BAD_CAST idp->template);
 	if (rc < 0) goto err_xml;
 	rc = xmlTextWriterWriteAttribute(writer,
 	    BAD_CAST "ovf:required", BAD_CAST "false");
@@ -1269,16 +1661,13 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	    BAD_CAST "rasd:Caption", BAD_CAST "Drive 1");
 	if (rc < 0) goto err_xml;
 	/* Why no rasd:Description for disks? */
-	uuid_unparse_lower(vol_uuid, uuidbuf);
 	rc = xmlTextWriterWriteElement(writer,
-	    BAD_CAST "rasd:InstanceId", BAD_CAST uuidbuf);
+	    BAD_CAST "rasd:InstanceId", BAD_CAST idp->volume);
 	if (rc < 0) goto err_xml;
 	rc = xmlTextWriterWriteElement(writer,
 	    BAD_CAST "rasd:ResourceType", BAD_CAST "17");
 	if (rc < 0) goto err_xml;
-	uuid_unparse_lower(img_uuid, buf100);
-	buf100[36] = '/';
-	uuid_unparse_lower(vol_uuid, buf100+37);
+	snprintf(buf100, 100, "%s/%s", idp->image, idp->volume);
 	rc = xmlTextWriterWriteElement(writer,
 	    BAD_CAST "rasd:HostResource", BAD_CAST buf100);
 	if (rc < 0) goto err_xml;
@@ -1305,7 +1694,7 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	if (rc < 0) goto err_xml;
 
 	rc = xmlTextWriterWriteElement(writer,
-	    BAD_CAST "rasd:StoragePoolId", BAD_CAST sd->poolid);
+	    BAD_CAST "rasd:StoragePoolId", BAD_CAST poolid);
 	if (rc < 0) goto err_xml;
 
 	rc = xmlTextWriterWriteElement(writer,
@@ -1412,14 +1801,13 @@ static void spitovf(struct config *cfg, struct stor_dom *sd,
 	exit(EXIT_FAILURE);
 }
 
-static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
+static void copyimage(const struct config *cfg, const struct id_pack *idp,
+    const struct stor_dom *sd, const char *poolid)
 {
 	int rc;
 	struct stat statb;
-	uuid_t vol_uuid, img_uuid;
 	char *domdir, *tmpimgdir;
 	char *imgsrc, *imgdst, *imgmeta;
-	char uuidbuf[37];
 	time_t now;
 	off_t vol_size;
 	FILE *fp;
@@ -1449,13 +1837,9 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 		exit(EXIT_FAILURE);
 	}
 
-	uuid_generate_random(vol_uuid);
-	uuid_generate_random(img_uuid);
-
 	/* FIXME Do something about garbage-collecting iwhd.* directories */
 
-	uuid_unparse_lower(img_uuid, uuidbuf);
-	rc = asprintf(&tmpimgdir, "%s/iwhd.%s", domdir, uuidbuf);
+	rc = asprintf(&tmpimgdir, "%s/iwhd.%s", domdir, idp->image);
 	if (rc < 0)
 		goto err_alloc;
 	if (mkdir(tmpimgdir, 0770) < 0) {
@@ -1467,8 +1851,7 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 	now = time(NULL);
 
 	imgsrc = cfg->image;
-	uuid_unparse_lower(vol_uuid, uuidbuf);
-	rc = asprintf(&imgdst, "%s/%s", tmpimgdir, uuidbuf);
+	rc = asprintf(&imgdst, "%s/%s", tmpimgdir, idp->volume);
 	if (rc < 0)
 		goto err_alloc;
 
@@ -1498,13 +1881,12 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 	fprintf(fp, "CTIME=%llu\n", (long long)now);
 	/* saved template has FORMAT=COW */
 	fprintf(fp, "FORMAT=RAW\n");
-	uuid_unparse_lower(img_uuid, uuidbuf);
-	fprintf(fp, "IMAGE=%s\n", uuidbuf);
+	fprintf(fp, "IMAGE=%s\n", idp->image);
 	fprintf(fp, "DISKTYPE=1\n");
 	fprintf(fp, "PUUID=%s\n", NULID);
 	fprintf(fp, "LEGALITY=LEGAL\n");
 	fprintf(fp, "MTIME=%llu\n", (long long)now);
-	fprintf(fp, "POOL_UUID=%s\n", sd->poolid);
+	fprintf(fp, "POOL_UUID=%s\n", poolid);
 	/* assuming 1KB alignment, 512 is good for sure */
 	fprintf(fp, "SIZE=%llu\n", (long long) (vol_size/512));
 	fprintf(fp, "TYPE=SPARSE\n");
@@ -1515,7 +1897,7 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 		exit(EXIT_FAILURE);
 	}
 
-	spitovf(cfg, sd, img_uuid, vol_uuid, vol_size, tpl_uuid);
+	spitovf(cfg, sd, poolid, idp, vol_size);
 
 	free(imgmeta);
 	free(imgdst);
@@ -1528,15 +1910,406 @@ static void copyimage(struct config *cfg, struct stor_dom *sd, uuid_t tpl_uuid)
 	exit(EXIT_FAILURE);
 }
 
+static char *import_get_status(xmlNode *etparent)
+{
+	char *status;
+	xmlNode *et;
+	xmlNode *ettext;
+
+	for (et = etparent->children; et; et = et->next) {
+		if (et->type != XML_ELEMENT_NODE)
+			continue;
+		if (strcmp((const char *)et->name, "status") == 0)
+			break;
+	}
+	if (!et) {
+		fprintf(stderr, "ERROR No import status\n");
+		exit(EXIT_FAILURE);
+	}
+
+	ettext = et->children;
+	if (!ettext || ettext->type != XML_TEXT_NODE || !ettext->content) {
+		fprintf(stderr, "ERROR Empty import status\n");
+		exit(EXIT_FAILURE);
+	}
+
+	status = strdup((char *)ettext->content);
+	if (!status)
+		goto err_alloc;
+
+	return status;
+
+ err_alloc:
+	fprintf(stderr, "ERROR No core\n");
+	exit(EXIT_FAILURE);
+}
+
+static xmlChar *import_start(struct config *cfg, struct api_conn *connection,
+    const struct stor_dom *sd, const char *poolid, const char *tplid,
+    const char *clustid, const char *msd)
+{
+	CURL *curl = connection->curl;
+	struct curl_slist *headers, *h, *hptr;
+	struct api_buf apib, apob;
+	char *url;
+	char *xmlbuf;
+	char *status;
+	xmlDocPtr doc;
+	xmlNode *etroot;
+	xmlChar *ahref;
+	CURLcode rcc;
+	int rc;
+
+	/*
+	 * XXX This is incorrect. We should be using the href attribute
+	 * in the <action> of the template. But finding that requires
+	 * yet another total scan of everything. So we just construct
+	 * the path for now.
+	 */
+	if (sd->toptpl) {
+		/*
+		 * RHEV-M 2.2 attaches templates at the top.
+		 */
+		rc = asprintf(&url,
+		     "%s%s/storagedomains/%s/templates/%s/import",
+		     connection->base, connection->path, sd->uuid, tplid);
+	} else {
+		/*
+		 * RHEV-M 3 has templates deep under datacenters.
+		 */
+		rc = asprintf(&url,
+		     "%s%s/datacenters/%s/storagedomains/%s/templates/%s/import",
+		     connection->base, connection->path, poolid, sd->uuid, tplid);
+	}
+	if (rc < 0)
+		goto err_alloc;
+
+	/*
+	 * The POST data is not even a complete XML, so we just roll it
+	 * with printf.
+	 */
+	rc = asprintf(&xmlbuf,
+	    "<action>\n"
+	    "  <cluster id=\"%s\"/>\n"
+	    "  <storage_domain id=\"%s\"/>\n"
+	    "</action>\n",
+	    clustid, msd);
+	if (rc < 0)
+		goto err_alloc;
+
+	/*
+	 * This operation needs a custom header in addition to the usual ones.
+	 * Copy them and adjust to suit.
+	 */
+	headers = NULL;
+	for (hptr = connection->hdrs; hptr; hptr = hptr->next) {
+		h = curl_slist_append(headers, hptr->data);
+		if (!h)
+			goto err_alloc;
+		headers = h;
+	}
+	h = curl_slist_append(headers, "Content-type: application/xml");
+	if (!h)
+		goto err_alloc;
+	headers = h;
+
+	/*
+	 */
+	memset(&apob, 0, sizeof(struct api_buf));
+	apob.buf = xmlbuf;
+	apob.alloc = strlen(xmlbuf);
+
+	memset(&apib, 0, sizeof(struct api_buf));
+	apib.buf = malloc(4000);
+	if (!apib.buf)
+		goto err_alloc;
+	apib.alloc = 4000;
+
+	// if (debugging) /* if (verbose) */
+	//	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, api_wcb);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &apib);
+	curl_easy_setopt(curl, CURLOPT_POST, 1);
+	curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, apob.alloc);
+	curl_easy_setopt(curl, CURLOPT_READFUNCTION, api_rcb);
+	curl_easy_setopt(curl, CURLOPT_READDATA, &apob);
+	/* CURLOPT_HTTPGET later */
+
+	rcc = curl_easy_perform(curl);
+	if (rcc != CURLE_OK) {
+		fprintf(stderr, "ERROR curl failed POST url `%s'\n", url);
+		exit(EXIT_FAILURE);
+	}
+
+	doc = xmlReadMemory(apib.buf, apib.used, "rhev-api.xml", NULL, 0);
+	if (doc == NULL) {
+		fprintf(stderr, "ERROR API parse error in `%s'\n", url);
+		exit(EXIT_FAILURE);
+	}
+
+	etroot = xmlDocGetRootElement(doc);
+	require_api_root(etroot->name, "action");
+
+	ahref = xmlGetProp(etroot, (xmlChar *)"href");
+	if (!ahref) {
+		fprintf(stderr, "ERROR API action without href\n");
+		exit(EXIT_FAILURE);
+	}
+
+	/*
+	 * Get the status from POST reply in case it's COMPLETE or ERROR.
+	 * We may not get another chance.
+	 */
+	status = import_get_status(etroot);
+	if (c_strcasecmp(status, "COMPLETE") == 0) {
+		/*
+		 * One little idiosyncrasy of RHEV-2.2 is that if it returned
+		 * a "COMPLETE" once, the status cannot be read again (although
+		 * it also returns href=). A new access of the action href ends
+		 * in a 301 with Location pointing to the imported template.
+		 * We need to signal this up.
+		 */
+		xmlFree(ahref);
+		ahref = NULL;
+	} else if (c_strcasecmp(status, "PENDING") == 0 ||
+		   c_strcasecmp(status, "IN_PROGRESS") == 0) {
+		;
+	} else {
+		fprintf(stderr, "ERROR Bad import status `%s'\n", status);
+		/*
+		 * XXX process "FAILED" status, report meaningful error
+		 *
+		 * <action>
+		 *     <storage_domain id="af096e18-4b05-4a04-bc60-5a4148d73b9c"/>
+		 *     <cluster id="2ffa21f2-0d68-4c6b-98e3-0ef6ec5003e7"/>
+		 *     <status>FAILED</status>
+		 *     <fault>
+		 *         <reason>RHEVM operation failed</reason>
+		 *         <detail>[vm cannot import template name exists, var  action  import, var  type  vm template]</detail>
+		 *     </fault>
+		 * </action>
+		 */
+		exit(EXIT_FAILURE);
+	}
+
+	free(status);
+	xmlFreeDoc(doc);
+	free(apib.buf);
+	free(xmlbuf);
+	free(url);
+	return ahref;
+
+ err_alloc:
+	fprintf(stderr, "ERROR No core\n");
+	exit(EXIT_FAILURE);
+}
+
+static char *import_status(struct config *cfg, struct api_conn *connection,
+    xmlChar *ahref)
+{
+	CURL *curl = connection->curl;
+	struct curl_slist *headers = connection->hdrs;
+	struct api_buf apib;
+	char *url;
+	char *status;
+	xmlDocPtr doc;
+	xmlNode *etroot;
+	CURLcode rcc;
+	int rc;
+
+	rc = asprintf(&url, "%s%s", connection->base, ahref);
+	if (rc < 0)
+		goto err_alloc;
+
+	memset(&apib, 0, sizeof(struct api_buf));
+	apib.buf = malloc(4000);
+	if (!apib.buf)
+		goto err_alloc;
+	apib.alloc = 4000;
+
+	curl_easy_setopt(curl, CURLOPT_HTTPGET, 1);
+
+	// if (debugging) /* if (verbose) */
+	//	curl_easy_setopt(curl, CURLOPT_VERBOSE, 1);
+	curl_easy_setopt(curl, CURLOPT_URL, url);
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, api_wcb);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, &apib);
+
+	rcc = curl_easy_perform(curl);
+	if (rcc != CURLE_OK) {
+		fprintf(stderr, "ERROR curl failed GET url `%s'\n", url);
+		exit(EXIT_FAILURE);
+	}
+
+	doc = xmlReadMemory(apib.buf, apib.used, "rhev-api.xml", NULL, 0);
+	if (doc == NULL) {
+		fprintf(stderr, "ERROR API parse error in `%s'\n", url);
+		exit(EXIT_FAILURE);
+	}
+
+	etroot = xmlDocGetRootElement(doc);
+	require_api_root(etroot->name, "action");
+
+	status = import_get_status(etroot);
+
+	xmlFreeDoc(doc);
+	free(apib.buf);
+	free(url);
+	return status;
+
+ err_alloc:
+	fprintf(stderr, "ERROR No core\n");
+	exit(EXIT_FAILURE);
+}
+
+/*
+ * Import consists of two phases:
+ *   1. collect the IDs that we need,
+ *   2. issue the import call and monitor its progress.
+ *
+ * For phase 2 we need:
+ *   - Datacenter ID
+ *      + for which we remember that Pool ID is one and the same
+ *   - Import Storage Domain ID, whence to import the template
+ *      + uuid in sd
+ *   - Template ID
+ *   - Cluster ID
+ *      + Supplied by command line or auto-detected
+ *   - Master Storage Domain, destination where to import
+ *
+ * This is phase 2.
+ */
+static void import_tpl(struct config *cfg, struct api_conn *connection,
+    const struct stor_dom *sd, const char *poolid, const char *tplid,
+    const char *clustid, const char *msd)
+{
+	xmlChar *ahref;
+	char *status;
+	struct timespec tm;
+	unsigned int i;
+
+/* P3 */ printf("import cluster %s\n", clustid);
+/* P3 */ printf("import target %s\n", msd);
+	ahref = import_start(cfg, connection, sd, poolid, tplid, clustid, msd);
+	if (!ahref)
+		return;
+/* P3 */ printf("import href %s\n", ahref);
+
+	i = 0;
+	for (;;) {
+		status = import_status(cfg, connection, ahref);
+		if (c_strcasecmp(status, "COMPLETE") == 0) {
+			break;
+		}
+		if (c_strcasecmp(status, "PENDING") == 0 ||
+		    c_strcasecmp(status, "IN_PROGRESS") == 0) {
+			if (++i >= 20) {
+				fprintf(stderr,
+				    "ERROR import times out, status `%s'\n",
+				    status);
+				exit(EXIT_FAILURE);
+			}
+		} else {
+			fprintf(stderr, "ERROR Unknown import status `%s'\n",
+			    status);
+			exit(EXIT_FAILURE);
+		}
+
+		tm.tv_sec = 3;
+		tm.tv_nsec = 0;
+		nanosleep(&tm, NULL);
+
+		free(status);
+	}
+
+	free(status);
+	xmlFree(ahref);
+}
+
+static void delete_tpl(struct config *cfg,
+    const struct stor_dom *sd, const struct id_pack *idp)
+{
+	char *path;
+	int rc;
+
+	/*
+	 * Remove the OVF first. This kills the template for RHEV-M,
+	 * so we can dismantle it in peace.
+	 */
+	rc = asprintf(&path, "%s/%s/master/vms/%s/%s.ovf",
+	     cfg->nfsdir, sd->uuid, idp->template, idp->template);
+	if (rc < 0)
+		goto err_alloc;
+	if (unlink(path) < 0)
+		goto err_unlink;
+	free(path);
+
+	rc = asprintf(&path, "%s/%s/master/vms/%s",
+	     cfg->nfsdir, sd->uuid, idp->template);
+	if (rc < 0)
+		goto err_alloc;
+	if (rmdir(path) < 0)
+		goto err_rmdir;
+	free(path);
+
+	rc = asprintf(&path, "%s/%s/images/%s/%s.meta",
+	     cfg->nfsdir, sd->uuid, idp->image, idp->volume);
+	if (rc < 0)
+		goto err_alloc;
+	if (unlink(path) < 0)
+		goto err_unlink;
+	free(path);
+
+	rc = asprintf(&path, "%s/%s/images/%s/%s",
+	     cfg->nfsdir, sd->uuid, idp->image, idp->volume);
+	if (rc < 0)
+		goto err_alloc;
+	if (unlink(path) < 0)
+		goto err_unlink;
+	free(path);
+
+	rc = asprintf(&path, "%s/%s/images/%s",
+	     cfg->nfsdir, sd->uuid, idp->image);
+	if (rc < 0)
+		goto err_alloc;
+	if (rmdir(path) < 0)
+		goto err_rmdir;
+	free(path);
+
+	return;
+
+ err_unlink:
+	fprintf(stderr, "ERROR Cannot unlink `%s': %s\n",
+	    path, strerror(errno));
+	exit(EXIT_FAILURE);
+
+ err_rmdir:
+	fprintf(stderr, "ERROR Cannot remove `%s': %s\n",
+	    path, strerror(errno));
+	exit(EXIT_FAILURE);
+
+ err_alloc:
+	fprintf(stderr, "ERROR No core\n");
+	exit(EXIT_FAILURE);
+}
+
 int main(int argc, char **argv, char **envp)
 {
-	uuid_t tpl_uuid;
 	json_error_t err;
 	const char *cfgname;
 	struct config cfg;
+	struct api_conn conn;
 	json_t *jcfg;
+	char *pathsd, *pathdc, *pathcl;
+	struct id_pack ids;
 	struct stor_dom *sd;
-	char uuidbuf[37];
+	char *poolid, *clustid;
+	char *msd;	/* Master Storage Domain - no need for full stor_dom */
 
 	set_program_name (TAG);
 	atexit (close_stdout);
@@ -1578,6 +2351,7 @@ int main(int argc, char **argv, char **envp)
 	}
 	/* apiurl: the so-called "base", usually "rhev-api" */
 	cfg_veripick(&cfg.apiurl, cfgname, jcfg, "apiurl");
+	strip_trailing_slashes(cfg.apiurl);
 	/*
 	 * apiuser: username@AD.domain
 	 * We do not enforce with '@' syntax in case someone comes up with
@@ -1595,7 +2369,7 @@ int main(int argc, char **argv, char **envp)
 	cfg_veripick(&cfg.nfshost, cfgname, jcfg, "nfshost");
 	cfg_veripick(&cfg.nfspath, cfgname, jcfg, "nfspath");
 	/*
-	 * nfsdir: A directory where sysadmin, boot scripts or autofs mounted the
+	 * nfsdir: A directory where sysadmin, scripts or autofs mounted the
 	 * same area that RHEV-M considers an export domain (/mnt/vdsm/rhevm23).
 	 * N.B. If iwhd is running on the NFS server itself, nfsdir can be the
 	 * exported directory itself (like /home/vdsm/rhevm23). We verify that
@@ -1612,14 +2386,81 @@ int main(int argc, char **argv, char **envp)
 		exit(EXIT_FAILURE);
 	}
 
+	cfg_veripick(&cfg.cluster, cfgname, jcfg, "cluster");
+
 	json_decref(jcfg);
 	jcfg = NULL;
 
-	sd = apistart(&cfg);
+	gen_uuids(&ids);
 
-	copyimage(&cfg, sd, tpl_uuid);
+	api_start(&conn, &cfg);
 
-	uuid_unparse_lower(tpl_uuid, uuidbuf);
-	printf("IMAGE %s\n", uuidbuf);
+	/*
+	 * Step 1.1, fetch the refs
+	 *
+	 * This is largely a formality, because if we know names of resources,
+	 * why not to fetch resources directly? But the docs imply we should
+	 * jump through this hoop.
+	 */
+	apipaths(&conn, &pathsd, &pathdc, &pathcl);
+
+	/*
+	 * Step 1.2, get import domain
+	 */
+	sd = apistordom(&cfg, &conn, pathsd);
+
+	/*
+	 * Step 1.3, find the "storage pool ID"
+	 *
+	 * This is crazy to be a separate step. You'd expect the storage domain
+	 * descriptor itself contain its pool, to be saved on Step 2. But no.
+	 */
+	poolid = apipool(&cfg, &conn, pathdc, sd->uuid);
+
+	/*
+	 * The first major transfer: create a template in an import domain.
+	 */
+	copyimage(&cfg, &ids, sd, poolid);
+
+	/*
+	 * Step 2.1, resolve or find the cluster
+	 */
+	clustid = apiclust(&cfg, &conn, pathcl, poolid);
+	if (!clustid) {
+		/*
+		 * No cluster means no import. Just return the template.
+		 */
+		printf("IMAGE %s\n", ids.template);
+
+		api_done(&conn);
+		// sd_free(sd) -- XXX
+		free(poolid);
+		return 0;
+	}
+
+	/*
+	 * Step 2.2, find the destination storage domain
+	 */
+	msd = apimaster(&cfg, &conn, pathdc, poolid);
+
+	/*
+	 * The second major transfer: import template into a master domain.
+	 */
+	import_tpl(&cfg, &conn, sd, poolid, ids.template, clustid, msd);
+
+	/*
+	 * Finally, delete the intermediary template in the export domain.
+	 */
+	delete_tpl(&cfg, sd, &ids);
+
+	/*
+	 * Same ID after import as before import, just located in a different
+	 * storage domain now.
+	 */
+	printf("IMAGE %s\n", ids.template);
+
+	api_done(&conn);
+	// sd_free(sd) -- XXX
+	free(poolid);
 	return 0;
 }

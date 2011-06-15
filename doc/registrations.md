@@ -108,7 +108,20 @@ Registration call:
   -d nfs-host=fish.usersys.redhat.com \
   -d nfs-path=/home/vdsm/v1 \
   -d nfs-dir=/mnt/iwhd-fish \
+  -d cluster=_any_ \
   http://localhost:9090/buk1/dummy_img
+
+The parameter "cluster" is optional. If it is omitted, it defaults to
+"_none_". In that case, iwhd only uploads the object into the export
+domain, but does not import the template. Do not use "Default" here.
+It is a dummy cluster that RHEV-M comes with, just like the template
+called "Blank".
+
+The name of the resulting template is going to be the object's name
+("dummy_img" in the above example). Note that if you let iwhd import
+(by specifying "-d cluster=xxxxx"), template names have to be unique
+in the datacenter, so you cannot register the same object twice, and
+you have to delete the old template to proceed.
 
 The ami-id contains a pattern like "OK <uuid>". The UUID is the "image"
 UUID that can be used to find the image by RHEV-M datacenters through
