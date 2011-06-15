@@ -38,7 +38,7 @@ bootstrap-tools = autoconf,automake,gnulib
 # Now that we have better tests, make this the default.
 export VERBOSE = yes
 
-old_NEWS_hash = c1f1d16e5ac8dfe47f856adb966b22ad
+old_NEWS_hash = 207c7ece9d99fa0538b14e13f73c5ee7
 
 sc_prohibit_echo_minus_en:
 	@prohibit='\<echo -[en]'					\
