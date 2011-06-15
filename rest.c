@@ -659,22 +659,17 @@ proxy_put_attr (void *cctx, struct MHD_Connection *conn, const char *url,
 		}
 	}
 	else if (*data_size) {
-		if (ms->pipe.data_len) {
-			ms->pipe.data_len += *data_size;
-			char *p = realloc(ms->pipe.data_ptr,ms->pipe.data_len);
-			if (!p) {
-				return MHD_NO;
-			}
-			ms->pipe.data_ptr = p;
-		}
-		else {
-			ms->pipe.data_len = *data_size + 1;
-			ms->pipe.data_ptr = malloc(ms->pipe.data_len);
-			if (!ms->pipe.data_ptr) {
-				return MHD_NO;
-			}
-			((char *)ms->pipe.data_ptr)[0] = '\0';
-		}
+		/* For the first buffer (when ms->pipe.data_len == 0),
+		   add room for a trailing NUL byte.  */
+		bool first = ms->pipe.data_len == 0;
+		ms->pipe.data_len += *data_size + first;
+		char *p = realloc(ms->pipe.data_ptr,ms->pipe.data_len);
+		if (!p)
+			return MHD_NO;
+		if (first)
+			*p = '\0';
+		ms->pipe.data_ptr = p;
+
 		(void)strncat(ms->pipe.data_ptr,data,*data_size);
 		/* TBD: check return value */
 		*data_size = 0;
