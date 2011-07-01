@@ -2,6 +2,11 @@ iwhd NEWS                                                   -*- outline -*-
 
 * Noteworthy changes in release ?.? (????-??-??) [?]
 
+** Bug fixes
+
+  On Fedora systems, /etc/iwhd/conf.js is not overwritten anymore when
+  upgrading the package (added %config(noreplace)).
+
 
 * Noteworthy changes in release 0.96 (2011-06-15) [stable]
 
