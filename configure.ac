@@ -85,6 +85,18 @@ AC_CHECK_HEADER([mongo/client/dbclient.h], ,
   [#undef VERSION])
 AC_LANG_POP
 
+# Starting in jansson 2.1, file-loading functions require an
+# additional "flags" argument.  Test for this.
+AC_CACHE_CHECK([whether json_load_file takes 3 arguments],
+  [iw_cv_func_jansson_flag],
+  [AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+    #include <jansson.h>
+    json_t *f (void) { return json_load_file ("file", 0, NULL); }]])],
+      [iw_cv_func_jansson_flag=0,],
+      [iw_cv_func_jansson_flag=])])
+AC_DEFINE_UNQUOTED([JANSSON_LOAD_FLAG], $iw_cv_func_jansson_flag,
+  [Define to "0," if json_load_file and json_loads require a flags arguments.])
+
 # from http://www.gnu.org/software/autoconf-archive/
 AX_BOOST_BASE
 AX_BOOST_SYSTEM

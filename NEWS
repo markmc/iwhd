@@ -7,6 +7,11 @@ iwhd NEWS                                                   -*- outline -*-
   On Fedora systems, /etc/iwhd/conf.js is not overwritten anymore when
   upgrading the package (added %config(noreplace)).
 
+** Infrastructure
+
+  Adapt to jansson-1.2's new, incompatible changed API, so we can build
+  both with it and the older API.
+
 
 * Noteworthy changes in release 0.96 (2011-06-15) [stable]
 

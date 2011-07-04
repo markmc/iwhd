@@ -2329,7 +2329,7 @@ int main(int argc, char **argv, char **envp)
 
 	memset(&cfg, 0, sizeof(struct config));
 
-	jcfg = json_load_file(cfgname, &err);
+	jcfg = json_load_file(cfgname, JANSSON_LOAD_FLAG &err);
 	if (!jcfg) {
 		fprintf(stderr, "ERROR configuration JSON error %s:%d: %s\n",
 		    cfgname, err.line, err.text);

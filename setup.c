@@ -583,7 +583,7 @@ parse_config (char *cfg_file)
 		return NULL;
 	}
 
-	config = json_load_file(cfg_file,&err);
+	config = json_load_file(cfg_file, JANSSON_LOAD_FLAG &err);
 	if (!config) {
 		error(0,0,_("JSON error on line %d: %s"),err.line,err.text);
 		return NULL;
@@ -614,7 +614,7 @@ auto_config(void)
 		return NULL;
 	}
 
-	config = json_loads(auto_json,&err);
+	config = json_loads(auto_json, JANSSON_LOAD_FLAG &err);
 	if (!config) {
 		error(0, 0, _("JSON error on line %d: %s"), err.line, err.text);
 		return NULL;
