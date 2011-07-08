@@ -16,7 +16,6 @@
 #include <config.h>
 
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <pthread.h>
@@ -31,6 +30,7 @@
 #include <microhttpd.h>	/* for HTTP status values */
 
 #include "iwh.h"
+#include "logging.h"
 #include "setup.h"
 #include "query.h"
 #include "meta.h"

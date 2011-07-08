@@ -28,13 +28,6 @@ GLOBAL(const char *,	db_host,	"localhost");
 GLOBAL(unsigned short,	db_port,	0);
 GLOBAL(const char *,    me,             "here");
 
-#define DPRINTF(fmt,args...) do {			\
-	if (verbose) {					\
-		printf("%d " fmt,getpid(),##args);	\
-		fflush(stdout);				\
-	}						\
-} while (0)
-
 #ifndef __attribute__
 # if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 8)
 #  define __attribute__(x) /* empty */

@@ -13,13 +13,13 @@
 }
 
 %{
-#include <error.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
 #include "iwh.h"
+#include "logging.h"
 
 /* Return a pointer to this when allocation fails in a value_t-returning
    function.  */

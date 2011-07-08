@@ -28,7 +28,6 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <errno.h>
-#include <error.h>
 
 #include <microhttpd.h>
 #include <curl/curl.h>
@@ -36,6 +35,7 @@
 
 #define GLOBALS_IMPL
 #include "iwh.h"
+#include "logging.h"
 #include "meta.h"
 #include "setup.h"
 #include "template.h"

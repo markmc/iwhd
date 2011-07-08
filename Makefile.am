@@ -39,6 +39,7 @@ MAINTAINERCLEANFILES =
 iwhd_SOURCES = \
   auto.c	\
   backend.c	\
+  logging.c	\
   meta.cpp	\
   mpipe.c	\
   replica.c	\
@@ -51,6 +52,7 @@ noinst_HEADERS = \
   backend.h	\
   gc-wrap.h	\
   iwh.h		\
+  logging.h	\
   meta.h	\
   mpipe.h	\
   query.h	\
@@ -174,6 +176,7 @@ EXTRA_DIST += qlexer.c
 noinst_PROGRAMS = parser-test
 BUILT_SOURCES += parser-test.c
 MAINTAINERCLEANFILES += $(BUILT_SOURCES)
+parser_test_SOURCES = parser-test.c logging.c
 parser_test_CPPFLAGS	= -I. -I$(top_srcdir)/lib
 parser_test_LDADD = lib/libiwhd.a -lgc -lpthread
 

@@ -1,7 +1,6 @@
 #include <config.h>
 
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <signal.h>
@@ -19,6 +18,7 @@
 #include <jansson.h>
 
 #include "iwh.h"
+#include "logging.h"
 #include "state_defs.h"
 
 static int auto_db_port;

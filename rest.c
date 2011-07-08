@@ -15,9 +15,9 @@
 
 #include <config.h>
 
-#include <error.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <logging.h>
 #include <poll.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -37,6 +37,7 @@
 #include "configmake.h" /* for LOCALEDIR */
 #include "dirname.h"
 #include "iwh.h"
+#include "logging.h"
 #include "closeout.h"
 #include "hash.h"
 #include "progname.h"
@@ -2306,6 +2307,7 @@ static const struct option my_options[] = {
 	{ "db",      required_argument, NULL, 'd' },
 	{ "master",  required_argument, NULL, 'm' },
 	{ "port",    required_argument, NULL, 'p' },
+	{ "logfile", required_argument, NULL, 'l' },
 	{ "verbose", no_argument,       NULL, 'v' },
 	{ "version", no_argument,       NULL, GETOPT_VERSION_CHAR },
 	{ "help", no_argument,          NULL, GETOPT_HELP_CHAR },
@@ -2333,6 +2335,7 @@ A configuration file must be specified.\n\
   -d, --db=HOST_PORT      database server as ip[:port]\n\
   -m, --master=HOST_PORT  master (upstream) server as ip[:port]\n\
   -p, --port=PORT         alternate listen port (default 9090)\n\
+  -l, --logfile=PATH      path to log file\n\
   -v, --verbose           verbose/debug output\n\
 \n\
       --help     display this help and exit\n\
@@ -2357,6 +2360,7 @@ main (int argc, char **argv)
 	char			*port_tmp;
 	bool			 autostart = false;
 	char *cfg_file = NULL;
+	char *log_file = NULL;
 
 	set_program_name (argv[0]);
 	setlocale (LC_ALL, "");
@@ -2367,7 +2371,7 @@ main (int argc, char **argv)
 
 	GC_INIT ();
 
-	for (;;) switch (getopt_long(argc,argv,"ac:d:m:p:v",my_options,NULL)) {
+	for (;;) switch (getopt_long(argc,argv,"ac:d:m:p:l:v",my_options,NULL)) {
 	case 'a':
 		autostart = true;
 		break;
@@ -2393,6 +2397,9 @@ main (int argc, char **argv)
 	case 'p':
 		my_port = (unsigned short)strtoul(optarg,NULL,10);
 		break;
+	case 'l':
+		log_file = optarg;
+		break;
 	case 'v':
 		++verbose;
 		break;
@@ -2412,6 +2419,8 @@ main (int argc, char **argv)
 		break;
 	}
 args_done:
+
+	log_init(verbose ? LOG_DEBUG : LOG_WARN, log_file);
 
 	if (optind < argc) {
 		error (0, 0, _("extra operand %s"), quote (argv[optind]));

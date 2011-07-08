@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include "iwh.h"
+#include "logging.h"
 #include "mpipe.h"
 
 int
